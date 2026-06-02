@@ -30,7 +30,7 @@ struct InvoiceGenApp: App {
         Settings {
             SettingsView()
                 .environmentObject(model)
-                .frame(width: 520)
+                .frame(width: 680)
         }
     }
 }

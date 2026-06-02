@@ -67,6 +67,7 @@ struct ClientsView: View {
 struct ClientEditorView: View {
     @EnvironmentObject private var model: AppModel
     @Binding var client: Client
+    @State private var isConfirmingDelete = false
 
     var body: some View {
         ScrollView {
@@ -95,21 +96,14 @@ struct ClientEditorView: View {
                         .font(.headline)
                         .foregroundStyle(Color.runeyPrimary)
                     
-                    TextEditor(text: $client.notes)
-                        .frame(minHeight: 120)
-                        .padding(4)
-                        .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                        }
+                    RuneyMultilineEditor(text: $client.notes, minHeight: 120)
                 }
                 .runeyCard()
                 
                 // Danger Zone: Delete Button
                 VStack(alignment: .leading, spacing: 14) {
                     Button(role: .destructive, action: {
-                        model.deleteSelectedClient()
+                        isConfirmingDelete = true
                     }) {
                         Label("Delete Client", systemImage: "trash.fill")
                             .font(.body.weight(.medium))
@@ -126,6 +120,14 @@ struct ClientEditorView: View {
         }
         .background(Color.runeyBackground)
         .navigationTitle(client.name)
+        .alert("Delete client?", isPresented: $isConfirmingDelete) {
+            Button("Delete Client", role: .destructive) {
+                model.deleteSelectedClient()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently removes the client from the local store and unassigns it from related invoices and projects.")
+        }
     }
 
     private func runeyField(_ label: String, text: Binding<String>, isMultiline: Bool = false) -> some View {
@@ -134,16 +136,7 @@ struct ClientEditorView: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(Color.runeyMuted)
             if isMultiline {
-                TextField("", text: text, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(2...4)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                    }
+                RuneyMultilineEditor(text: text)
             } else {
                 TextField("", text: text)
                     .textFieldStyle(.plain)
@@ -158,4 +151,3 @@ struct ClientEditorView: View {
         }
     }
 }
-

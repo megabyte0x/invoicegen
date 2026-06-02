@@ -78,6 +78,10 @@ struct InvoiceSheetView: View {
         book.client(for: invoice)
     }
 
+    private var paymentAcceptanceDetails: [PaymentAcceptanceDetail] {
+        book.paymentAcceptanceDetails(for: invoice)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header: Invoice Title + Company Identity
@@ -282,6 +286,27 @@ struct InvoiceSheetView: View {
                                 .foregroundStyle(Color(white: 0.35))
                         }
                     }
+                    if !paymentAcceptanceDetails.isEmpty {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Payment Acceptance")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(Color(white: 0.45))
+
+                            ForEach(paymentAcceptanceDetails) { detail in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(detail.kind.label): \(detail.label)")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(Color.black)
+
+                                    ForEach(detailLines(for: detail), id: \.self) { line in
+                                        Text(line)
+                                            .font(.caption)
+                                            .foregroundStyle(Color(white: 0.35))
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
@@ -351,5 +376,12 @@ struct InvoiceSheetView: View {
             return String(Int(val))
         }
         return String(format: "%.2f", val)
+    }
+
+    private func detailLines(for detail: PaymentAcceptanceDetail) -> [String] {
+        detail.details
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }

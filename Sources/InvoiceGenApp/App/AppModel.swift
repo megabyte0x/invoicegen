@@ -7,6 +7,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     case invoices
     case clients
     case projects
+    case settings
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .invoices: return "Invoices"
         case .clients: return "Clients"
         case .projects: return "Projects"
+        case .settings: return "Settings"
         }
     }
 
@@ -25,6 +27,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .invoices: return "doc.text"
         case .clients: return "person.2"
         case .projects: return "folder"
+        case .settings: return "gearshape"
         }
     }
 }
@@ -40,13 +43,16 @@ final class AppModel: ObservableObject {
     @Published var errorMessage: String?
 
     let store: LocalInvoiceStore
+    private var loadedStoreSuccessfully: Bool
 
     init(store: LocalInvoiceStore = LocalInvoiceStore()) {
         self.store = store
         do {
             self.book = try store.load()
+            self.loadedStoreSuccessfully = true
         } catch {
             self.book = .empty
+            self.loadedStoreSuccessfully = false
             self.errorMessage = error.localizedDescription
         }
     }
@@ -54,16 +60,28 @@ final class AppModel: ObservableObject {
     func reload() {
         do {
             book = try store.load()
+            loadedStoreSuccessfully = true
             errorMessage = nil
         } catch {
+            loadedStoreSuccessfully = false
             errorMessage = error.localizedDescription
         }
     }
 
     func save() {
+        save(allowingOverwriteAfterLoadFailure: false)
+    }
+
+    private func save(allowingOverwriteAfterLoadFailure: Bool) {
+        guard loadedStoreSuccessfully || allowingOverwriteAfterLoadFailure else {
+            errorMessage = "InvoiceGen did not save because the local store could not be loaded. Fix or reload the store file before saving, or use Seed Sample Data to intentionally replace it."
+            return
+        }
+
         do {
             book.refreshInvoiceStatuses()
             try store.save(book)
+            loadedStoreSuccessfully = true
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -74,7 +92,7 @@ final class AppModel: ObservableObject {
         book = .sample()
         selectedSection = .dashboard
         selectedInvoiceID = book.invoices.first?.id
-        save()
+        save(allowingOverwriteAfterLoadFailure: true)
     }
 
     func addInvoice() {
@@ -119,6 +137,9 @@ final class AppModel: ObservableObject {
         for index in book.invoices.indices where book.invoices[index].clientId == id {
             book.invoices[index].clientId = nil
         }
+        for index in book.projects.indices where book.projects[index].clientId == id {
+            book.projects[index].clientId = nil
+        }
         selectedClientID = book.clients.first?.id
         save()
     }
@@ -145,13 +166,37 @@ final class AppModel: ObservableObject {
         save()
     }
 
+    func addPaymentAcceptanceDetail(kind: PaymentAcceptanceKind) {
+        let detail = PaymentAcceptanceDetail(
+            kind: kind,
+            label: defaultPaymentAcceptanceLabel(for: kind),
+            details: ""
+        )
+        book.paymentAcceptanceDetails.append(detail)
+        selectedSection = .settings
+        save()
+    }
+
+    func deletePaymentAcceptanceDetail(id: UUID) {
+        book.paymentAcceptanceDetails.removeAll { $0.id == id }
+        for index in book.invoices.indices {
+            book.invoices[index].acceptedPaymentDetailIDs.removeAll { $0 == id }
+        }
+        save()
+    }
+
     func invoiceBinding(id: UUID) -> Binding<Invoice>? {
-        guard let index = book.invoices.firstIndex(where: { $0.id == id }) else {
+        guard let fallback = book.invoices.first(where: { $0.id == id }) else {
             return nil
         }
         return Binding(
-            get: { self.book.invoices[index] },
+            get: {
+                self.book.invoices.first(where: { $0.id == id }) ?? fallback
+            },
             set: { newValue in
+                guard let index = self.book.invoices.firstIndex(where: { $0.id == id }) else {
+                    return
+                }
                 self.book.invoices[index] = newValue
                 self.book.invoices[index].updatedAt = Date()
                 self.save()
@@ -160,12 +205,17 @@ final class AppModel: ObservableObject {
     }
 
     func clientBinding(id: UUID) -> Binding<Client>? {
-        guard let index = book.clients.firstIndex(where: { $0.id == id }) else {
+        guard let fallback = book.clients.first(where: { $0.id == id }) else {
             return nil
         }
         return Binding(
-            get: { self.book.clients[index] },
+            get: {
+                self.book.clients.first(where: { $0.id == id }) ?? fallback
+            },
             set: { newValue in
+                guard let index = self.book.clients.firstIndex(where: { $0.id == id }) else {
+                    return
+                }
                 self.book.clients[index] = newValue
                 self.book.clients[index].updatedAt = Date()
                 self.save()
@@ -174,16 +224,30 @@ final class AppModel: ObservableObject {
     }
 
     func projectBinding(id: UUID) -> Binding<Project>? {
-        guard let index = book.projects.firstIndex(where: { $0.id == id }) else {
+        guard let fallback = book.projects.first(where: { $0.id == id }) else {
             return nil
         }
         return Binding(
-            get: { self.book.projects[index] },
+            get: {
+                self.book.projects.first(where: { $0.id == id }) ?? fallback
+            },
             set: { newValue in
+                guard let index = self.book.projects.firstIndex(where: { $0.id == id }) else {
+                    return
+                }
                 self.book.projects[index] = newValue
                 self.book.projects[index].updatedAt = Date()
                 self.save()
             }
         )
+    }
+
+    private func defaultPaymentAcceptanceLabel(for kind: PaymentAcceptanceKind) -> String {
+        switch kind {
+        case .bankDetails:
+            return "Bank account"
+        case .cryptocurrency:
+            return "Crypto wallet"
+        }
     }
 }

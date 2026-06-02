@@ -20,6 +20,10 @@ let package = Package(
         .testTarget(
             name: "InvoiceCoreTests",
             dependencies: ["InvoiceCore"]
+        ),
+        .testTarget(
+            name: "InvoiceGenAppTests",
+            dependencies: ["InvoiceCore", "InvoiceGenApp"]
         )
     ]
 )

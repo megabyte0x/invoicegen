@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-run}"
 APP_NAME="InvoiceGen"
 BUNDLE_ID="com.megabyte0x.InvoiceGen"
 MIN_SYSTEM_VERSION="14.0"
@@ -10,20 +9,19 @@ BUILD_NUMBER="${INVOICEGEN_BUILD_NUMBER:-1}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DIST_DIR="$ROOT_DIR/dist"
-APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
+RELEASE_DIR="$ROOT_DIR/dist/release"
+APP_BUNDLE="$RELEASE_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
+ZIP_PATH="$RELEASE_DIR/$APP_NAME-$VERSION.zip"
 
-pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+swift build -c release --product "$APP_NAME"
+BUILD_BINARY="$(swift build -c release --show-bin-path)/$APP_NAME"
 
-swift build --product "$APP_NAME"
-BUILD_BINARY="$(swift build --show-bin-path)/$APP_NAME"
-
-rm -rf "$APP_BUNDLE"
+rm -rf "$APP_BUNDLE" "$ZIP_PATH"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
@@ -57,34 +55,14 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
-codesign --force --deep --sign "$CODESIGN_IDENTITY" "$APP_BUNDLE" >/dev/null
+if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
+  codesign --force --deep --sign "$CODESIGN_IDENTITY" "$APP_BUNDLE"
+else
+  codesign --force --deep --options runtime --timestamp --sign "$CODESIGN_IDENTITY" "$APP_BUNDLE"
+fi
 
-open_app() {
-  /usr/bin/open -n "$APP_BUNDLE"
-}
+codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_PATH"
 
-case "$MODE" in
-  run)
-    open_app
-    ;;
-  --debug|debug)
-    lldb -- "$APP_BINARY"
-    ;;
-  --logs|logs)
-    open_app
-    /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
-    ;;
-  --telemetry|telemetry)
-    open_app
-    /usr/bin/log stream --info --style compact --predicate "subsystem == \"$BUNDLE_ID\""
-    ;;
-  --verify|verify)
-    open_app
-    sleep 1
-    pgrep -x "$APP_NAME" >/dev/null
-    ;;
-  *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
-    exit 2
-    ;;
-esac
+echo "Packaged $APP_BUNDLE"
+echo "Created $ZIP_PATH"

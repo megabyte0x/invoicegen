@@ -62,6 +62,7 @@ public final class LocalInvoiceStore {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         var book = try decoder.decode(InvoiceBook.self, from: data)
+        book.schemaVersion = InvoiceBook.currentSchemaVersion
         book.refreshInvoiceStatuses()
         return book
     }
@@ -74,6 +75,13 @@ public final class LocalInvoiceStore {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(book)
+        if fileManager.fileExists(atPath: url.path) {
+            let backupURL = url.appendingPathExtension("bak")
+            if fileManager.fileExists(atPath: backupURL.path) {
+                try fileManager.removeItem(at: backupURL)
+            }
+            try fileManager.copyItem(at: url, to: backupURL)
+        }
         try data.write(to: url, options: [.atomic])
     }
 

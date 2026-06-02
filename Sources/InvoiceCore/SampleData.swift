@@ -26,6 +26,17 @@ public extension InvoiceBook {
             currencyCode: "USD"
         )
 
+        let bankDetails = PaymentAcceptanceDetail(
+            kind: .bankDetails,
+            label: "Primary business account",
+            details: "Bank: Example Federal Bank\nAccount: 123456789\nRouting: 987654321"
+        )
+        let cryptoDetails = PaymentAcceptanceDetail(
+            kind: .cryptocurrency,
+            label: "USDC wallet",
+            details: "USDC on Base: 0x1234abcd5678ef901234abcd5678ef901234abcd"
+        )
+
         let invoice1 = Invoice(
             number: "INV-\(Calendar(identifier: .gregorian).component(.year, from: now))-0001",
             clientId: clientA.id,
@@ -39,7 +50,8 @@ public extension InvoiceBook {
                 InvoiceLineItem(title: "Design direction", details: "Visual territory and component starter kit", quantity: 1, unitPriceMinorUnits: 280000)
             ],
             notes: "Thank you for the continued partnership.",
-            terms: "Net 14. Bank transfer details are included in the payment notes."
+            terms: "Net 14.",
+            acceptedPaymentDetailIDs: [bankDetails.id, cryptoDetails.id]
         )
 
         let invoice2 = Invoice(
@@ -52,7 +64,8 @@ public extension InvoiceBook {
             lineItems: [
                 InvoiceLineItem(title: "Retainer", details: "June advisory retainer", quantity: 1, unitPriceMinorUnits: 220000)
             ],
-            terms: "Net 14."
+            terms: "Net 14.",
+            acceptedPaymentDetailIDs: [bankDetails.id]
         )
 
         var book = InvoiceBook(
@@ -66,6 +79,7 @@ public extension InvoiceBook {
             ),
             clients: [clientA, clientB],
             projects: [project],
+            paymentAcceptanceDetails: [bankDetails, cryptoDetails],
             invoices: [invoice1, invoice2]
         )
         book.refreshInvoiceStatuses(now: now)

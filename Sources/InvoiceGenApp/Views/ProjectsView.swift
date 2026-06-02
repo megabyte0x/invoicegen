@@ -66,6 +66,7 @@ struct ProjectsView: View {
 struct ProjectEditorView: View {
     @EnvironmentObject private var model: AppModel
     @Binding var project: Project
+    @State private var isConfirmingDelete = false
 
     var body: some View {
         ScrollView {
@@ -105,7 +106,7 @@ struct ProjectEditorView: View {
                 // Danger Zone: Delete Button
                 VStack(alignment: .leading, spacing: 14) {
                     Button(role: .destructive, action: {
-                        model.deleteSelectedProject()
+                        isConfirmingDelete = true
                     }) {
                         Label("Delete Project", systemImage: "trash.fill")
                             .font(.body.weight(.medium))
@@ -122,6 +123,14 @@ struct ProjectEditorView: View {
         }
         .background(Color.runeyBackground)
         .navigationTitle(project.name)
+        .alert("Delete project?", isPresented: $isConfirmingDelete) {
+            Button("Delete Project", role: .destructive) {
+                model.deleteSelectedProject()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently removes the project from the local store and unassigns it from related invoices.")
+        }
     }
 
     private var clientBinding: Binding<UUID?> {
@@ -137,16 +146,7 @@ struct ProjectEditorView: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(Color.runeyMuted)
             if isMultiline {
-                TextField("", text: text, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(2...4)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                    }
+                RuneyMultilineEditor(text: text)
             } else {
                 TextField("", text: text)
                     .textFieldStyle(.plain)
@@ -161,4 +161,3 @@ struct ProjectEditorView: View {
         }
     }
 }
-

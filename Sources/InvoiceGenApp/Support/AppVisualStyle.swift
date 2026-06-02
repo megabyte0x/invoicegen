@@ -93,3 +93,20 @@ struct LocalBadge: View {
     }
 }
 
+struct RuneyMultilineEditor: View {
+    @Binding var text: String
+    var minHeight: CGFloat = 72
+
+    var body: some View {
+        TextEditor(text: $text)
+            .font(.body)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: minHeight)
+            .padding(4)
+            .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.runeyBorder, lineWidth: 1)
+            }
+    }
+}

@@ -27,3 +27,22 @@ swift build
 ```
 
 The Codex app Run action is wired to the same script.
+
+## Package a Release Build
+
+```sh
+./script/package_release.sh
+```
+
+The package script builds `InvoiceGen` in release mode, stages
+`dist/release/InvoiceGen.app`, signs it, verifies the app bundle, and creates
+`dist/release/InvoiceGen-0.1.0.zip`.
+
+By default the script uses ad-hoc signing for local validation. For a
+distributable build, provide a Developer ID identity:
+
+```sh
+CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./script/package_release.sh
+```
+
+Notarization still requires Apple credentials and a Developer ID signature.

@@ -59,6 +59,22 @@ public enum InvoiceTextRenderer {
             lines.append("")
         }
 
+        let paymentAcceptanceDetails = book.paymentAcceptanceDetails(for: invoice)
+        if !paymentAcceptanceDetails.isEmpty {
+            lines.append("Payment Acceptance")
+            for detail in paymentAcceptanceDetails {
+                lines.append("\(detail.kind.label): \(detail.label)")
+                let detailLines = detail.details
+                    .components(separatedBy: .newlines)
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                for detailLine in detailLines {
+                    lines.append("  \(detailLine)")
+                }
+            }
+            lines.append("")
+        }
+
         return lines.joined(separator: "\n")
     }
 

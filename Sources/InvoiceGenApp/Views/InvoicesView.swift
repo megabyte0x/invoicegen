@@ -3,6 +3,7 @@ import InvoiceCore
 
 struct InvoicesView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var invoiceIDPendingDeletion: UUID?
 
     private var filteredInvoices: [Invoice] {
         let query = model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -25,8 +26,7 @@ struct InvoicesView: View {
                         .tag(invoice.id)
                         .contextMenu {
                             Button("Delete", role: .destructive) {
-                                model.selectedInvoiceID = invoice.id
-                                model.deleteSelectedInvoice()
+                                invoiceIDPendingDeletion = invoice.id
                             }
                         }
                 }
@@ -63,6 +63,23 @@ struct InvoicesView: View {
             if model.selectedInvoiceID == nil {
                 model.selectedInvoiceID = filteredInvoices.first?.id
             }
+        }
+        .alert("Delete invoice?", isPresented: Binding(
+            get: { invoiceIDPendingDeletion != nil },
+            set: { if !$0 { invoiceIDPendingDeletion = nil } }
+        )) {
+            Button("Delete Invoice", role: .destructive) {
+                if let id = invoiceIDPendingDeletion {
+                    model.selectedInvoiceID = id
+                    model.deleteSelectedInvoice()
+                }
+                invoiceIDPendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                invoiceIDPendingDeletion = nil
+            }
+        } message: {
+            Text("This permanently removes the selected invoice from the local store.")
         }
     }
 }
@@ -122,4 +139,3 @@ struct StatusBadge: View {
         }
     }
 }
-

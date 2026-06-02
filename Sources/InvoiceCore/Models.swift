@@ -138,6 +138,47 @@ public struct InvoiceLineItem: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+public enum PaymentAcceptanceKind: String, Codable, CaseIterable, Identifiable, Sendable {
+    case bankDetails
+    case cryptocurrency
+
+    public var id: String { rawValue }
+
+    public var label: String {
+        switch self {
+        case .bankDetails:
+            return "Bank Details"
+        case .cryptocurrency:
+            return "Cryptocurrency"
+        }
+    }
+}
+
+public struct PaymentAcceptanceDetail: Identifiable, Codable, Equatable, Sendable {
+    public var id: UUID
+    public var kind: PaymentAcceptanceKind
+    public var label: String
+    public var details: String
+    public var createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        kind: PaymentAcceptanceKind,
+        label: String,
+        details: String = "",
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.kind = kind
+        self.label = label
+        self.details = details
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
 public struct Payment: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var amountMinorUnits: Int64
@@ -173,6 +214,7 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
     public var payments: [Payment]
     public var notes: String
     public var terms: String
+    public var acceptedPaymentDetailIDs: [UUID]
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -189,6 +231,7 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
         payments: [Payment] = [],
         notes: String = "",
         terms: String = "Payment due on receipt.",
+        acceptedPaymentDetailIDs: [UUID] = [],
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -204,6 +247,7 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
         self.payments = payments
         self.notes = notes
         self.terms = terms
+        self.acceptedPaymentDetailIDs = acceptedPaymentDetailIDs
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -233,31 +277,81 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
 
         if totalMinorUnits > 0, paidMinorUnits >= totalMinorUnits {
             status = .paid
-        } else if status == .sent, dueDate < now {
-            status = .overdue
+        } else if status == .sent || status == .overdue || status == .paid {
+            status = dueDate < now ? .overdue : .sent
         }
         updatedAt = now
+    }
+
+    public mutating func markUnpaid(now: Date = Date()) {
+        guard status != .void else { return }
+
+        payments.removeAll()
+        status = dueDate < now ? .overdue : .sent
+        updatedAt = now
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case number
+        case clientId
+        case projectId
+        case issueDate
+        case dueDate
+        case status
+        case currencyCode
+        case lineItems
+        case payments
+        case notes
+        case terms
+        case acceptedPaymentDetailIDs
+        case createdAt
+        case updatedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        number = try container.decode(String.self, forKey: .number)
+        clientId = try container.decodeIfPresent(UUID.self, forKey: .clientId)
+        projectId = try container.decodeIfPresent(UUID.self, forKey: .projectId)
+        issueDate = try container.decode(Date.self, forKey: .issueDate)
+        dueDate = try container.decode(Date.self, forKey: .dueDate)
+        status = try container.decodeIfPresent(InvoiceStatus.self, forKey: .status) ?? .draft
+        currencyCode = try container.decodeIfPresent(String.self, forKey: .currencyCode) ?? "USD"
+        lineItems = try container.decodeIfPresent([InvoiceLineItem].self, forKey: .lineItems) ?? []
+        payments = try container.decodeIfPresent([Payment].self, forKey: .payments) ?? []
+        notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        terms = try container.decodeIfPresent(String.self, forKey: .terms) ?? "Payment due on receipt."
+        acceptedPaymentDetailIDs = try container.decodeIfPresent([UUID].self, forKey: .acceptedPaymentDetailIDs) ?? []
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? issueDate
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
     }
 }
 
 public struct InvoiceBook: Codable, Equatable, Sendable {
+    public static let currentSchemaVersion = 2
+
     public var schemaVersion: Int
     public var businessProfile: BusinessProfile
     public var clients: [Client]
     public var projects: [Project]
+    public var paymentAcceptanceDetails: [PaymentAcceptanceDetail]
     public var invoices: [Invoice]
 
     public init(
-        schemaVersion: Int = 1,
+        schemaVersion: Int = Self.currentSchemaVersion,
         businessProfile: BusinessProfile = BusinessProfile(),
         clients: [Client] = [],
         projects: [Project] = [],
+        paymentAcceptanceDetails: [PaymentAcceptanceDetail] = [],
         invoices: [Invoice] = []
     ) {
         self.schemaVersion = schemaVersion
         self.businessProfile = businessProfile
         self.clients = clients
         self.projects = projects
+        self.paymentAcceptanceDetails = paymentAcceptanceDetails
         self.invoices = invoices
     }
 
@@ -281,6 +375,11 @@ public struct InvoiceBook: Codable, Equatable, Sendable {
         return projects.first { $0.id == projectId }
     }
 
+    public func paymentAcceptanceDetails(for invoice: Invoice) -> [PaymentAcceptanceDetail] {
+        let detailsByID = Dictionary(uniqueKeysWithValues: paymentAcceptanceDetails.map { ($0.id, $0) })
+        return invoice.acceptedPaymentDetailIDs.compactMap { detailsByID[$0] }
+    }
+
     public func nextInvoiceNumber(date: Date = Date()) -> String {
         let year = Calendar(identifier: .gregorian).component(.year, from: date)
         let prefix = "INV-\(year)-"
@@ -290,5 +389,24 @@ public struct InvoiceBook: Codable, Equatable, Sendable {
             .compactMap { Int($0.dropFirst(prefix.count)) }
             .max() ?? 0
         return "\(prefix)\(String(format: "%04d", maxSequence + 1))"
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case businessProfile
+        case clients
+        case projects
+        case paymentAcceptanceDetails
+        case invoices
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? Self.currentSchemaVersion
+        businessProfile = try container.decodeIfPresent(BusinessProfile.self, forKey: .businessProfile) ?? BusinessProfile()
+        clients = try container.decodeIfPresent([Client].self, forKey: .clients) ?? []
+        projects = try container.decodeIfPresent([Project].self, forKey: .projects) ?? []
+        paymentAcceptanceDetails = try container.decodeIfPresent([PaymentAcceptanceDetail].self, forKey: .paymentAcceptanceDetails) ?? []
+        invoices = try container.decodeIfPresent([Invoice].self, forKey: .invoices) ?? []
     }
 }

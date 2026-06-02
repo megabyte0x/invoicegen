@@ -110,6 +110,8 @@ struct ContentView: View {
             ClientsView()
         case .projects:
             ProjectsView()
+        case .settings:
+            SettingsView()
         }
     }
 }

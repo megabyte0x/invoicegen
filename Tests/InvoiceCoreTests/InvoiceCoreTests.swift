@@ -27,6 +27,44 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(invoice.balanceDueMinorUnits, 0)
     }
 
+    func testPaidInvoiceCanBeMarkedUnpaid() {
+        let now = Date(timeIntervalSince1970: 0)
+        var invoice = Invoice(
+            number: "INV-2026-0002",
+            dueDate: now.addingTimeInterval(86_400),
+            lineItems: [
+                InvoiceLineItem(title: "Work", unitPriceMinorUnits: 10000)
+            ]
+        )
+
+        invoice.payments.append(Payment(amountMinorUnits: 10000, paidAt: now))
+        invoice.refreshStatus(now: now)
+        XCTAssertEqual(invoice.status, .paid)
+
+        invoice.markUnpaid(now: now)
+
+        XCTAssertEqual(invoice.payments, [])
+        XCTAssertEqual(invoice.paidMinorUnits, 0)
+        XCTAssertEqual(invoice.balanceDueMinorUnits, 10000)
+        XCTAssertEqual(invoice.status, .sent)
+    }
+
+    func testOverdueInvoiceReturnsToSentWhenDueDateMovesForward() {
+        let now = Date(timeIntervalSince1970: 0)
+        var invoice = Invoice(
+            number: "INV-2026-0003",
+            dueDate: now.addingTimeInterval(86_400),
+            status: .overdue,
+            lineItems: [
+                InvoiceLineItem(title: "Work", unitPriceMinorUnits: 10000)
+            ]
+        )
+
+        invoice.refreshStatus(now: now)
+
+        XCTAssertEqual(invoice.status, .sent)
+    }
+
     func testLocalStoreRoundTrip() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let url = directory.appendingPathComponent("store.json")
@@ -41,11 +79,110 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(loaded.invoices.count, 2)
     }
 
+    func testLocalStoreKeepsBackupBeforeReplacingExistingStore() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let url = directory.appendingPathComponent("store.json")
+        let backupURL = url.appendingPathExtension("bak")
+        let store = LocalInvoiceStore(url: url)
+
+        try store.save(InvoiceBook(businessProfile: BusinessProfile(name: "Original Business")))
+        try store.save(InvoiceBook(businessProfile: BusinessProfile(name: "Updated Business")))
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let backupBook = try decoder.decode(InvoiceBook.self, from: Data(contentsOf: backupURL))
+        let loaded = try store.load()
+
+        XCTAssertEqual(backupBook.businessProfile.name, "Original Business")
+        XCTAssertEqual(loaded.businessProfile.name, "Updated Business")
+    }
+
     func testAppStoreOverrides() {
         let appURL = LocalInvoiceStore.defaultStoreURL(
             environment: ["INVOICEGEN_APP_STORE": "/tmp/invoicegen-app.json"]
         )
 
         XCTAssertEqual(appURL.path, "/tmp/invoicegen-app.json")
+    }
+
+    func testSelectedPaymentAcceptanceDetailsRoundTripAndRender() throws {
+        let timestamp = Date(timeIntervalSince1970: 0)
+        let bankDetails = PaymentAcceptanceDetail(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!,
+            kind: .bankDetails,
+            label: "Primary bank account",
+            details: "Account: 123456789\nRouting: 987654321",
+            createdAt: timestamp,
+            updatedAt: timestamp
+        )
+        let cryptoDetails = PaymentAcceptanceDetail(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000102")!,
+            kind: .cryptocurrency,
+            label: "USDC wallet",
+            details: "USDC on Base: 0xabc123",
+            createdAt: timestamp,
+            updatedAt: timestamp
+        )
+        let invoice = Invoice(
+            number: "INV-2026-0003",
+            dueDate: Date(),
+            lineItems: [
+                InvoiceLineItem(title: "Work", unitPriceMinorUnits: 10000)
+            ],
+            acceptedPaymentDetailIDs: [bankDetails.id, cryptoDetails.id]
+        )
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let url = directory.appendingPathComponent("store.json")
+        let store = LocalInvoiceStore(url: url)
+        let book = InvoiceBook(
+            paymentAcceptanceDetails: [bankDetails, cryptoDetails],
+            invoices: [invoice]
+        )
+
+        try store.save(book)
+        let loaded = try store.load()
+
+        XCTAssertEqual(loaded.paymentAcceptanceDetails, [bankDetails, cryptoDetails])
+        XCTAssertEqual(loaded.invoices.first?.acceptedPaymentDetailIDs, [bankDetails.id, cryptoDetails.id])
+
+        let rendered = InvoiceTextRenderer.render(invoice: invoice, book: loaded)
+        XCTAssertTrue(rendered.contains("Payment Acceptance"))
+        XCTAssertTrue(rendered.contains("Bank Details: Primary bank account"))
+        XCTAssertTrue(rendered.contains("Cryptocurrency: USDC wallet"))
+        XCTAssertTrue(rendered.contains("Account: 123456789"))
+        XCTAssertTrue(rendered.contains("USDC on Base: 0xabc123"))
+    }
+
+    func testLegacyStoreWithoutPaymentAcceptanceDetailsDecodes() throws {
+        let legacyJSON = """
+        {
+          "schemaVersion": 1,
+          "businessProfile": {
+            "name": "Legacy Co",
+            "email": "",
+            "address": "",
+            "taxIdentifier": "",
+            "currencyCode": "USD",
+            "paymentTermsDays": 14
+          },
+          "clients": [],
+          "projects": [],
+          "invoices": [
+            {
+              "id": "00000000-0000-0000-0000-000000000201",
+              "number": "INV-LEGACY",
+              "issueDate": "2026-01-01T00:00:00Z",
+              "dueDate": "2026-01-15T00:00:00Z"
+            }
+          ]
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let book = try decoder.decode(InvoiceBook.self, from: Data(legacyJSON.utf8))
+
+        XCTAssertEqual(book.paymentAcceptanceDetails, [])
+        XCTAssertEqual(book.invoices.first?.acceptedPaymentDetailIDs, [])
     }
 }
