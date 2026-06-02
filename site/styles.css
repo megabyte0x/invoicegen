@@ -132,31 +132,27 @@ h3 {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #0f6b5f 0%, #0a4f47 100%);
-  border: none;
-  border-radius: 9px;
-  box-shadow: 0 4px 10px rgba(15, 107, 95, 0.2);
+  display: block;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(15, 107, 95, 0.22);
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html.dark .brand-mark {
-  color: #090b0a;
-  background: linear-gradient(135deg, #5fe0c2 0%, #0f6b5f 100%);
-  box-shadow: 0 4px 12px rgba(95, 224, 194, 0.2);
+  box-shadow: 0 4px 14px rgba(95, 224, 194, 0.2);
 }
 
 .brand:hover .brand-mark {
   transform: scale(1.06);
 }
 
-.brand-mark svg {
-  width: 19px;
-  height: 19px;
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .nav-links {

@@ -9,10 +9,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 20) {
                 // Brand Header
                 HStack(spacing: 12) {
-                    Image(systemName: "circle.grid.cross.fill")
-                        .font(.title2)
-                        .foregroundStyle(Color.runeyPrimary)
-                        .rotationEffect(.degrees(45))
+                    InvoiceGenLogoMark(size: 34)
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("InvoiceGen")

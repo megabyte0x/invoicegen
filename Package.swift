@@ -15,7 +15,10 @@ let package = Package(
         .executableTarget(
             name: "InvoiceGenApp",
             dependencies: ["InvoiceCore"],
-            path: "Sources/InvoiceGenApp"
+            path: "Sources/InvoiceGenApp",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "InvoiceCoreTests",

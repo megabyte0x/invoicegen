@@ -59,6 +59,40 @@ extension View {
     }
 }
 
+struct InvoiceGenLogoMark: View {
+    var size: CGFloat = 34
+
+    var body: some View {
+        Group {
+            if let logo = Self.logoImage {
+                Image(nsImage: logo)
+                    .resizable()
+                    .interpolation(.high)
+            } else {
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: size * 0.54, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: size, height: size)
+                    .background(
+                        RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
+                            .fill(Color.runeyPrimary)
+                    )
+            }
+        }
+        .frame(width: size, height: size)
+        .shadow(color: Color.black.opacity(0.12), radius: 5, x: 0, y: 2)
+        .accessibilityHidden(true)
+    }
+
+    private static let logoImage: NSImage? = {
+        guard let url = Bundle.module.url(forResource: "invoicegen-logo", withExtension: "png") else {
+            return nil
+        }
+
+        return NSImage(contentsOf: url)
+    }()
+}
+
 struct TahoeHeaderBackground: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
