@@ -153,6 +153,32 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertTrue(rendered.contains("USDC on Base: 0xabc123"))
     }
 
+    func testInvoiceTextRendererOmitsStatusFromClientFacingOutput() {
+        let invoice = Invoice(
+            number: "INV-NO-STATUS",
+            dueDate: Date(timeIntervalSince1970: 0),
+            status: .paid,
+            lineItems: [
+                InvoiceLineItem(title: "Work", unitPriceMinorUnits: 10000)
+            ]
+        )
+        let book = InvoiceBook(invoices: [invoice])
+
+        let rendered = InvoiceTextRenderer.render(invoice: invoice, book: book)
+
+        XCTAssertTrue(rendered.contains("INVOICE INV-NO-STATUS"))
+        XCTAssertFalse(rendered.contains("Status:"), rendered)
+    }
+
+    func testInvoicePDFFileNameUsesInvoiceNumber() {
+        let invoice = Invoice(
+            number: "INV 2026/0001",
+            dueDate: Date(timeIntervalSince1970: 0)
+        )
+
+        XCTAssertEqual(InvoiceExportNaming.pdfFileName(for: invoice), "INV-2026-0001.pdf")
+    }
+
     func testLegacyStoreWithoutPaymentAcceptanceDetailsDecodes() throws {
         let legacyJSON = """
         {

@@ -20,7 +20,11 @@ invoicegen invoice --help
 invoicegen --store ./invoicegen-store.json seed-sample --force
 invoicegen --store ./invoicegen-store.json invoice list --format json
 invoicegen --store ./invoicegen-store.json invoice render INV-2026-0001
+invoicegen --store ./invoicegen-store.json invoice render INV-2026-0001 --output ./exports
 ```
+
+When `--output` points to a directory, the CLI writes a PDF named from the
+invoice number, such as `INV-2026-0001.pdf`.
 
 If `--store` is not provided, the CLI uses the app store path. Set
 `INVOICEGEN_APP_STORE` to point the CLI and macOS app at a custom store file.

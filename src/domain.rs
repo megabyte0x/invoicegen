@@ -1002,7 +1002,6 @@ pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> String {
         "Due Date:   {}",
         format_date_medium(&invoice.due_date)
     ));
-    lines.push(format!("Status:     {}", invoice.status.label()));
     lines.push(String::new());
 
     lines.push("Items".to_string());
@@ -1071,6 +1070,164 @@ pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> String {
     }
 
     lines.join("\n")
+}
+
+pub fn render_invoice_pdf(invoice: &Invoice, book: &InvoiceBook) -> Vec<u8> {
+    render_text_pdf(&render_invoice_text(invoice, book))
+}
+
+pub fn invoice_pdf_file_name(invoice: &Invoice) -> String {
+    let mut file_stem = String::new();
+    let mut previous_was_separator = false;
+
+    for character in invoice.number.trim().chars() {
+        if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+            file_stem.push(character);
+            previous_was_separator = false;
+        } else if !previous_was_separator {
+            file_stem.push('-');
+            previous_was_separator = true;
+        }
+    }
+
+    let file_stem = file_stem.trim_matches(['-', '.', '_']);
+    if file_stem.is_empty() {
+        "invoice.pdf".to_string()
+    } else {
+        format!("{file_stem}.pdf")
+    }
+}
+
+fn render_text_pdf(text: &str) -> Vec<u8> {
+    const PAGE_WIDTH: i32 = 612;
+    const PAGE_HEIGHT: i32 = 792;
+    const LEFT_MARGIN: i32 = 50;
+    const TOP_Y: i32 = 742;
+    const LINE_HEIGHT: i32 = 14;
+    const LINES_PER_PAGE: usize = 50;
+    const MAX_LINE_CHARS: usize = 88;
+
+    let mut lines = Vec::new();
+    for line in text.lines() {
+        lines.extend(wrap_pdf_line(line, MAX_LINE_CHARS));
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+
+    let pages: Vec<&[String]> = lines.chunks(LINES_PER_PAGE).collect();
+    let mut objects = Vec::new();
+
+    objects.push("<< /Type /Catalog /Pages 2 0 R >>".to_string());
+
+    let kids = pages
+        .iter()
+        .enumerate()
+        .map(|(index, _)| format!("{} 0 R", 3 + index * 2))
+        .collect::<Vec<_>>()
+        .join(" ");
+    objects.push(format!(
+        "<< /Type /Pages /Kids [{kids}] /Count {} >>",
+        pages.len()
+    ));
+
+    for (index, page_lines) in pages.iter().enumerate() {
+        let page_id = 3 + index * 2;
+        let content_id = page_id + 1;
+        objects.push(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_WIDTH} {PAGE_HEIGHT}] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Courier >> >> >> /Contents {content_id} 0 R >>"
+        ));
+
+        let mut stream = format!("BT\n/F1 10 Tf\n{LEFT_MARGIN} {TOP_Y} Td\n");
+        for (line_index, line) in page_lines.iter().enumerate() {
+            if line_index > 0 {
+                stream.push_str(&format!("0 -{LINE_HEIGHT} Td\n"));
+            }
+            stream.push('(');
+            stream.push_str(&escape_pdf_literal(line));
+            stream.push_str(") Tj\n");
+        }
+        stream.push_str("ET\n");
+
+        objects.push(format!(
+            "<< /Length {} >>\nstream\n{}endstream",
+            stream.as_bytes().len(),
+            stream
+        ));
+    }
+
+    write_pdf_objects(objects)
+}
+
+fn wrap_pdf_line(line: &str, max_chars: usize) -> Vec<String> {
+    if line.is_empty() {
+        return vec![String::new()];
+    }
+
+    let mut wrapped = Vec::new();
+    let mut current = String::new();
+    let mut count = 0;
+
+    for character in line.chars() {
+        if count == max_chars {
+            wrapped.push(current);
+            current = String::new();
+            count = 0;
+        }
+        current.push(character);
+        count += 1;
+    }
+
+    if !current.is_empty() {
+        wrapped.push(current);
+    }
+
+    wrapped
+}
+
+fn escape_pdf_literal(value: &str) -> String {
+    let mut escaped = String::new();
+    for character in value.chars() {
+        match character {
+            '\\' => escaped.push_str("\\\\"),
+            '(' => escaped.push_str("\\("),
+            ')' => escaped.push_str("\\)"),
+            '\t' => escaped.push_str("    "),
+            character if character.is_control() => escaped.push(' '),
+            character => escaped.push(character),
+        }
+    }
+    escaped
+}
+
+fn write_pdf_objects(objects: Vec<String>) -> Vec<u8> {
+    let mut pdf = Vec::new();
+    pdf.extend_from_slice(b"%PDF-1.4\n");
+
+    let mut offsets = Vec::with_capacity(objects.len() + 1);
+    offsets.push(0);
+    for (index, object) in objects.iter().enumerate() {
+        offsets.push(pdf.len());
+        pdf.extend_from_slice(format!("{} 0 obj\n", index + 1).as_bytes());
+        pdf.extend_from_slice(object.as_bytes());
+        pdf.extend_from_slice(b"\nendobj\n");
+    }
+
+    let xref_offset = pdf.len();
+    pdf.extend_from_slice(format!("xref\n0 {}\n", offsets.len()).as_bytes());
+    pdf.extend_from_slice(b"0000000000 65535 f \n");
+    for offset in offsets.iter().skip(1) {
+        pdf.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
+    }
+    pdf.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n",
+            offsets.len()
+        )
+        .as_bytes(),
+    );
+
+    pdf
 }
 
 pub fn now_iso() -> String {

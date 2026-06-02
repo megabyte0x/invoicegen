@@ -435,13 +435,36 @@ fn cli_creates_entities_persists_swift_compatible_json_and_renders_invoice_text(
         "{rendered}"
     );
     assert!(rendered.contains("Account: 123456789"), "{rendered}");
+    assert!(!rendered.contains("Status:"), "{rendered}");
+
+    let output_directory = store.with_file_name("exports");
+    fs::create_dir_all(&output_directory).unwrap();
+    let pdf_path = output_directory.join("INV-TEST-0001.pdf");
+    let output_directory_text = output_directory.to_string_lossy().into_owned();
+    let pdf_path_text = pdf_path.to_string_lossy().into_owned();
+    let wrote_pdf = assert_success(run(
+        &store,
+        &[
+            "invoice",
+            "render",
+            &invoice_id,
+            "--output",
+            &output_directory_text,
+        ],
+    ));
+    assert!(
+        wrote_pdf.contains(&format!("Wrote {pdf_path_text}")),
+        "{wrote_pdf}"
+    );
+    let pdf_bytes = fs::read(&pdf_path).unwrap();
+    assert!(pdf_bytes.starts_with(b"%PDF-"), "{pdf_bytes:?}");
+    let pdf_text = String::from_utf8_lossy(&pdf_bytes);
+    assert!(pdf_text.contains("INVOICE INV-TEST-0001"), "{pdf_text}");
+    assert!(!pdf_text.contains("Status:"), "{pdf_text}");
 
     assert_success(run(&store, &["invoice", "mark-paid", &invoice_id]));
     let paid_rendered = assert_success(run(&store, &["invoice", "render", &invoice_id]));
-    assert!(
-        paid_rendered.contains("Status:     Paid"),
-        "{paid_rendered}"
-    );
+    assert!(!paid_rendered.contains("Status:"), "{paid_rendered}");
     assert!(
         paid_rendered.contains("Paid:     USD 220.00"),
         "{paid_rendered}"

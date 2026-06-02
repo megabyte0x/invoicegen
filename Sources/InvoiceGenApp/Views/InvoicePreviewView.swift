@@ -64,6 +64,7 @@ struct InvoicePreviewView: View {
         printInfo.bottomMargin = 36
 
         let printOp = NSPrintOperation(view: hostingView, printInfo: printInfo)
+        printOp.jobTitle = InvoiceExportNaming.pdfFileStem(for: invoice)
         printOp.showsPrintPanel = true
         printOp.showsProgressPanel = true
         printOp.run()
@@ -171,14 +172,6 @@ struct InvoiceSheetView: View {
                             Text(DateFormatting.short.string(from: invoice.dueDate))
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(Color.black)
-                        }
-                        GridRow {
-                            Text("Status:")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color(white: 0.45))
-                            Text(invoice.status.label)
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(statusColor)
                         }
                     }
                 }
@@ -359,16 +352,6 @@ struct InvoiceSheetView: View {
         }
         .padding(32)
         .background(Color.white)
-    }
-
-    private var statusColor: Color {
-        switch invoice.status {
-        case .draft: return .gray
-        case .sent: return .blue
-        case .paid: return Color(red: 0.35, green: 0.65, blue: 0.15) // Printable green
-        case .overdue: return Color(red: 0.85, green: 0.25, blue: 0.25) // Printable red
-        case .void: return .orange
-        }
     }
 
     private func trimmedQty(_ val: Double) -> String {

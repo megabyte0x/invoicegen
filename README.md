@@ -31,8 +31,12 @@ cargo run -- invoice --help
 cargo run -- --store /tmp/invoicegen-store.json seed-sample --force
 cargo run -- --store /tmp/invoicegen-store.json invoice list --status overdue --format json
 cargo run -- --store /tmp/invoicegen-store.json invoice render INV-2026-0001
+cargo run -- --store /tmp/invoicegen-store.json invoice render INV-2026-0001 --output ./exports
 cargo run -- completion zsh
 ```
+
+When `--output` points to a directory, the CLI writes a PDF named from the
+invoice number, such as `INV-2026-0001.pdf`.
 
 Common workflows are available as subcommands for `profile`, `client`,
 `project`, `payment-detail`, and `invoice`. The CLI honors the same

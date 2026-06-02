@@ -1,7 +1,8 @@
 use crate::domain::{
-    add_days_iso, format_money, normalize_date_input, now_iso, parse_minor_units,
-    render_invoice_text, BusinessProfile, Client, Invoice, InvoiceBook, InvoiceLineItem,
-    InvoiceStatus, Payment, PaymentAcceptanceDetail, PaymentAcceptanceKind, Project,
+    add_days_iso, format_money, invoice_pdf_file_name, normalize_date_input, now_iso,
+    parse_minor_units, render_invoice_pdf, render_invoice_text, BusinessProfile, Client, Invoice,
+    InvoiceBook, InvoiceLineItem, InvoiceStatus, Payment, PaymentAcceptanceDetail,
+    PaymentAcceptanceKind, Project,
 };
 use crate::json::{self, JsonValue};
 use crate::store::LocalInvoiceStore;
@@ -811,13 +812,15 @@ fn command_invoice(
             reject_unknown(args)?;
             let book = store.load()?;
             let index = find_invoice_index(&book, &id)?;
-            let rendered = render_invoice_text(&book.invoices[index], &book);
             if let Some(output_path) = output_path {
-                fs::write(&output_path, &rendered).map_err(|error| {
+                let output_path = invoice_render_output_path(output_path, &book.invoices[index]);
+                let pdf = render_invoice_pdf(&book.invoices[index], &book);
+                fs::write(&output_path, pdf).map_err(|error| {
                     format!("failed to write {}: {error}", output_path.display())
                 })?;
                 Ok(format!("Wrote {}\n", output_path.display()))
             } else {
+                let rendered = render_invoice_text(&book.invoices[index], &book);
                 Ok(format!("{rendered}\n"))
             }
         }
@@ -1277,6 +1280,14 @@ fn payment_detail_command() -> Command {
         )
 }
 
+fn invoice_render_output_path(output_path: PathBuf, invoice: &Invoice) -> PathBuf {
+    if output_path.is_dir() {
+        output_path.join(invoice_pdf_file_name(invoice))
+    } else {
+        output_path
+    }
+}
+
 fn payment_detail_write_command(name: &'static str, needs_id: bool) -> Command {
     let mut command = Command::new(name)
         .arg(
@@ -1296,7 +1307,7 @@ fn invoice_command() -> Command {
     Command::new("invoice")
         .about("Manage invoices")
         .after_help(
-            "Examples:\n  invoicegen-rs invoice list [--status STATUS]\n  invoicegen-rs invoice list --status overdue --format json\n  invoicegen-rs invoice render INV-2026-0001 --output invoice.txt",
+            "Examples:\n  invoicegen-rs invoice list [--status STATUS]\n  invoicegen-rs invoice list --status overdue --format json\n  invoicegen-rs invoice render INV-2026-0001 --output ./exports",
         )
         .subcommand(Command::new("list")
             .arg(option("status", "status", "STATUS").value_parser(["draft", "sent", "paid", "overdue", "void"]))

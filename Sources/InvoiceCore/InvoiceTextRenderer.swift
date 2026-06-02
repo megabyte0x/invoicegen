@@ -25,7 +25,6 @@ public enum InvoiceTextRenderer {
 
         lines.append("Issue Date: \(DateFormatting.short.string(from: invoice.issueDate))")
         lines.append("Due Date:   \(DateFormatting.short.string(from: invoice.dueDate))")
-        lines.append("Status:     \(invoice.status.label)")
         lines.append("")
 
         lines.append("Items")
