@@ -8,19 +8,72 @@
       name="description"
       content="InvoiceGen is a native, local-first macOS app and CLI for managing invoices, clients, projects, and payment details on your Mac."
     />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#0f6b5f" />
+    <link rel="canonical" href="https://invoicegen.megabyte.sh/" />
     <meta property="og:title" content="InvoiceGen - Native macOS Invoicing" />
     <meta
       property="og:description"
       content="A native macOS invoice workspace with local storage, PDF export, client tracking, and an agent-friendly CLI."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/assets/invoicegen-preview.png" />
-    <link rel="icon" href="/assets/invoicegen-logo.png" type="image/png" />
+    <meta property="og:url" content="https://invoicegen.megabyte.sh/" />
+    <meta property="og:site_name" content="InvoiceGen" />
+    <meta property="og:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-preview.png" />
+    <meta property="og:image:alt" content="InvoiceGen macOS app dashboard preview" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="InvoiceGen - Local-first macOS invoicing" />
+    <meta
+      name="twitter:description"
+      content="Native macOS invoicing with local storage, PDF export, client tracking, and a Rust CLI."
+    />
+    <meta name="twitter:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-preview.png" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/invoicegen-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&f[]=clash-display@400,500,600,700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://invoicegen.megabyte.sh/#website",
+            "name": "InvoiceGen",
+            "url": "https://invoicegen.megabyte.sh/",
+            "description": "Local-first macOS invoicing app and Rust CLI for managing invoices, clients, projects, and payment details."
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://invoicegen.megabyte.sh/#software",
+            "name": "InvoiceGen",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "macOS 14.0 or newer",
+            "softwareVersion": "0.1.5",
+            "url": "https://invoicegen.megabyte.sh/",
+            "downloadUrl": "https://github.com/megabyte0x/invoicegen/releases/download/v0.1.5/InvoiceGen-0.1.5.dmg",
+            "codeRepository": "https://github.com/megabyte0x/invoicegen",
+            "license": "https://opensource.org/license/mit",
+            "image": "https://invoicegen.megabyte.sh/assets/invoicegen-preview.png",
+            "description": "InvoiceGen is a native, local-first macOS invoice workspace with PDF-ready exports and an agent-friendly Rust CLI.",
+            "creator": {
+              "@type": "Person",
+              "name": "megabyte0x",
+              "url": "https://github.com/megabyte0x"
+            },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "dateModified": "2026-06-02"
+          }
+        ]
+      }
+    </script>
     <script>
       (function() {
         const storedTheme = localStorage.getItem('theme');
@@ -41,9 +94,10 @@
         <span>InvoiceGen</span>
       </a>
       <nav class="nav-links">
+        <a href="#overview">Overview</a>
         <a href="#features">Features</a>
         <a href="#faq">FAQ</a>
-        <a id="nav-download" href="https://github.com/megabyte0x/invoicegen/releases/download/v0.1.4/InvoiceGen-0.1.4.dmg">Download</a>
+        <a id="nav-download" href="https://github.com/megabyte0x/invoicegen/releases/download/v0.1.5/InvoiceGen-0.1.5.dmg">Download</a>
         <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle dark/light mode" title="Toggle theme">
           <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="4" />
@@ -65,7 +119,7 @@
             InvoiceGen gives independent operators a focused local workspace for clients, projects, invoices, payment details, and PDF-ready exports.
           </p>
           <div class="actions" aria-label="Primary actions">
-            <a class="button primary" id="hero-download-btn" href="https://github.com/megabyte0x/invoicegen/releases/download/v0.1.4/InvoiceGen-0.1.4.dmg">
+            <a class="button primary" id="hero-download-btn" href="https://github.com/megabyte0x/invoicegen/releases/download/v0.1.5/InvoiceGen-0.1.5.dmg">
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor">
                 <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M12 2v12M16 10l-4 4-4-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
@@ -91,7 +145,7 @@
               <span class="badge">Recommended</span>
             </div>
             <div class="agent-prompt-body">
-              <code id="agent-setup-prompt">Install this skill invoicegen-jade.vercel.app/SKILL.md and start with seting up invoice</code>
+              <code id="agent-setup-prompt">Install this InvoiceGen skill from https://invoicegen.megabyte.sh/SKILL.md, then set up a new invoice.</code>
               <button class="copy-prompt-btn" type="button" data-copy-target="agent-setup-prompt" aria-label="Copy agent prompt" title="Copy prompt">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M8 8h10v12H8z" />
@@ -103,7 +157,7 @@
           </div>
 
           <div class="download-meta">
-            <span id="meta-version">Version v0.1.4</span>
+            <span id="meta-version">Version v0.1.5</span>
             <span id="meta-size">Build from source or releases</span>
             <span id="meta-platform">macOS 14.0+</span>
           </div>
@@ -149,6 +203,36 @@
             <span>Rust CLI mirrors the app store format.</span>
           </div>
         </div>
+      </section>
+
+      <section class="answer-section" id="overview" aria-labelledby="overview-title">
+        <div class="answer-copy">
+          <p class="eyebrow">Quick answer</p>
+          <h2 id="overview-title">What is InvoiceGen?</h2>
+          <p>
+            InvoiceGen is a local-first macOS invoice app and Rust CLI for freelancers, consultants, and small operators who want invoice data to stay on their Mac. The app manages clients, projects, payment details, invoice drafts, due dates, line items, discounts, tax rates, and PDF-ready exports without requiring an account or hosted backend. Its companion Rust CLI reads and writes the same local store format as the macOS app, so invoices can be listed, rendered, filtered, or automated from scripts. InvoiceGen is open source under the MIT License, free to download, and currently targets macOS 14 Sonoma or newer. It is best suited for solo operators who prefer a native desktop workflow, transparent local files, and simple automation over subscription invoicing platforms. For AI agents, the project publishes a repository skill at /SKILL.md with CLI commands, safety rules, sample workflows, and verification steps.
+          </p>
+        </div>
+        <dl class="fact-list" aria-label="InvoiceGen facts">
+          <div>
+            <dt>Platform</dt>
+            <dd>Native macOS 14+ app</dd>
+          </div>
+          <div>
+            <dt>Storage</dt>
+            <dd>Local files on the user's Mac</dd>
+          </div>
+          <div>
+            <dt>Automation</dt>
+            <dd>Rust CLI with shared store format</dd>
+          </div>
+          <div>
+            <dt>License</dt>
+            <dd>Open source, MIT License</dd>
+          </div>
+        </dl>
+      </section>
+
       <section class="features-section" id="features" aria-labelledby="features-title">
         <div class="section-heading">
           <p class="eyebrow">Features</p>

@@ -1,0 +1,23 @@
+# InvoiceGen
+> Local-first macOS invoicing app and Rust CLI for managing clients, projects, invoices, payment details, and PDF-ready exports on a user's Mac.
+
+## Main pages
+- [Homepage](https://invoicegen.megabyte.sh/): Product overview, download link, feature summary, privacy position, and macOS support details.
+- [Repository skill](https://invoicegen.megabyte.sh/SKILL.md): Agent-facing workflow for using the InvoiceGen CLI safely with sample commands and verification steps.
+- [GitHub repository](https://github.com/megabyte0x/invoicegen): Source code for the Swift macOS app, Rust CLI, static site, release scripts, and packaging metadata.
+- [Latest release](https://github.com/megabyte0x/invoicegen/releases/latest): Current macOS DMG release and downloadable build artifacts.
+
+## Key facts
+- InvoiceGen stores invoice, client, project, and payment-detail data locally on the user's Mac.
+- InvoiceGen does not require an account, cloud backend, tracking SDK, subscription tier, or hosted invoice store.
+- The macOS app and Rust CLI share the same local invoice store format.
+- The CLI supports agent-friendly invoice, client, project, payment-detail, config, summary, and render workflows.
+- InvoiceGen is open source under the MIT License and currently targets macOS 14 Sonoma or newer.
+
+## Suggested citation
+InvoiceGen is a local-first macOS invoicing app and Rust CLI that keeps invoice data on the user's Mac while supporting client management, project tracking, PDF-ready exports, and scriptable invoice workflows.
+
+## Contact and ownership
+- Creator: megabyte0x
+- GitHub: https://github.com/megabyte0x
+- License: MIT

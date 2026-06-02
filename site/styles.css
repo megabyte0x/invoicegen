@@ -586,6 +586,7 @@ html.dark .hero-proof:hover {
 }
 
 .workflow-section,
+.answer-section,
 .features-section,
 .faq-section,
 .cli-section,
@@ -594,12 +595,62 @@ html.dark .hero-proof:hover {
   border-top: 1px solid var(--line);
 }
 
+.answer-section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(320px, 0.48fr);
+  gap: 40px;
+  align-items: start;
+  background: color-mix(in srgb, var(--surface-muted) 46%, transparent);
+}
+
+.answer-copy {
+  max-width: 900px;
+}
+
+.answer-copy p:last-child {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 1.02rem;
+}
+
+.fact-list {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.fact-list div {
+  display: grid;
+  gap: 4px;
+  padding: 18px 20px;
+}
+
+.fact-list div + div {
+  border-top: 1px solid var(--line);
+}
+
+.fact-list dt {
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fact-list dd {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 .section-heading {
   max-width: 760px;
   margin-bottom: 34px;
 }
 
 .section-heading h2,
+.answer-copy h2,
 .cli-copy h2,
 .download-section h2 {
   font-family: var(--font-serif);
@@ -932,6 +983,7 @@ footer .brand-mark {
 
 @media (max-width: 1120px) {
   .hero,
+  .answer-section,
   .cli-section,
   .download-section {
     grid-template-columns: 1fr;
@@ -981,6 +1033,7 @@ footer .brand-mark {
 
   .hero,
   .workflow-section,
+  .answer-section,
   .features-section,
   .faq-section,
   .cli-section,
@@ -1004,6 +1057,7 @@ footer .brand-mark {
   }
 
   .section-heading h2,
+  .answer-copy h2,
   .cli-copy h2,
   .download-section h2 {
     font-size: 2.35rem;
@@ -1056,6 +1110,14 @@ footer .brand-mark {
 
   .button {
     width: 100%;
+  }
+
+  .agent-prompt-body {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-prompt-btn {
+    justify-self: start;
   }
 
   .download-meta {
