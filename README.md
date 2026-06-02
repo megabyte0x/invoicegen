@@ -22,19 +22,34 @@ swift build
 
 ## Rust CLI
 
-This repo also includes a dependency-free Rust CLI that reads and writes the
-same local `store.json` format as the macOS app.
+This repo also includes a Rust CLI that ships as a single native binary and
+reads and writes the same local `store.json` format as the macOS app.
 
 ```sh
 cargo run -- --help
+cargo run -- invoice --help
 cargo run -- --store /tmp/invoicegen-store.json seed-sample --force
-cargo run -- --store /tmp/invoicegen-store.json invoice list
+cargo run -- --store /tmp/invoicegen-store.json invoice list --status overdue --format json
 cargo run -- --store /tmp/invoicegen-store.json invoice render INV-2026-0001
+cargo run -- completion zsh
 ```
 
 Common workflows are available as subcommands for `profile`, `client`,
 `project`, `payment-detail`, and `invoice`. The CLI honors the same
 `INVOICEGEN_APP_STORE` override as the app when `--store` is not provided.
+
+List, show, summary, and config commands support `--format text|tsv|csv|json`.
+List commands also support common filters such as `--query`, `--status`,
+`--client`, `--sort`, and `--reverse` where they apply. Destructive delete
+commands require `--force`.
+
+CLI defaults can be stored separately from invoice data:
+
+```sh
+invoicegen-rs --config ~/.config/invoicegen/config.json config set --store ~/invoices/store.json --default-output json
+invoicegen-rs --config ~/.config/invoicegen/config.json client list
+invoicegen-rs config show --format json
+```
 
 ### Install the CLI
 

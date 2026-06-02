@@ -27,6 +27,13 @@ fn run(store: &Path, args: &[&str]) -> Output {
         .expect("failed to run invoicegen-rs")
 }
 
+fn run_without_store(args: &[&str]) -> Output {
+    Command::new(bin())
+        .args(args)
+        .output()
+        .expect("failed to run invoicegen-rs")
+}
+
 fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
@@ -45,6 +52,16 @@ fn assert_success(output: Output) -> String {
     stdout(&output)
 }
 
+fn assert_failure(output: Output) -> String {
+    assert!(
+        !output.status.success(),
+        "expected failure\nstdout:\n{}\nstderr:\n{}",
+        stdout(&output),
+        stderr(&output)
+    );
+    stderr(&output)
+}
+
 fn id_from_created_line(output: &str, entity: &str) -> String {
     let prefix = format!("Created {entity} ");
     output
@@ -53,6 +70,161 @@ fn id_from_created_line(output: &str, entity: &str) -> String {
         .unwrap_or_else(|| panic!("missing line with prefix {prefix:?} in:\n{output}"))
         .trim()
         .to_string()
+}
+
+#[test]
+fn cli_exposes_command_help_examples_and_shell_completions() {
+    let global_help = assert_success(run_without_store(&["--help"]));
+    assert!(global_help.contains("Examples:"), "{global_help}");
+    assert!(
+        global_help.contains("invoicegen-rs --store /tmp/invoicegen-store.json invoice list"),
+        "{global_help}"
+    );
+
+    let invoice_help = assert_success(run_without_store(&["invoice", "--help"]));
+    assert!(invoice_help.contains("Usage:"), "{invoice_help}");
+    assert!(
+        invoice_help.contains("invoicegen-rs invoice list [--status STATUS]"),
+        "{invoice_help}"
+    );
+    assert!(invoice_help.contains("Examples:"), "{invoice_help}");
+
+    let client_help = assert_success(run_without_store(&["client", "--help"]));
+    assert!(client_help.contains("Examples:"), "{client_help}");
+    assert!(
+        client_help.contains("invoicegen-rs client list --query acme --format csv"),
+        "{client_help}"
+    );
+
+    let completion = assert_success(run_without_store(&["completion", "zsh"]));
+    assert!(
+        completion.contains("#compdef invoicegen-rs"),
+        "{completion}"
+    );
+    assert!(completion.contains("invoice"), "{completion}");
+    assert!(completion.contains("client"), "{completion}");
+}
+
+#[test]
+fn cli_outputs_json_csv_tsv_and_filters_lists() {
+    let store = temp_store("format-filter");
+    assert_success(run(&store, &["seed-sample", "--force"]));
+
+    let overdue_json = assert_success(run(
+        &store,
+        &["invoice", "list", "--status", "overdue", "--format", "json"],
+    ));
+    assert!(overdue_json.trim_start().starts_with('['), "{overdue_json}");
+    assert!(
+        overdue_json.contains(r#""status": "overdue""#),
+        "{overdue_json}"
+    );
+    assert!(
+        !overdue_json.contains(r#""status": "sent""#),
+        "{overdue_json}"
+    );
+
+    let client_csv = assert_success(run(
+        &store,
+        &["client", "list", "--query", "avery", "--format", "csv"],
+    ));
+    assert!(
+        client_csv.starts_with("id,name,email,company\n"),
+        "{client_csv}"
+    );
+    assert!(client_csv.contains("Avery Patel"), "{client_csv}");
+    assert!(!client_csv.contains("Northstar Studio"), "{client_csv}");
+
+    let project_tsv = assert_success(run(&store, &["project", "list", "--format", "tsv"]));
+    assert!(
+        project_tsv.starts_with("id\tname\tclient\trate\n"),
+        "{project_tsv}"
+    );
+
+    let summary_json = assert_success(run(&store, &["summary", "--format", "json"]));
+    assert!(summary_json.trim_start().starts_with('{'), "{summary_json}");
+    assert!(summary_json.contains(r#""outstanding""#), "{summary_json}");
+}
+
+#[test]
+fn cli_uses_config_for_store_and_default_output() {
+    let store = temp_store("configured-store");
+    let config = temp_store("configured-store").with_file_name("invoicegen-config.json");
+    let store_text = store.to_string_lossy().into_owned();
+    let config_text = config.to_string_lossy().into_owned();
+
+    assert_success(run_without_store(&[
+        "--config",
+        &config_text,
+        "config",
+        "set",
+        "--store",
+        &store_text,
+        "--default-output",
+        "json",
+    ]));
+    assert_success(run_without_store(&[
+        "--config",
+        &config_text,
+        "seed-sample",
+        "--force",
+    ]));
+
+    let clients = assert_success(run_without_store(&[
+        "--config",
+        &config_text,
+        "client",
+        "list",
+    ]));
+    assert!(clients.trim_start().starts_with('['), "{clients}");
+    assert!(clients.contains(r#""name": "Avery Patel""#), "{clients}");
+    assert!(store.exists(), "configured store was not written");
+
+    let shown = assert_success(run_without_store(&[
+        "--config",
+        &config_text,
+        "config",
+        "show",
+        "--format",
+        "json",
+    ]));
+    assert!(shown.contains(r#""defaultOutput": "json""#), "{shown}");
+    assert!(shown.contains(&store_text), "{shown}");
+}
+
+#[test]
+fn destructive_commands_require_force_and_errors_are_actionable() {
+    let store = temp_store("force-errors");
+    let client_id = id_from_created_line(
+        &assert_success(run(&store, &["client", "add", "--name", "Delete Me"])),
+        "client",
+    );
+
+    let stderr = assert_failure(run(&store, &["client", "delete", &client_id]));
+    assert!(
+        stderr.contains("error: destructive_action_requires_force"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("hint: pass --force"), "{stderr}");
+
+    assert_success(run(&store, &["client", "delete", &client_id, "--force"]));
+
+    let missing_value = assert_failure(run(&store, &["client", "add", "--name"]));
+    assert!(
+        missing_value.contains("error: missing_value"),
+        "{missing_value}"
+    );
+    assert!(
+        missing_value.contains("--name requires a value"),
+        "{missing_value}"
+    );
+
+    let unknown = assert_failure(run_without_store(&["bogus"]));
+    assert!(unknown.contains("error: unknown_command"), "{unknown}");
+    assert!(
+        unknown.contains("hint: run invoicegen-rs --help"),
+        "{unknown}"
+    );
 }
 
 #[test]

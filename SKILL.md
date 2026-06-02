@@ -48,6 +48,8 @@ Run from the repo root:
 
 ```sh
 cargo run -- --help
+cargo run -- invoice --help
+cargo run -- completion zsh
 ```
 
 Use `--store PATH` for experiments so agent work does not mutate the user's real app data:
@@ -55,11 +57,23 @@ Use `--store PATH` for experiments so agent work does not mutate the user's real
 ```sh
 cargo run -- --store /tmp/invoicegen-store.json seed-sample --force
 cargo run -- --store /tmp/invoicegen-store.json summary
-cargo run -- --store /tmp/invoicegen-store.json invoice list
+cargo run -- --store /tmp/invoicegen-store.json invoice list --status overdue --format json
 cargo run -- --store /tmp/invoicegen-store.json invoice render INV-2026-0001
 ```
 
 When `--store` is omitted, the CLI honors `INVOICEGEN_APP_STORE`. If that environment variable is also unset, it uses the same default app store convention as the macOS app.
+
+The CLI uses Clap for command parsing, help, validation, and shell completion generation. Keep the command builder in `src/cli.rs` aligned with handler behavior and contract tests.
+
+List, show, summary, and config commands support `--format text|tsv|csv|json`. List commands support targeted filters such as `--query`, `--status`, `--client`, `--sort`, and `--reverse` where relevant.
+
+CLI defaults can be stored separately from invoice data:
+
+```sh
+cargo run -- --config /tmp/invoicegen-config.json config set --store /tmp/invoicegen-store.json --default-output json
+cargo run -- --config /tmp/invoicegen-config.json client list
+cargo run -- config show --format json
+```
 
 ## Common Workflows
 
@@ -96,6 +110,8 @@ cargo run -- --store /tmp/invoicegen-store.json invoice set-status INV-2026-0001
 
 Invoice commands accept either the invoice UUID or invoice number. Client, project, payment-detail, and line-item commands require UUIDs.
 
+Destructive delete commands require `--force`; do not remove that guard when extending delete behavior.
+
 ## Store Safety
 
 - Prefer `/tmp/...` stores while testing.
@@ -108,15 +124,15 @@ Invoice commands accept either the invoice UUID or invoice number. Client, proje
 - Money parsing and formatting must match `Sources/InvoiceCore/Money.swift`.
 - Text invoice rendering must match `Sources/InvoiceCore/InvoiceTextRenderer.swift` closely enough for copied raw invoice text to remain compatible.
 - Status refresh behavior must match Swift: paid invoices become `paid`; sent, paid, or overdue invoices can refresh to `sent` or `overdue`; void invoices stay void.
-- The Rust crate intentionally has no third-party dependencies. Do not add dependencies unless the user explicitly accepts that tradeoff.
+- The Rust CLI intentionally keeps dependencies narrow. Clap and `clap_complete` are accepted for parser, help, validation, and completion behavior; avoid adding more dependencies unless the user explicitly accepts that tradeoff.
 
 ## Verification
 
 Run Rust verification after CLI changes:
 
 ```sh
-cargo fmt
-cargo test
+cargo fmt --check
+cargo test --locked
 ```
 
 Run Swift verification when changes might affect shared behavior or compatibility:
