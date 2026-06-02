@@ -104,8 +104,6 @@ jobs:
     needs: build-cli
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     steps:
       - name: Check out repository
@@ -136,11 +134,10 @@ jobs:
         run: npm run stage:npm-cli
 
       - name: Publish npm packages
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
         shell: bash
         run: |
-          if [[ -n "${NODE_AUTH_TOKEN}" ]]; then
-            echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
-          fi
           for package_dir in dist/npm/invoicegen-darwin-arm64 dist/npm/invoicegen-darwin-x64 dist/npm/invoicegen-linux-arm64 dist/npm/invoicegen-linux-x64; do
             npm publish "$package_dir" --access public
           done

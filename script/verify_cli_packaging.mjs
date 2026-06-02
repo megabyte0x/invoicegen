@@ -67,10 +67,16 @@ assert.ok(formula.includes("system \"cargo\", \"install\""));
 const releaseWorkflowPath = path.join(root, ".github", "workflows", "publish.yml");
 assert.ok(fs.existsSync(releaseWorkflowPath), "missing CLI release workflow");
 const releaseWorkflow = fs.readFileSync(releaseWorkflowPath, "utf8");
-assert.ok(releaseWorkflow.includes("NPM_TOKEN"), "workflow must support npm publish token");
 assert.ok(releaseWorkflow.includes("id-token: write"), "workflow must support npm trusted publishing");
 assert.ok(releaseWorkflow.includes("actions/setup-node@v6"), "workflow must set up a trusted-publishing capable npm");
 assert.ok(releaseWorkflow.includes("node-version: \"24\""), "workflow must use Node 24 for npm trusted publishing");
+assert.ok(releaseWorkflow.includes("NPM_CONFIG_PROVENANCE"), "workflow must publish npm packages with provenance");
+assert.ok(!releaseWorkflow.includes("NODE_AUTH_TOKEN"), "workflow must not use token auth for npm publishing");
+assert.ok(!releaseWorkflow.includes("NPM_TOKEN"), "workflow must not require an npm token for trusted publishing");
+assert.ok(
+  !releaseWorkflow.includes("//registry.npmjs.org/:_authToken"),
+  "workflow must not write npm token auth to .npmrc",
+);
 assert.ok(releaseWorkflow.includes("HOMEBREW_TAP_TOKEN"), "workflow must support Homebrew tap token");
 
 console.log("CLI packaging metadata is ready.");

@@ -95,8 +95,7 @@ Publishing prerequisites:
 
 - create or confirm access to the npm scope `@megabyte0x`
 - configure npm trusted publishers for the npm packages with workflow filename
-  `publish.yml` (filename only, not `.github/workflows/publish.yml`), or create
-  `NPM_TOKEN` as a GitHub Actions secret with publish access
+  `publish.yml` (filename only, not `.github/workflows/publish.yml`)
 - create the Homebrew tap repository, expected by default at
   `megabyte0x/homebrew-tap`
 - create `HOMEBREW_TAP_TOKEN` as a GitHub Actions secret with push access to
@@ -112,7 +111,7 @@ ALLOW_MISSING_CLI_BINARIES=1 npm run stage:npm-cli
 
 Tagged releases run `.github/workflows/publish.yml`, which builds native CLI
 archives, uploads GitHub Release assets, stages npm packages, publishes npm
-packages through npm trusted publishing or `NPM_TOKEN`, and optionally updates
+packages through npm trusted publishing with provenance, and optionally updates
 the Homebrew tap when `HOMEBREW_TAP_TOKEN` exists.
 
 ## Run the macOS App

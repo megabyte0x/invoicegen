@@ -157,7 +157,7 @@ ALLOW_MISSING_CLI_BINARIES=1 npm run stage:npm-cli
 
 Use strict `npm run stage:npm-cli` only when all platform binaries exist in `dist/cli/<rust-target>/bin/`; it should fail if a publishable native package would be missing its binary.
 
-The release workflow expects these secrets when publishing is desired:
+The release workflow expects this publishing setup:
 
-- `NPM_TOKEN` for npm package publishing
+- npm Trusted Publishers configured for `@megabyte0x/invoicegen` and each platform package with workflow filename `publish.yml`
 - `HOMEBREW_TAP_TOKEN` for pushing `Formula/invoicegen.rb` to `megabyte0x/homebrew-tap`
