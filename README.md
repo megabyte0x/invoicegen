@@ -109,7 +109,7 @@ The Codex app Run action is wired to the same script.
 
 The package script builds `InvoiceGen` in release mode, stages
 `dist/release/InvoiceGen.app`, signs it, verifies the app bundle, and creates
-`dist/release/InvoiceGen-0.1.3.dmg`.
+`dist/release/InvoiceGen-0.1.4.dmg`.
 
 By default the script uses ad-hoc signing for local validation. For a
 distributable build, provide a Developer ID identity:
@@ -136,8 +136,8 @@ command and deploy only the generated static site output.
 Version tags publish a GitHub Release automatically:
 
 ```sh
-git tag v0.1.3
-git push origin v0.1.3
+git tag v0.1.4
+git push origin v0.1.4
 ```
 
 The release workflow runs `script/package_release.sh` on macOS and uploads

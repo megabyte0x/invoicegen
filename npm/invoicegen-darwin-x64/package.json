@@ -1,6 +1,6 @@
 {
   "name": "@megabyte0x/invoicegen-darwin-x64",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Native macOS x64 binary for @megabyte0x/invoicegen",
   "license": "MIT",
   "os": [
