@@ -1,6 +1,6 @@
 {
   "name": "@megabyte0x/invoicegen",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Local-first invoice management CLI for InvoiceGen",
   "license": "MIT",
   "homepage": "https://github.com/megabyte0x/invoicegen#readme",
@@ -18,10 +18,10 @@
     "bin/"
   ],
   "optionalDependencies": {
-    "@megabyte0x/invoicegen-darwin-arm64": "0.1.4",
-    "@megabyte0x/invoicegen-darwin-x64": "0.1.4",
-    "@megabyte0x/invoicegen-linux-arm64": "0.1.4",
-    "@megabyte0x/invoicegen-linux-x64": "0.1.4"
+    "@megabyte0x/invoicegen-darwin-arm64": "0.1.5",
+    "@megabyte0x/invoicegen-darwin-x64": "0.1.5",
+    "@megabyte0x/invoicegen-linux-arm64": "0.1.5",
+    "@megabyte0x/invoicegen-linux-x64": "0.1.5"
   },
   "publishConfig": {
     "access": "public"
