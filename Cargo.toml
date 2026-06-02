@@ -1,0 +1,20 @@
+[package]
+name = "invoicegen-rs"
+version = "0.1.1"
+edition = "2021"
+description = "Local-first invoice management CLI for InvoiceGen"
+license = "MIT"
+repository = "https://github.com/megabyte0x/invoicegen"
+readme = "README.md"
+
+[lib]
+name = "invoicegen_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "invoicegen-rs"
+path = "src/main.rs"
+
+[[test]]
+name = "rust_cli_contract"
+path = "RustTests/rust_cli_contract.rs"
