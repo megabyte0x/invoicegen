@@ -11,7 +11,6 @@ const platforms = [
   ["invoicegen-darwin-x64", "x86_64-apple-darwin", "invoicegen-rs"],
   ["invoicegen-linux-arm64", "aarch64-unknown-linux-gnu", "invoicegen-rs"],
   ["invoicegen-linux-x64", "x86_64-unknown-linux-gnu", "invoicegen-rs"],
-  ["invoicegen-win32-x64", "x86_64-pc-windows-msvc", "invoicegen-rs.exe"],
 ];
 
 fs.rmSync(outRoot, { recursive: true, force: true });

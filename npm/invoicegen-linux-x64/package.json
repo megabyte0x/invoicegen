@@ -1,6 +1,6 @@
 {
   "name": "@megabyte0x/invoicegen-linux-x64",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Native Linux x64 binary for @megabyte0x/invoicegen",
   "license": "MIT",
   "os": [

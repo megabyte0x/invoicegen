@@ -8,7 +8,6 @@ const platformPackages = {
   "darwin-x64": ["@megabyte0x/invoicegen-darwin-x64", "invoicegen-rs"],
   "linux-arm64": ["@megabyte0x/invoicegen-linux-arm64", "invoicegen-rs"],
   "linux-x64": ["@megabyte0x/invoicegen-linux-x64", "invoicegen-rs"],
-  "win32-x64": ["@megabyte0x/invoicegen-win32-x64", "invoicegen-rs.exe"],
 };
 
 function resolveBinary() {

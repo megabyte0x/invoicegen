@@ -41,8 +41,6 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-          - runner: windows-latest
-            target: x86_64-pc-windows-msvc
 
     steps:
       - name: Check out repository
@@ -134,7 +132,7 @@ jobs:
         shell: bash
         run: |
           echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
-          for package_dir in dist/npm/invoicegen-darwin-arm64 dist/npm/invoicegen-darwin-x64 dist/npm/invoicegen-linux-arm64 dist/npm/invoicegen-linux-x64 dist/npm/invoicegen-win32-x64; do
+          for package_dir in dist/npm/invoicegen-darwin-arm64 dist/npm/invoicegen-darwin-x64 dist/npm/invoicegen-linux-arm64 dist/npm/invoicegen-linux-x64; do
             npm publish "$package_dir" --access public
           done
           npm publish dist/npm/invoicegen --access public

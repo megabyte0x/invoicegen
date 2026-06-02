@@ -68,7 +68,8 @@ The npm package metadata lives in `npm/`. The root package remains private
 because it is used for the static site. The publishable CLI package is
 `@megabyte0x/invoicegen`, with platform packages such as
 `@megabyte0x/invoicegen-darwin-arm64` and
-`@megabyte0x/invoicegen-win32-x64`.
+`@megabyte0x/invoicegen-linux-x64`. Windows publishing is intentionally paused
+for now.
 
 Publishing prerequisites:
 
@@ -108,7 +109,7 @@ The Codex app Run action is wired to the same script.
 
 The package script builds `InvoiceGen` in release mode, stages
 `dist/release/InvoiceGen.app`, signs it, verifies the app bundle, and creates
-`dist/release/InvoiceGen-0.1.2.dmg`.
+`dist/release/InvoiceGen-0.1.3.dmg`.
 
 By default the script uses ad-hoc signing for local validation. For a
 distributable build, provide a Developer ID identity:
@@ -135,8 +136,8 @@ command and deploy only the generated static site output.
 Version tags publish a GitHub Release automatically:
 
 ```sh
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.3
+git push origin v0.1.3
 ```
 
 The release workflow runs `script/package_release.sh` on macOS and uploads
