@@ -1,0 +1,13 @@
+.build
+.swiftpm
+.omx
+DerivedData
+dist
+Sources
+Tests
+.github
+Package.swift
+script/build_and_run.sh
+script/package_release.sh
+*.log
+*.xcuserstate
