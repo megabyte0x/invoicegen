@@ -35,7 +35,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          asset="dist/release/InvoiceGen-${INVOICEGEN_VERSION}.zip"
+          asset="dist/release/InvoiceGen-${INVOICEGEN_VERSION}.dmg"
           notes="Native macOS build of InvoiceGen ${INVOICEGEN_VERSION}."
 
           if [[ ! -f "$asset" ]]; then

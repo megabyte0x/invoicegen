@@ -16,12 +16,13 @@ APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
-ZIP_PATH="$RELEASE_DIR/$APP_NAME-$VERSION.zip"
+DMG_PATH="$RELEASE_DIR/$APP_NAME-$VERSION.dmg"
 
 swift build -c release --product "$APP_NAME"
 BUILD_BINARY="$(swift build -c release --show-bin-path)/$APP_NAME"
 
-rm -rf "$APP_BUNDLE" "$ZIP_PATH"
+rm -rf "$APP_BUNDLE"
+rm -f "$DMG_PATH"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
@@ -62,7 +63,12 @@ else
 fi
 
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
-ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_PATH"
+hdiutil create \
+  -volname "$APP_NAME $VERSION" \
+  -srcfolder "$APP_BUNDLE" \
+  -ov \
+  -format UDZO \
+  "$DMG_PATH"
 
 echo "Packaged $APP_BUNDLE"
-echo "Created $ZIP_PATH"
+echo "Created $DMG_PATH"
