@@ -46,3 +46,26 @@ CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./script/packag
 ```
 
 Notarization still requires Apple credentials and a Developer ID signature.
+
+## Website
+
+The static website lives in `site/` and is built without dependencies:
+
+```sh
+npm run build:site
+```
+
+The build output is written to `dist/site`. Vercel is configured to run that
+command and deploy only the generated static site output.
+
+## GitHub Releases
+
+Version tags publish a GitHub Release automatically:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow runs `script/package_release.sh` on macOS and uploads
+`dist/release/InvoiceGen-<version>.zip` to the matching GitHub Release.

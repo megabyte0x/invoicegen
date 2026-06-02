@@ -1,0 +1,9 @@
+{
+  "name": "invoicegen-site",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:site",
+    "build:site": "node script/build_site.mjs"
+  }
+}

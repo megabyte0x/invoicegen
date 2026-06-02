@@ -1,0 +1,52 @@
+name: GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package-macos:
+    name: Package macOS app
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Derive release version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ -z "$version" || "$version" == "$GITHUB_REF_NAME" ]]; then
+            echo "Release tags must use the v<version> format, for example v0.1.0." >&2
+            exit 1
+          fi
+          echo "INVOICEGEN_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Build package
+        run: ./script/package_release.sh
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          asset="dist/release/InvoiceGen-${INVOICEGEN_VERSION}.zip"
+          notes="Native macOS build of InvoiceGen ${INVOICEGEN_VERSION}."
+
+          if [[ ! -f "$asset" ]]; then
+            echo "Missing release artifact: $asset" >&2
+            exit 1
+          fi
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$asset" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$asset" \
+              --title "InvoiceGen ${INVOICEGEN_VERSION}" \
+              --notes "$notes"
+          fi
