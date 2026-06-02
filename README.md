@@ -60,9 +60,9 @@ cargo install --path .
 invoicegen-rs --help
 ```
 
-After npm publishing, users can install the wrapper package. The npm package
-exposes the shorter `invoicegen` command and downloads the matching native
-binary package for the user's OS and CPU:
+Users can install the npm wrapper package. The npm package exposes the shorter
+`invoicegen` command and downloads the matching native binary package for the
+user's OS and CPU:
 
 ```sh
 npm install -g @megabyte0x/invoicegen
@@ -84,12 +84,15 @@ because it is used for the static site. The publishable CLI package is
 `@megabyte0x/invoicegen`, with platform packages such as
 `@megabyte0x/invoicegen-darwin-arm64` and
 `@megabyte0x/invoicegen-linux-x64`. Windows publishing is intentionally paused
-for now.
+for now. The public npm package README lives in `npm/invoicegen/README.md` and
+is included in the package tarball.
 
 Publishing prerequisites:
 
 - create or confirm access to the npm scope `@megabyte0x`
-- create `NPM_TOKEN` as a GitHub Actions secret with publish access
+- configure npm trusted publishers for the npm packages with workflow filename
+  `publish.yml` (filename only, not `.github/workflows/publish.yml`), or create
+  `NPM_TOKEN` as a GitHub Actions secret with publish access
 - create the Homebrew tap repository, expected by default at
   `megabyte0x/homebrew-tap`
 - create `HOMEBREW_TAP_TOKEN` as a GitHub Actions secret with push access to
@@ -103,10 +106,10 @@ npm run build:cli-release
 ALLOW_MISSING_CLI_BINARIES=1 npm run stage:npm-cli
 ```
 
-Tagged releases run `.github/workflows/release-cli.yml`, which builds native
-CLI archives, uploads GitHub Release assets, stages npm packages, optionally
-publishes npm packages when `NPM_TOKEN` exists, and optionally updates the
-Homebrew tap when `HOMEBREW_TAP_TOKEN` exists.
+Tagged releases run `.github/workflows/publish.yml`, which builds native CLI
+archives, uploads GitHub Release assets, stages npm packages, publishes npm
+packages through npm trusted publishing or `NPM_TOKEN`, and optionally updates
+the Homebrew tap when `HOMEBREW_TAP_TOKEN` exists.
 
 ## Run the macOS App
 

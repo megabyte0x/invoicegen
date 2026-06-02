@@ -22,7 +22,7 @@ Treat the Swift app and Rust CLI as two clients for the same local-first invoice
 - npm package metadata and wrapper: `npm/`
 - CLI release scripts: `script/build_cli_release.mjs`, `script/stage_npm_packages.mjs`, `script/render_homebrew_formula.mjs`, `script/verify_cli_packaging.mjs`
 - Homebrew formula template: `Formula/invoicegen.rb`
-- CLI release workflow: `.github/workflows/release-cli.yml`
+- CLI release workflow: `.github/workflows/publish.yml`
 - Swift source of truth: `Sources/InvoiceCore/`
 
 ## How To Use The CLI

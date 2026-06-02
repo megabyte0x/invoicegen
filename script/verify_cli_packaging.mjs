@@ -16,13 +16,23 @@ assert.equal(mainPackage.version, version);
 assert.equal(mainPackage.bin.invoicegen, "bin/invoicegen.js");
 assert.equal(mainPackage.license, "MIT");
 assert.equal(mainPackage.publishConfig?.access, "public");
-assert.deepEqual(mainPackage.files, ["bin/"]);
+assert.ok(
+  mainPackage.keywords.includes("invoice"),
+  "main package should be discoverable by invoice keyword",
+);
+assert.deepEqual(mainPackage.files, ["bin/", "README.md"]);
 
 const wrapperPath = path.join(root, "npm", "invoicegen", "bin", "invoicegen.js");
 assert.ok(fs.existsSync(wrapperPath), "missing npm CLI wrapper");
 const wrapper = fs.readFileSync(wrapperPath, "utf8");
 assert.ok(wrapper.startsWith("#!/usr/bin/env node"), "wrapper must be executable by npm");
 assert.ok(wrapper.includes("spawnSync"), "wrapper must delegate to the native binary");
+
+const npmReadmePath = path.join(root, "npm", "invoicegen", "README.md");
+assert.ok(fs.existsSync(npmReadmePath), "missing npm package README");
+const npmReadme = fs.readFileSync(npmReadmePath, "utf8");
+assert.ok(npmReadme.includes("npm install -g @megabyte0x/invoicegen"));
+assert.ok(npmReadme.includes("invoicegen --help"));
 
 const platforms = [
   ["darwin-arm64", "darwin", "arm64", "invoicegen-rs"],
@@ -39,6 +49,7 @@ for (const [suffix, os, cpu, binaryName] of platforms) {
   assert.deepEqual(pkg.os, [os]);
   assert.deepEqual(pkg.cpu, [cpu]);
   assert.deepEqual(pkg.files, [`bin/${binaryName}`]);
+  assert.equal(pkg.publishConfig?.access, "public");
   assert.equal(
     mainPackage.optionalDependencies[pkg.name],
     version,
@@ -53,10 +64,13 @@ assert.ok(formula.includes("class Invoicegen < Formula"));
 assert.ok(formula.includes("depends_on \"rust\" => :build"));
 assert.ok(formula.includes("system \"cargo\", \"install\""));
 
-const releaseWorkflowPath = path.join(root, ".github", "workflows", "release-cli.yml");
+const releaseWorkflowPath = path.join(root, ".github", "workflows", "publish.yml");
 assert.ok(fs.existsSync(releaseWorkflowPath), "missing CLI release workflow");
 const releaseWorkflow = fs.readFileSync(releaseWorkflowPath, "utf8");
 assert.ok(releaseWorkflow.includes("NPM_TOKEN"), "workflow must support npm publish token");
+assert.ok(releaseWorkflow.includes("id-token: write"), "workflow must support npm trusted publishing");
+assert.ok(releaseWorkflow.includes("actions/setup-node@v6"), "workflow must set up a trusted-publishing capable npm");
+assert.ok(releaseWorkflow.includes("node-version: \"24\""), "workflow must use Node 24 for npm trusted publishing");
 assert.ok(releaseWorkflow.includes("HOMEBREW_TAP_TOKEN"), "workflow must support Homebrew tap token");
 
 console.log("CLI packaging metadata is ready.");

@@ -2,6 +2,13 @@
   "name": "@megabyte0x/invoicegen",
   "version": "0.1.5",
   "description": "Local-first invoice management CLI for InvoiceGen",
+  "keywords": [
+    "invoice",
+    "invoicing",
+    "cli",
+    "local-first",
+    "freelancers"
+  ],
   "license": "MIT",
   "homepage": "https://github.com/megabyte0x/invoicegen#readme",
   "repository": {
@@ -15,7 +22,8 @@
     "invoicegen": "bin/invoicegen.js"
   },
   "files": [
-    "bin/"
+    "bin/",
+    "README.md"
   ],
   "optionalDependencies": {
     "@megabyte0x/invoicegen-darwin-arm64": "0.1.5",
