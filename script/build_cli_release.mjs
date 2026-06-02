@@ -62,8 +62,14 @@ function rustHostTriple() {
 }
 
 function run(command, args) {
-  const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
+  const result = spawnSync(command, args, {
+    cwd: root,
+    stdio: "inherit",
+    shell: process.platform === "win32",
+    windowsHide: true,
+  });
   if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed`);
+    const code = result.status ?? result.signal ?? "unknown";
+    throw new Error(`${command} ${args.join(" ")} failed with ${code}`);
   }
 }

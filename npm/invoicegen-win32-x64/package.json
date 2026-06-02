@@ -1,6 +1,6 @@
 {
   "name": "@megabyte0x/invoicegen-win32-x64",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Native Windows x64 binary for @megabyte0x/invoicegen",
   "license": "MIT",
   "os": [
