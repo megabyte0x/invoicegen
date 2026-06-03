@@ -8,6 +8,15 @@ const cargoToml = fs.readFileSync(path.join(root, "Cargo.toml"), "utf8");
 const version = cargoToml.match(/^version = "([^"]+)"/m)?.[1];
 assert.ok(version, "Cargo.toml must contain a package version");
 
+const rootPackagePath = path.join(root, "package.json");
+assert.ok(fs.existsSync(rootPackagePath), "missing root package.json");
+const rootPackage = JSON.parse(fs.readFileSync(rootPackagePath, "utf8"));
+assert.equal(
+  rootPackage.version,
+  version,
+  "root package version must match Cargo.toml for Vercel site builds",
+);
+
 const mainPackagePath = path.join(root, "npm", "invoicegen", "package.json");
 assert.ok(fs.existsSync(mainPackagePath), "missing npm/invoicegen/package.json");
 const mainPackage = JSON.parse(fs.readFileSync(mainPackagePath, "utf8"));
@@ -70,6 +79,14 @@ const site = fs.readFileSync(sitePath, "utf8");
 assert.ok(site.includes("__INVOICEGEN_VERSION__"), "site should derive release version during build");
 assert.ok(!site.includes("v0.1.5"), "site must not hardcode an old release version");
 assert.ok(!/discounts?/i.test(site), "site must not claim discount support until the product model supports it");
+
+const buildSitePath = path.join(root, "script", "build_site.mjs");
+assert.ok(fs.existsSync(buildSitePath), "missing static site build script");
+const buildSite = fs.readFileSync(buildSitePath, "utf8");
+assert.ok(
+  buildSite.includes("package.json"),
+  "site build must fall back to package.json when Cargo.toml is excluded from Vercel",
+);
 
 const releaseWorkflowPath = path.join(root, ".github", "workflows", "publish.yml");
 assert.ok(fs.existsSync(releaseWorkflowPath), "missing CLI release workflow");
