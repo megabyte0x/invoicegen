@@ -64,6 +64,13 @@ assert.ok(formula.includes("class Invoicegen < Formula"));
 assert.ok(formula.includes("depends_on \"rust\" => :build"));
 assert.ok(formula.includes("system \"cargo\", \"install\""));
 
+const sitePath = path.join(root, "site", "index.html");
+assert.ok(fs.existsSync(sitePath), "missing static site index");
+const site = fs.readFileSync(sitePath, "utf8");
+assert.ok(site.includes("__INVOICEGEN_VERSION__"), "site should derive release version during build");
+assert.ok(!site.includes("v0.1.5"), "site must not hardcode an old release version");
+assert.ok(!/discounts?/i.test(site), "site must not claim discount support until the product model supports it");
+
 const releaseWorkflowPath = path.join(root, ".github", "workflows", "publish.yml");
 assert.ok(fs.existsSync(releaseWorkflowPath), "missing CLI release workflow");
 const releaseWorkflow = fs.readFileSync(releaseWorkflowPath, "utf8");
@@ -78,5 +85,24 @@ assert.ok(
   "workflow must not write npm token auth to .npmrc",
 );
 assert.ok(releaseWorkflow.includes("HOMEBREW_TAP_TOKEN"), "workflow must support Homebrew tap token");
+assert.ok(
+  releaseWorkflow.includes("node script/publish_npm_packages.mjs"),
+  "workflow must use the idempotent npm publish script",
+);
+assert.ok(
+  releaseWorkflow.includes("npm_publish_dry_run"),
+  "workflow must expose a manual npm publish dry-run gate",
+);
+assert.ok(
+  releaseWorkflow.includes("NPM_PUBLISH_DRY_RUN"),
+  "workflow must pass dry-run mode to the npm publish script",
+);
+
+const npmPublishScriptPath = path.join(root, "script", "publish_npm_packages.mjs");
+assert.ok(fs.existsSync(npmPublishScriptPath), "missing idempotent npm publish script");
+const npmPublishScript = fs.readFileSync(npmPublishScriptPath, "utf8");
+assert.ok(npmPublishScript.includes("npm view"), "publish script must skip already-published versions");
+assert.ok(npmPublishScript.includes("NPM_PUBLISH_DRY_RUN"), "publish script must support dry-run verification");
+assert.ok(!npmPublishScript.includes("_authToken"), "publish script must not write token auth");
 
 console.log("CLI packaging metadata is ready.");

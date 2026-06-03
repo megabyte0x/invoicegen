@@ -68,6 +68,8 @@ public final class LocalInvoiceStore {
     }
 
     public func save(_ book: InvoiceBook) throws {
+        try book.validateForSave()
+
         let directory = url.deletingLastPathComponent()
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
@@ -83,6 +85,38 @@ public final class LocalInvoiceStore {
             try fileManager.copyItem(at: url, to: backupURL)
         }
         try data.write(to: url, options: [.atomic])
+    }
+
+    public func exportStore(to destinationURL: URL) throws {
+        _ = try load()
+        if url.standardizedFileURL == destinationURL.standardizedFileURL {
+            return
+        }
+
+        let directory = destinationURL.deletingLastPathComponent()
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        if fileManager.fileExists(atPath: url.path) {
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                try fileManager.removeItem(at: destinationURL)
+            }
+            try fileManager.copyItem(at: url, to: destinationURL)
+        } else {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(InvoiceBook.empty)
+            try data.write(to: destinationURL, options: [.atomic])
+        }
+    }
+
+    public func restoreStore(from sourceURL: URL) throws {
+        let data = try Data(contentsOf: sourceURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var book = try decoder.decode(InvoiceBook.self, from: data)
+        book.schemaVersion = InvoiceBook.currentSchemaVersion
+        try save(book)
     }
 
     public func update<T>(_ transform: (inout InvoiceBook) throws -> T) throws -> T {

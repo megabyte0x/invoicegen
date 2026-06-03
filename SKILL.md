@@ -59,6 +59,8 @@ cargo run -- --store /tmp/invoicegen-store.json seed-sample --force
 cargo run -- --store /tmp/invoicegen-store.json summary
 cargo run -- --store /tmp/invoicegen-store.json invoice list --status overdue --format json
 cargo run -- --store /tmp/invoicegen-store.json invoice render INV-2026-0001
+cargo run -- --store /tmp/invoicegen-store.json store export /tmp/invoicegen-backup.json
+cargo run -- --store /tmp/invoicegen-store.json store restore /tmp/invoicegen-backup.json --force
 ```
 
 When `--store` is omitted, the CLI honors `INVOICEGEN_APP_STORE`. If that environment variable is also unset, it uses the same default app store convention as the macOS app.
@@ -117,6 +119,8 @@ Destructive delete commands require `--force`; do not remove that guard when ext
 - Prefer `/tmp/...` stores while testing.
 - Do not run `seed-sample --force` against the user's real app store unless explicitly asked.
 - Keep backup behavior intact: saving over an existing store creates `store.json.bak`.
+- Use `store export PATH` and `store restore PATH --force` for explicit backup and recovery workflows.
+- Keep shared validation intact so invalid invoice numbers, duplicate invoice numbers, invalid dates, invalid currency codes, non-positive quantities, negative prices, invalid tax rates, and overpayments cannot replace the store.
 - Preserve legacy decoding behavior for stores missing v2 fields such as `paymentAcceptanceDetails` and `acceptedPaymentDetailIDs`.
 
 ## Compatibility Notes

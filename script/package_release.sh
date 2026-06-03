@@ -4,11 +4,11 @@ set -euo pipefail
 APP_NAME="InvoiceGen"
 BUNDLE_ID="com.megabyte0x.InvoiceGen"
 MIN_SYSTEM_VERSION="14.0"
-VERSION="${INVOICEGEN_VERSION:-0.1.4}"
 BUILD_NUMBER="${INVOICEGEN_BUILD_NUMBER:-1}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VERSION="${INVOICEGEN_VERSION:-$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT_DIR/Cargo.toml" | head -n 1)}"
 RELEASE_DIR="$ROOT_DIR/dist/release"
 APP_BUNDLE="$RELEASE_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"

@@ -97,6 +97,55 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(loaded.businessProfile.name, "Updated Business")
     }
 
+    func testLocalStoreRejectsInvalidInvoiceBookWithoutReplacingExistingStore() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let url = directory.appendingPathComponent("store.json")
+        let store = LocalInvoiceStore(url: url)
+        let validInvoice = Invoice(
+            number: "INV-VALID",
+            issueDate: Date(timeIntervalSince1970: 0),
+            dueDate: Date(timeIntervalSince1970: 86_400),
+            lineItems: [
+                InvoiceLineItem(title: "Work", unitPriceMinorUnits: 10_000)
+            ]
+        )
+        try store.save(InvoiceBook(businessProfile: BusinessProfile(name: "Valid Co"), invoices: [validInvoice]))
+
+        let invalidInvoice = Invoice(
+            number: "   ",
+            issueDate: Date(timeIntervalSince1970: 86_400),
+            dueDate: Date(timeIntervalSince1970: 0),
+            currencyCode: "usd",
+            lineItems: [
+                InvoiceLineItem(title: "", quantity: 0, unitPriceMinorUnits: -1, taxRatePercent: -5)
+            ]
+        )
+
+        XCTAssertThrowsError(try store.save(InvoiceBook(invoices: [invalidInvoice]))) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Invoice number is required"), "\(error)")
+            XCTAssertTrue(error.localizedDescription.contains("Due date cannot be before issue date"), "\(error)")
+        }
+
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.businessProfile.name, "Valid Co")
+        XCTAssertEqual(loaded.invoices.first?.number, "INV-VALID")
+    }
+
+    func testLocalStoreExportsAndRestoresStoreFile() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let url = directory.appendingPathComponent("store.json")
+        let exportURL = directory.appendingPathComponent("backups/exported-store.json")
+        let store = LocalInvoiceStore(url: url)
+
+        try store.save(InvoiceBook(businessProfile: BusinessProfile(name: "Original Co")))
+        try store.exportStore(to: exportURL)
+        try store.save(InvoiceBook(businessProfile: BusinessProfile(name: "Changed Co")))
+        try store.restoreStore(from: exportURL)
+
+        let restored = try store.load()
+        XCTAssertEqual(restored.businessProfile.name, "Original Co")
+    }
+
     func testAppStoreOverrides() {
         let appURL = LocalInvoiceStore.defaultStoreURL(
             environment: ["INVOICEGEN_APP_STORE": "/tmp/invoicegen-app.json"]
@@ -125,7 +174,8 @@ final class InvoiceCoreTests: XCTestCase {
         )
         let invoice = Invoice(
             number: "INV-2026-0003",
-            dueDate: Date(),
+            issueDate: timestamp,
+            dueDate: timestamp.addingTimeInterval(86_400),
             lineItems: [
                 InvoiceLineItem(title: "Work", unitPriceMinorUnits: 10000)
             ],

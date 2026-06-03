@@ -68,6 +68,29 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func exportStore(to destinationURL: URL) {
+        do {
+            try store.exportStore(to: destinationURL)
+            errorMessage = "Exported local store backup to \(destinationURL.path)"
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func restoreStore(from sourceURL: URL) {
+        do {
+            try store.restoreStore(from: sourceURL)
+            book = try store.load()
+            loadedStoreSuccessfully = true
+            selectedInvoiceID = book.invoices.first?.id
+            selectedClientID = book.clients.first?.id
+            selectedProjectID = book.projects.first?.id
+            errorMessage = "Restored local store from \(sourceURL.path)"
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func save() {
         save(allowingOverwriteAfterLoadFailure: false)
     }

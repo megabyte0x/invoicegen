@@ -52,9 +52,9 @@
             "name": "InvoiceGen",
             "applicationCategory": "BusinessApplication",
             "operatingSystem": "macOS 14.0 or newer",
-            "softwareVersion": "0.1.5",
+            "softwareVersion": "__INVOICEGEN_VERSION__",
             "url": "https://invoicegen.megabyte.sh/",
-            "downloadUrl": "https://github.com/megabyte0x/invoicegen/releases/download/v0.1.5/InvoiceGen-0.1.5.dmg",
+            "downloadUrl": "https://github.com/megabyte0x/invoicegen/releases/download/v__INVOICEGEN_VERSION__/InvoiceGen-__INVOICEGEN_VERSION__.dmg",
             "codeRepository": "https://github.com/megabyte0x/invoicegen",
             "license": "https://opensource.org/license/mit",
             "image": "https://invoicegen.megabyte.sh/assets/invoicegen-preview.png",
@@ -69,7 +69,7 @@
               "price": "0",
               "priceCurrency": "USD"
             },
-            "dateModified": "2026-06-02"
+            "dateModified": "__INVOICEGEN_DATE_MODIFIED__"
           }
         ]
       }
@@ -97,7 +97,7 @@
         <a href="#overview">Overview</a>
         <a href="#features">Features</a>
         <a href="#faq">FAQ</a>
-        <a id="nav-download" href="https://github.com/megabyte0x/invoicegen/releases/download/v0.1.5/InvoiceGen-0.1.5.dmg">Download</a>
+        <a id="nav-download" href="https://github.com/megabyte0x/invoicegen/releases/download/v__INVOICEGEN_VERSION__/InvoiceGen-__INVOICEGEN_VERSION__.dmg">Download</a>
         <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle dark/light mode" title="Toggle theme">
           <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="4" />
@@ -119,7 +119,7 @@
             InvoiceGen gives independent operators a focused local workspace for clients, projects, invoices, payment details, and PDF-ready exports.
           </p>
           <div class="actions" aria-label="Primary actions">
-            <a class="button primary" id="hero-download-btn" href="https://github.com/megabyte0x/invoicegen/releases/download/v0.1.5/InvoiceGen-0.1.5.dmg">
+            <a class="button primary" id="hero-download-btn" href="https://github.com/megabyte0x/invoicegen/releases/download/v__INVOICEGEN_VERSION__/InvoiceGen-__INVOICEGEN_VERSION__.dmg">
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor">
                 <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M12 2v12M16 10l-4 4-4-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
@@ -157,7 +157,7 @@
           </div>
 
           <div class="download-meta">
-            <span id="meta-version">Version v0.1.5</span>
+            <span id="meta-version">Version v__INVOICEGEN_VERSION__</span>
             <span id="meta-size">Build from source or releases</span>
             <span id="meta-platform">macOS 14.0+</span>
           </div>
@@ -196,7 +196,7 @@
           </div>
           <div>
             <strong>PDF ready</strong>
-            <span>Line items, tax, discounts, and payment notes.</span>
+            <span>Line items, tax, payment details, and notes.</span>
           </div>
           <div>
             <strong>Scriptable</strong>
@@ -210,7 +210,7 @@
           <p class="eyebrow">Quick answer</p>
           <h2 id="overview-title">What is InvoiceGen?</h2>
           <p>
-            InvoiceGen is a local-first macOS invoice app and Rust CLI for freelancers, consultants, and small operators who want invoice data to stay on their Mac. The app manages clients, projects, payment details, invoice drafts, due dates, line items, discounts, tax rates, and PDF-ready exports without requiring an account or hosted backend. Its companion Rust CLI reads and writes the same local store format as the macOS app, so invoices can be listed, rendered, filtered, or automated from scripts. InvoiceGen is open source under the MIT License, free to download, and currently targets macOS 14 Sonoma or newer. It is best suited for solo operators who prefer a native desktop workflow, transparent local files, and simple automation over subscription invoicing platforms. For AI agents, the project publishes a repository skill at /SKILL.md with CLI commands, safety rules, sample workflows, and verification steps.
+            InvoiceGen is a local-first macOS invoice app and Rust CLI for freelancers, consultants, and small operators who want invoice data to stay on their Mac. The app manages clients, projects, payment details, invoice drafts, due dates, line items, tax rates, and PDF-ready exports without requiring an account or hosted backend. Its companion Rust CLI reads and writes the same local store format as the macOS app, so invoices can be listed, rendered, filtered, or automated from scripts. InvoiceGen is open source under the MIT License, free to download, and currently targets macOS 14 Sonoma or newer. It is best suited for solo operators who prefer a native desktop workflow, transparent local files, and simple automation over subscription invoicing platforms. For AI agents, the project publishes a repository skill at /SKILL.md with CLI commands, safety rules, sample workflows, and verification steps.
           </p>
         </div>
         <dl class="fact-list" aria-label="InvoiceGen facts">
@@ -258,7 +258,7 @@
               </svg>
             </div>
             <h3>Draft & render invoices</h3>
-            <p>Generate clean, client-ready formats with structured invoice numbers, due dates, line items, customizable tax rates, discounts, and payment terms.</p>
+            <p>Generate clean, client-ready formats with structured invoice numbers, due dates, line items, customizable tax rates, payment details, and payment terms.</p>
           </article>
 
           <article class="feature-card">
@@ -351,7 +351,7 @@
             </button>
             <div class="faq-answer">
               <div class="faq-answer-inner">
-                Standard backups like Time Machine can capture the local application support data. You can also manually copy the app store file when migrating.
+                Use Export Backup and Restore Backup in Settings, or run `invoicegen store export PATH` and `invoicegen store restore PATH --force` from the CLI. Standard backups like Time Machine can also capture the local application support data.
               </div>
             </div>
           </div>

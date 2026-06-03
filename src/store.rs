@@ -30,6 +30,8 @@ impl LocalInvoiceStore {
     }
 
     pub fn save(&self, book: &InvoiceBook) -> Result<(), String> {
+        book.validate_for_save()?;
+
         let directory = self
             .path
             .parent()
@@ -64,6 +66,44 @@ impl LocalInvoiceStore {
             )
         })?;
         Ok(())
+    }
+
+    pub fn export_to(&self, destination: &Path) -> Result<(), String> {
+        let _ = self.load()?;
+        if self.path == destination {
+            return Ok(());
+        }
+
+        if let Some(directory) = destination.parent() {
+            fs::create_dir_all(directory)
+                .map_err(|error| format!("failed to create {}: {error}", directory.display()))?;
+        }
+        if self.path.exists() {
+            fs::copy(&self.path, destination).map_err(|error| {
+                format!(
+                    "failed to export {} to {}: {error}",
+                    self.path.display(),
+                    destination.display()
+                )
+            })?;
+        } else {
+            fs::write(
+                destination,
+                json::stringify_pretty(&InvoiceBook::empty().to_json()),
+            )
+            .map_err(|error| format!("failed to write {}: {error}", destination.display()))?;
+        }
+        Ok(())
+    }
+
+    pub fn restore_from(&self, source: &Path) -> Result<(), String> {
+        let data = fs::read_to_string(source)
+            .map_err(|error| format!("failed to read {}: {error}", source.display()))?;
+        let json = json::parse(&data)?;
+        let mut book = InvoiceBook::from_json(&json)?;
+        book.schema_version = CURRENT_SCHEMA_VERSION;
+        book.refresh_invoice_statuses(&now_iso());
+        self.save(&book)
     }
 }
 

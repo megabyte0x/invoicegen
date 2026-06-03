@@ -1,9 +1,11 @@
 import SwiftUI
 import InvoiceCore
+import AppKit
 
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
     @State private var isConfirmingSeedSampleData = false
+    @State private var restoreURLPendingConfirmation: URL?
     @State private var paymentDetailIDPendingDeletion: UUID?
 
     var body: some View {
@@ -165,6 +167,38 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                         
                         Button(action: {
+                            exportStoreBackup()
+                        }) {
+                            Label("Export Backup", systemImage: "square.and.arrow.up")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(Color.runeyPrimary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            chooseStoreBackupToRestore()
+                        }) {
+                            Label("Restore Backup", systemImage: "arrow.down.doc")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(Color.runeyPrimary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
                             isConfirmingSeedSampleData = true
                         }) {
                             Label("Seed Sample Data", systemImage: "doc.text.fill.badge.plus")
@@ -175,7 +209,44 @@ struct SettingsView: View {
                                 .background(Color.runeyInfo, in: RoundedRectangle(cornerRadius: 8))
                         }
                         .buttonStyle(.plain)
-                        
+
+                        Spacer()
+                    }
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            NSWorkspace.shared.activateFileViewerSelecting([model.store.url])
+                        }) {
+                            Label("Open Store Folder", systemImage: "folder")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(Color.runeyPrimary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(model.store.url.path, forType: .string)
+                            model.errorMessage = "Copied local store path."
+                        }) {
+                            Label("Copy Store Path", systemImage: "doc.on.doc")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(Color.runeyPrimary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(.plain)
+
                         Spacer()
                     }
                     .padding(.top, 4)
@@ -198,6 +269,22 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This replaces the current local invoice store with sample clients, projects, invoices, and payment details.")
+        }
+        .alert("Restore local data from backup?", isPresented: Binding(
+            get: { restoreURLPendingConfirmation != nil },
+            set: { if !$0 { restoreURLPendingConfirmation = nil } }
+        )) {
+            Button("Restore Backup", role: .destructive) {
+                if let url = restoreURLPendingConfirmation {
+                    model.restoreStore(from: url)
+                }
+                restoreURLPendingConfirmation = nil
+            }
+            Button("Cancel", role: .cancel) {
+                restoreURLPendingConfirmation = nil
+            }
+        } message: {
+            Text("This replaces the current local invoice store with the selected backup file.")
         }
         .alert("Delete payment details?", isPresented: Binding(
             get: { paymentDetailIDPendingDeletion != nil },
@@ -224,6 +311,28 @@ struct SettingsView: View {
                 model.book.businessProfile.paymentTermsDays = min(max(newValue, 0), 120)
             }
         )
+    }
+
+    private func exportStoreBackup() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = "InvoiceGen-store-backup.json"
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            model.exportStore(to: url)
+        }
+    }
+
+    private func chooseStoreBackupToRestore() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            restoreURLPendingConfirmation = url
+        }
     }
 
     private func runeyField(_ label: String, text: Binding<String>, isMultiline: Bool = false) -> some View {

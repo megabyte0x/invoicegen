@@ -454,6 +454,156 @@ impl InvoiceBook {
         format!("{prefix}{:04}", max_sequence + 1)
     }
 
+    pub fn validate_for_save(&self) -> Result<(), String> {
+        let mut issues = Vec::new();
+
+        if !is_valid_currency_code(&self.business_profile.currency_code) {
+            issues.push(
+                "Business profile currency must be a three-letter uppercase code".to_string(),
+            );
+        }
+        if !(0..=120).contains(&self.business_profile.payment_terms_days) {
+            issues.push("Payment terms must be between 0 and 120 days".to_string());
+        }
+
+        for project in &self.projects {
+            if let Some(client_id) = &project.client_id {
+                if !self.clients.iter().any(|client| &client.id == client_id) {
+                    issues.push(format!(
+                        "Project references a missing client: {}",
+                        project.name
+                    ));
+                }
+            }
+            if !is_valid_currency_code(&project.currency_code) {
+                issues.push(format!(
+                    "Project currency must be a three-letter uppercase code for project {}",
+                    project.name
+                ));
+            }
+            if project.hourly_rate_minor_units < 0 {
+                issues.push(format!(
+                    "Project hourly rate cannot be negative for project {}",
+                    project.name
+                ));
+            }
+        }
+
+        let mut seen_invoice_numbers = BTreeMap::new();
+        for invoice in &self.invoices {
+            let trimmed_number = invoice.number.trim();
+            if trimmed_number.is_empty() {
+                issues.push("Invoice number is required".to_string());
+            } else {
+                let normalized_number = trimmed_number.to_lowercase();
+                if seen_invoice_numbers.contains_key(&normalized_number) {
+                    issues.push(format!("Invoice number must be unique: {trimmed_number}"));
+                } else {
+                    seen_invoice_numbers.insert(normalized_number, invoice.id.clone());
+                }
+            }
+
+            if date_before(&invoice.due_date, &invoice.issue_date) {
+                issues.push(format!(
+                    "Due date cannot be before issue date for invoice {}",
+                    invoice_display_number(invoice)
+                ));
+            }
+            if !is_valid_currency_code(&invoice.currency_code) {
+                issues.push(format!(
+                    "Invoice currency must be a three-letter uppercase code for invoice {}",
+                    invoice_display_number(invoice)
+                ));
+            }
+            if let Some(client_id) = &invoice.client_id {
+                if !self.clients.iter().any(|client| &client.id == client_id) {
+                    issues.push(format!(
+                        "Invoice references a missing client: {}",
+                        invoice_display_number(invoice)
+                    ));
+                }
+            }
+            if let Some(project_id) = &invoice.project_id {
+                if !self
+                    .projects
+                    .iter()
+                    .any(|project| &project.id == project_id)
+                {
+                    issues.push(format!(
+                        "Invoice references a missing project: {}",
+                        invoice_display_number(invoice)
+                    ));
+                }
+            }
+            for payment_detail_id in &invoice.accepted_payment_detail_ids {
+                if !self
+                    .payment_acceptance_details
+                    .iter()
+                    .any(|detail| &detail.id == payment_detail_id)
+                {
+                    issues.push(format!(
+                        "Invoice references missing payment details: {}",
+                        invoice_display_number(invoice)
+                    ));
+                }
+            }
+            if invoice.paid_minor_units() > invoice.total_minor_units() {
+                issues.push(format!(
+                    "Payments cannot exceed invoice total for invoice {}",
+                    invoice_display_number(invoice)
+                ));
+            }
+            for payment in &invoice.payments {
+                if payment.amount_minor_units <= 0 {
+                    issues.push(format!(
+                        "Payment amount must be greater than zero for invoice {}",
+                        invoice_display_number(invoice)
+                    ));
+                }
+            }
+            for item in &invoice.line_items {
+                let item_label = if item.title.trim().is_empty() {
+                    "line item"
+                } else {
+                    item.title.as_str()
+                };
+                if item.title.trim().is_empty() {
+                    issues.push(format!(
+                        "Line item title is required for invoice {}",
+                        invoice_display_number(invoice)
+                    ));
+                }
+                if item.quantity <= 0.0 || !item.quantity.is_finite() {
+                    issues.push(format!(
+                        "Line item quantity must be greater than zero for {item_label}"
+                    ));
+                }
+                if item.unit_price_minor_units < 0 {
+                    issues.push(format!(
+                        "Line item unit price cannot be negative for {item_label}"
+                    ));
+                }
+                if item.tax_rate_percent < 0.0
+                    || item.tax_rate_percent > 100.0
+                    || !item.tax_rate_percent.is_finite()
+                {
+                    issues.push(format!(
+                        "Line item tax rate must be between 0 and 100 for {item_label}"
+                    ));
+                }
+            }
+        }
+
+        if issues.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "error: validation_failed\nmessage: {}\nhint: Fix invalid invoice data before saving.\n",
+                issues.join("; ")
+            ))
+        }
+    }
+
     pub fn from_json(value: &JsonValue) -> Result<Self, String> {
         let object = value
             .as_object()
@@ -521,6 +671,19 @@ impl InvoiceBook {
             ),
         ])
     }
+}
+
+fn invoice_display_number(invoice: &Invoice) -> String {
+    let trimmed = invoice.number.trim();
+    if trimmed.is_empty() {
+        invoice.id.clone()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn is_valid_currency_code(value: &str) -> bool {
+    value.len() == 3 && value.bytes().all(|byte| byte.is_ascii_uppercase())
 }
 
 impl BusinessProfile {
@@ -1135,11 +1298,17 @@ fn render_text_pdf(text: &str) -> Vec<u8> {
         let page_id = 3 + index * 2;
         let content_id = page_id + 1;
         objects.push(format!(
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_WIDTH} {PAGE_HEIGHT}] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Courier >> >> >> /Contents {content_id} 0 R >>"
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_WIDTH} {PAGE_HEIGHT}] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> >> >> /Contents {content_id} 0 R >>"
         ));
 
-        let mut stream = format!("BT\n/F1 10 Tf\n{LEFT_MARGIN} {TOP_Y} Td\n");
+        let mut stream = format!("BT\n{LEFT_MARGIN} {TOP_Y} Td\n");
         for (line_index, line) in page_lines.iter().enumerate() {
+            if is_pdf_heading(line, line_index) {
+                let size = if line_index == 0 { 16 } else { 10 };
+                stream.push_str(&format!("/F2 {size} Tf\n"));
+            } else {
+                stream.push_str("/F1 10 Tf\n");
+            }
             if line_index > 0 {
                 stream.push_str(&format!("0 -{LINE_HEIGHT} Td\n"));
             }
@@ -1157,6 +1326,13 @@ fn render_text_pdf(text: &str) -> Vec<u8> {
     }
 
     write_pdf_objects(objects)
+}
+
+fn is_pdf_heading(line: &str, line_index: usize) -> bool {
+    line_index == 0
+        || matches!(line, "Items" | "Notes" | "Terms" | "Payment Acceptance")
+        || line.starts_with("Subtotal:")
+        || line.starts_with("Balance:")
 }
 
 fn wrap_pdf_line(line: &str, max_chars: usize) -> Vec<String> {

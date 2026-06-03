@@ -21,6 +21,8 @@ invoicegen --store ./invoicegen-store.json seed-sample --force
 invoicegen --store ./invoicegen-store.json invoice list --format json
 invoicegen --store ./invoicegen-store.json invoice render INV-2026-0001
 invoicegen --store ./invoicegen-store.json invoice render INV-2026-0001 --output ./exports
+invoicegen --store ./invoicegen-store.json store export ./invoicegen-backup.json
+invoicegen --store ./invoicegen-store.json store restore ./invoicegen-backup.json --force
 ```
 
 When `--output` points to a directory, the CLI writes a PDF named from the
@@ -32,6 +34,9 @@ If `--store` is not provided, the CLI uses the app store path. Set
 ```sh
 INVOICEGEN_APP_STORE=~/invoices/store.json invoicegen invoice list
 ```
+
+The CLI validates invoice data before replacing the local store and refuses
+destructive restore operations unless `--force` is passed.
 
 ## Supported Platforms
 

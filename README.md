@@ -32,6 +32,8 @@ cargo run -- --store /tmp/invoicegen-store.json seed-sample --force
 cargo run -- --store /tmp/invoicegen-store.json invoice list --status overdue --format json
 cargo run -- --store /tmp/invoicegen-store.json invoice render INV-2026-0001
 cargo run -- --store /tmp/invoicegen-store.json invoice render INV-2026-0001 --output ./exports
+cargo run -- --store /tmp/invoicegen-store.json store export /tmp/invoicegen-backup.json
+cargo run -- --store /tmp/invoicegen-store.json store restore /tmp/invoicegen-backup.json --force
 cargo run -- completion zsh
 ```
 
@@ -45,7 +47,12 @@ Common workflows are available as subcommands for `profile`, `client`,
 List, show, summary, and config commands support `--format text|tsv|csv|json`.
 List commands also support common filters such as `--query`, `--status`,
 `--client`, `--sort`, and `--reverse` where they apply. Destructive delete
-commands require `--force`.
+commands and store restores require `--force`.
+
+The app and CLI validate invoice data before replacing the local store. Invalid
+invoice numbers, duplicate invoice numbers, due dates before issue dates,
+invalid currency codes, non-positive quantities, negative prices, invalid tax
+rates, and overpayments are rejected before disk writes.
 
 CLI defaults can be stored separately from invoice data:
 
@@ -130,7 +137,7 @@ The Codex app Run action is wired to the same script.
 
 The package script builds `InvoiceGen` in release mode, stages
 `dist/release/InvoiceGen.app`, signs it, verifies the app bundle, and creates
-`dist/release/InvoiceGen-0.1.4.dmg`.
+`dist/release/InvoiceGen-<version>.dmg`.
 
 By default the script uses ad-hoc signing for local validation. For a
 distributable build, provide a Developer ID identity:
@@ -157,8 +164,8 @@ command and deploy only the generated static site output.
 Version tags publish a GitHub Release automatically:
 
 ```sh
-git tag v0.1.4
-git push origin v0.1.4
+git tag v<version>
+git push origin v<version>
 ```
 
 The release workflow runs `script/package_release.sh` on macOS and uploads

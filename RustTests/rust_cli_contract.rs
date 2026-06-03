@@ -228,6 +228,83 @@ fn destructive_commands_require_force_and_errors_are_actionable() {
 }
 
 #[test]
+fn cli_rejects_invalid_invoice_data_and_keeps_store_unchanged() {
+    let store = temp_store("validation");
+    assert_success(run(&store, &["seed-sample", "--force"]));
+
+    let invalid_date = assert_failure(run(
+        &store,
+        &[
+            "invoice",
+            "add",
+            "--number",
+            "INV-BAD-DATE",
+            "--issue-date",
+            "2026-02-01",
+            "--due-date",
+            "2026-01-01",
+        ],
+    ));
+    assert!(
+        invalid_date.contains("error: validation_failed"),
+        "{invalid_date}"
+    );
+    assert!(
+        invalid_date.contains("Due date cannot be before issue date"),
+        "{invalid_date}"
+    );
+
+    let before = fs::read_to_string(&store).unwrap();
+    let invalid_item = assert_failure(run(
+        &store,
+        &[
+            "invoice",
+            "add-item",
+            "INV-2026-0001",
+            "--title",
+            "",
+            "--quantity",
+            "0",
+            "--unit-price",
+            "1.00",
+            "--tax-rate",
+            "10",
+        ],
+    ));
+    assert!(
+        invalid_item.contains("Line item title is required"),
+        "{invalid_item}"
+    );
+    assert_eq!(fs::read_to_string(&store).unwrap(), before);
+}
+
+#[test]
+fn cli_exports_and_restores_local_store() {
+    let store = temp_store("export-restore");
+    assert_success(run(&store, &["profile", "set", "--name", "Original Co"]));
+    let export_path = store.with_file_name("store-backup.json");
+    let export_path_text = export_path.to_string_lossy().into_owned();
+
+    let exported = assert_success(run(&store, &["store", "export", &export_path_text]));
+    assert!(exported.contains(&export_path_text), "{exported}");
+    assert!(export_path.exists());
+
+    assert_success(run(&store, &["profile", "set", "--name", "Changed Co"]));
+    let refused = assert_failure(run(&store, &["store", "restore", &export_path_text]));
+    assert!(
+        refused.contains("error: destructive_action_requires_force"),
+        "{refused}"
+    );
+
+    assert_success(run(
+        &store,
+        &["store", "restore", &export_path_text, "--force"],
+    ));
+    let profile = assert_success(run(&store, &["profile", "show"]));
+    assert!(profile.contains("Name: Original Co"), "{profile}");
+}
+
+#[test]
 fn money_contract_matches_swift_core() {
     assert_eq!(
         invoicegen_rs::parse_minor_units("1,234.50").unwrap(),
@@ -460,6 +537,9 @@ fn cli_creates_entities_persists_swift_compatible_json_and_renders_invoice_text(
     assert!(pdf_bytes.starts_with(b"%PDF-"), "{pdf_bytes:?}");
     let pdf_text = String::from_utf8_lossy(&pdf_bytes);
     assert!(pdf_text.contains("INVOICE INV-TEST-0001"), "{pdf_text}");
+    assert!(pdf_text.contains("/BaseFont /Helvetica"), "{pdf_text}");
+    assert!(pdf_text.contains("/BaseFont /Helvetica-Bold"), "{pdf_text}");
+    assert!(pdf_text.contains("Bill To"), "{pdf_text}");
     assert!(!pdf_text.contains("Status:"), "{pdf_text}");
 
     assert_success(run(&store, &["invoice", "mark-paid", &invoice_id]));

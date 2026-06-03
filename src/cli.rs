@@ -160,6 +160,22 @@ fn command_store(
                 _ => Ok(format!("{}\n", store.path.display())),
             }
         }
+        "export" => {
+            args.remove(0);
+            let destination = PathBuf::from(next_arg(&mut args, "export path")?);
+            reject_unknown(args)?;
+            store.export_to(&destination)?;
+            Ok(format!("Exported store to {}\n", destination.display()))
+        }
+        "restore" => {
+            args.remove(0);
+            let source = PathBuf::from(next_arg(&mut args, "backup path")?);
+            let force = take_flag(&mut args, "--force");
+            reject_unknown(args)?;
+            require_force(force)?;
+            store.restore_from(&source)?;
+            Ok(format!("Restored store from {}\n", source.display()))
+        }
         _ => Err(cli_error(
             "unknown_command",
             format!("unknown store command: {subcommand}"),
@@ -1161,9 +1177,13 @@ fn build_command() -> Command {
                 .arg(option("default-output", "default-output", "FORMAT").value_parser(["text", "plain", "tsv", "csv", "json"]))
                 .arg(option("output", "output", "FORMAT").value_parser(["text", "plain", "tsv", "csv", "json"]))))
         .subcommand(Command::new("store")
-            .about("Inspect the resolved local store path")
-            .after_help("Examples:\n  invoicegen-rs store path\n  invoicegen-rs store path --format json")
-            .subcommand(Command::new("path")))
+            .about("Inspect, export, or restore the local store")
+            .after_help("Examples:\n  invoicegen-rs store path\n  invoicegen-rs store path --format json\n  invoicegen-rs store export ./store-backup.json\n  invoicegen-rs store restore ./store-backup.json --force")
+            .subcommand(Command::new("path"))
+            .subcommand(Command::new("export").arg(Arg::new("path").required(true)))
+            .subcommand(Command::new("restore")
+                .arg(Arg::new("path").required(true))
+                .arg(force_arg())))
         .subcommand(Command::new("seed-sample")
             .about("Seed sample data")
             .arg(force_arg()))

@@ -410,3 +410,96 @@ public struct InvoiceBook: Codable, Equatable, Sendable {
         invoices = try container.decodeIfPresent([Invoice].self, forKey: .invoices) ?? []
     }
 }
+
+public struct InvoiceBookValidationError: LocalizedError, Equatable, Sendable {
+    public var issues: [String]
+
+    public init(issues: [String]) {
+        self.issues = issues
+    }
+
+    public var errorDescription: String? {
+        "Invoice validation failed: " + issues.joined(separator: "; ")
+    }
+}
+
+public extension InvoiceBook {
+    func validateForSave() throws {
+        let issues = validationIssues()
+        if !issues.isEmpty {
+            throw InvoiceBookValidationError(issues: issues)
+        }
+    }
+
+    func validationIssues() -> [String] {
+        var issues: [String] = []
+
+        if !isValidCurrencyCode(businessProfile.currencyCode) {
+            issues.append("Business profile currency must be a three-letter uppercase code")
+        }
+        if !(0...120).contains(businessProfile.paymentTermsDays) {
+            issues.append("Payment terms must be between 0 and 120 days")
+        }
+
+        var seenInvoiceNumbers: [String: UUID] = [:]
+        for invoice in invoices {
+            let trimmedNumber = invoice.number.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedNumber.isEmpty {
+                issues.append("Invoice number is required")
+            } else {
+                let normalizedNumber = trimmedNumber.lowercased()
+                if seenInvoiceNumbers[normalizedNumber] != nil {
+                    issues.append("Invoice number must be unique: \(trimmedNumber)")
+                } else {
+                    seenInvoiceNumbers[normalizedNumber] = invoice.id
+                }
+            }
+
+            if invoice.dueDate < invoice.issueDate {
+                issues.append("Due date cannot be before issue date for invoice \(displayNumber(for: invoice))")
+            }
+
+            if !isValidCurrencyCode(invoice.currencyCode) {
+                issues.append("Invoice currency must be a three-letter uppercase code for invoice \(displayNumber(for: invoice))")
+            }
+
+            if invoice.paidMinorUnits > invoice.totalMinorUnits {
+                issues.append("Payments cannot exceed invoice total for invoice \(displayNumber(for: invoice))")
+            }
+
+            for payment in invoice.payments where payment.amountMinorUnits <= 0 {
+                issues.append("Payment amount must be greater than zero for invoice \(displayNumber(for: invoice))")
+            }
+
+            for item in invoice.lineItems {
+                let itemLabel = item.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "line item" : item.title
+                if item.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    issues.append("Line item title is required for invoice \(displayNumber(for: invoice))")
+                }
+                if item.quantity <= 0 || !item.quantity.isFinite {
+                    issues.append("Line item quantity must be greater than zero for \(itemLabel)")
+                }
+                if item.unitPriceMinorUnits < 0 {
+                    issues.append("Line item unit price cannot be negative for \(itemLabel)")
+                }
+                if item.taxRatePercent < 0 || item.taxRatePercent > 100 || !item.taxRatePercent.isFinite {
+                    issues.append("Line item tax rate must be between 0 and 100 for \(itemLabel)")
+                }
+            }
+        }
+
+        return issues
+    }
+
+    private func displayNumber(for invoice: Invoice) -> String {
+        let trimmed = invoice.number.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? invoice.id.uuidString : trimmed
+    }
+
+    private func isValidCurrencyCode(_ value: String) -> Bool {
+        let scalars = value.unicodeScalars
+        return scalars.count == 3 && scalars.allSatisfy { scalar in
+            scalar.value >= UnicodeScalar("A").value && scalar.value <= UnicodeScalar("Z").value
+        }
+    }
+}
