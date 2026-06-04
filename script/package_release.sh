@@ -6,6 +6,8 @@ BUNDLE_ID="com.megabyte0x.InvoiceGen"
 MIN_SYSTEM_VERSION="14.0"
 BUILD_NUMBER="${INVOICEGEN_BUILD_NUMBER:-1}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
+NOTARY_PROFILE="${INVOICEGEN_NOTARY_PROFILE:-}"
+NOTARY_TIMEOUT="${INVOICEGEN_NOTARY_TIMEOUT:-30m}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="${INVOICEGEN_VERSION:-$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT_DIR/Cargo.toml" | head -n 1)}"
@@ -17,6 +19,8 @@ APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 DMG_PATH="$RELEASE_DIR/$APP_NAME-$VERSION.dmg"
+NOTARY_SUBMISSION_JSON="$RELEASE_DIR/$APP_NAME-$VERSION-notary-submission.json"
+NOTARY_RESULT_JSON="$RELEASE_DIR/$APP_NAME-$VERSION-notary-result.json"
 
 swift build -c release --product "$APP_NAME"
 BUILD_BINARY="$(swift build -c release --show-bin-path)/$APP_NAME"
@@ -69,6 +73,49 @@ hdiutil create \
   -ov \
   -format UDZO \
   "$DMG_PATH"
+hdiutil verify "$DMG_PATH"
+
+if [[ "$CODESIGN_IDENTITY" != "-" ]]; then
+  codesign --force --sign "$CODESIGN_IDENTITY" --timestamp "$DMG_PATH"
+  codesign --verify --verbose=2 "$DMG_PATH"
+fi
+
+if [[ -n "$NOTARY_PROFILE" ]]; then
+  if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
+    echo "INVOICEGEN_NOTARY_PROFILE requires a Developer ID CODESIGN_IDENTITY." >&2
+    exit 1
+  fi
+
+  echo "Submitting $DMG_PATH for notarization with keychain profile $NOTARY_PROFILE"
+  xcrun notarytool submit "$DMG_PATH" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    --no-s3-acceleration \
+    --output-format json >"$NOTARY_SUBMISSION_JSON"
+
+  SUBMISSION_ID="$(plutil -extract id raw -o - "$NOTARY_SUBMISSION_JSON")"
+  echo "Notary submission ID: $SUBMISSION_ID"
+
+  if ! xcrun notarytool wait "$SUBMISSION_ID" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    --timeout "$NOTARY_TIMEOUT" \
+    --output-format json >"$NOTARY_RESULT_JSON"; then
+    echo "Notarization did not complete within $NOTARY_TIMEOUT." >&2
+    echo "Poll status with:" >&2
+    echo "xcrun notarytool info $SUBMISSION_ID --keychain-profile $NOTARY_PROFILE" >&2
+    exit 1
+  fi
+
+  NOTARY_STATUS="$(plutil -extract status raw -o - "$NOTARY_RESULT_JSON")"
+  if [[ "$NOTARY_STATUS" != "Accepted" ]]; then
+    echo "Notarization finished with status: $NOTARY_STATUS" >&2
+    echo "Fetch the log with:" >&2
+    echo "xcrun notarytool log $SUBMISSION_ID --keychain-profile $NOTARY_PROFILE" >&2
+    exit 1
+  fi
+
+  xcrun stapler staple "$DMG_PATH"
+  xcrun stapler validate "$DMG_PATH"
+fi
 
 echo "Packaged $APP_BUNDLE"
 echo "Created $DMG_PATH"

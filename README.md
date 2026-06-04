@@ -146,7 +146,29 @@ distributable build, provide a Developer ID identity:
 CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./script/package_release.sh
 ```
 
-Notarization still requires Apple credentials and a Developer ID signature.
+With a Developer ID identity, the script also signs and verifies the generated
+DMG. To notarize and staple the DMG, first store Apple notarization credentials
+in your Keychain:
+
+```sh
+xcrun notarytool store-credentials invoicegen-notary --apple-id "you@example.com" --team-id "TEAMID"
+```
+
+Then pass the stored profile name:
+
+```sh
+CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+INVOICEGEN_NOTARY_PROFILE="invoicegen-notary" \
+./script/package_release.sh
+```
+
+If Apple keeps a submission in `In Progress`, the script exits after the
+bounded notarization wait and prints the submission ID. Poll that ID instead of
+re-uploading the same artifact repeatedly:
+
+```sh
+xcrun notarytool info <submission-id> --keychain-profile invoicegen-notary
+```
 
 ## Website
 
