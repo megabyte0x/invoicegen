@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { agentPrompt, facts } from '../data/siteContent';
+import { agentPrompt, brandName, facts } from '../data/siteContent';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 
 export function Overview(): ReactElement {
@@ -12,12 +12,12 @@ export function Overview(): ReactElement {
         <p className="section-label">Overview</p>
         <h2 id="overview-title">A native invoice workspace without a service account.</h2>
         <p>
-          InvoiceGen keeps invoice data on your Mac while giving you enough structure for real client work: contacts, projects, line items, due
+          {brandName} keeps invoice data on your Mac while giving you enough structure for real client work: contacts, projects, line items, due
           dates, tax, payment notes, exports, backups, and a Rust CLI that reads the same local store.
         </p>
       </div>
 
-      <dl className="fact-list" aria-label="InvoiceGen facts">
+      <dl className="fact-list" aria-label={`${brandName} facts`}>
         {facts.map((fact) => (
           <div key={fact.id}>
             <dt>{fact.label}</dt>

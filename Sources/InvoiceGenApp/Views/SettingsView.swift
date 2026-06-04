@@ -32,9 +32,7 @@ struct SettingsView: View {
                             runeyField("Business Address", text: $model.book.businessProfile.address, isMultiline: true)
                             
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Payment Terms (Due Date Offset)")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(Color.runeyMuted)
+                                RuneyFormLabel(title: "Payment Terms (Due Date Offset)")
 
                                 HStack(spacing: 8) {
                                     Text("Net")
@@ -42,17 +40,9 @@ struct SettingsView: View {
                                         .foregroundStyle(Color.runeyPrimary)
 
                                     TextField("", value: paymentTermsDaysBinding, format: .number)
-                                        .textFieldStyle(.plain)
                                         .font(.system(.body, design: .monospaced))
                                         .multilineTextAlignment(.trailing)
-                                        .frame(width: 56)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                        }
+                                        .runeyFieldInput(width: 56)
 
                                     Text("Days")
                                         .font(.body)
@@ -78,33 +68,15 @@ struct SettingsView: View {
                             model.addPaymentAcceptanceDetail(kind: .bankDetails)
                         }) {
                             Label("Add Bank Details", systemImage: "building.columns")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.runeyPrimary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RuneyButtonStyle())
 
                         Button(action: {
                             model.addPaymentAcceptanceDetail(kind: .cryptocurrency)
                         }) {
                             Label("Add Cryptocurrency", systemImage: "bitcoinsign.circle")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.runeyPrimary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RuneyButtonStyle())
                     }
 
                     if model.book.paymentAcceptanceDetails.isEmpty {
@@ -132,9 +104,7 @@ struct SettingsView: View {
                         .foregroundStyle(Color.runeyPrimary)
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Active Store Path")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(Color.runeyMuted)
+                        RuneyFormLabel(title: "Active Store Path")
                         
                         Text(model.store.url.path)
                             .font(.system(.caption, design: .monospaced))
@@ -142,10 +112,10 @@ struct SettingsView: View {
                             .textSelection(.enabled)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 8)
-                            .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
+                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .strokeBorder(Color.runeyBorder, lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
                             }
                     }
                     
@@ -154,61 +124,29 @@ struct SettingsView: View {
                             model.reload()
                         }) {
                             Label("Reload From Disk", systemImage: "arrow.clockwise")
-                                .font(.body.weight(.medium))
-                                .foregroundStyle(Color.runeyPrimary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RuneyButtonStyle())
                         
                         Button(action: {
                             exportStoreBackup()
                         }) {
                             Label("Export Backup", systemImage: "square.and.arrow.up")
-                                .font(.body.weight(.medium))
-                                .foregroundStyle(Color.runeyPrimary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RuneyButtonStyle())
 
                         Button(action: {
                             chooseStoreBackupToRestore()
                         }) {
                             Label("Restore Backup", systemImage: "arrow.down.doc")
-                                .font(.body.weight(.medium))
-                                .foregroundStyle(Color.runeyPrimary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RuneyButtonStyle())
 
                         Button(action: {
                             isConfirmingSeedSampleData = true
                         }) {
                             Label("Seed Sample Data", systemImage: "doc.text.fill.badge.plus")
-                                .font(.body.weight(.medium))
-                                .foregroundStyle(Color.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(Color.runeyInfo, in: RoundedRectangle(cornerRadius: 8))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RuneyButtonStyle(variant: .prominent))
 
                         Spacer()
                     }
@@ -217,17 +155,8 @@ struct SettingsView: View {
                             NSWorkspace.shared.activateFileViewerSelecting([model.store.url])
                         }) {
                             Label("Open Store Folder", systemImage: "folder")
-                                .font(.body.weight(.medium))
-                                .foregroundStyle(Color.runeyPrimary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RuneyButtonStyle())
 
                         Button(action: {
                             NSPasteboard.general.clearContents()
@@ -235,17 +164,8 @@ struct SettingsView: View {
                             model.errorMessage = "Copied local store path."
                         }) {
                             Label("Copy Store Path", systemImage: "doc.on.doc")
-                                .font(.body.weight(.medium))
-                                .foregroundStyle(Color.runeyPrimary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RuneyButtonStyle())
 
                         Spacer()
                     }
@@ -317,7 +237,7 @@ struct SettingsView: View {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = "InvoiceGen-store-backup.json"
+        panel.nameFieldStringValue = "Local-Invoice-store-backup.json"
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             model.exportStore(to: url)
@@ -337,21 +257,12 @@ struct SettingsView: View {
 
     private func runeyField(_ label: String, text: Binding<String>, isMultiline: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.runeyMuted)
+            RuneyFormLabel(title: label)
             if isMultiline {
                 RuneyMultilineEditor(text: text)
             } else {
                 TextField("", text: text)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                    }
+                    .runeyFieldInput()
             }
         }
     }
@@ -382,11 +293,9 @@ struct PaymentAcceptanceDetailEditor: View {
 
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
-                        .foregroundStyle(Color.runeyDestructive)
                         .frame(width: 28, height: 28)
-                        .background(Color.runeyDestructive.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(RuneyButtonStyle(variant: .destructiveIcon))
             }
 
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
@@ -413,27 +322,18 @@ struct PaymentAcceptanceDetailEditor: View {
             }
         }
         .padding(12)
-        .background(Color.runeyBackground.opacity(0.55), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color.runeyBorder, lineWidth: 1)
+                .strokeBorder(Color.runeyBorder.opacity(0.7), lineWidth: 1)
         }
     }
 
     private func runeyField(_ label: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.runeyMuted)
+            RuneyFormLabel(title: label)
             TextField("", text: text)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                }
+                .runeyFieldInput()
         }
     }
 }
@@ -448,31 +348,21 @@ struct PaymentDetailLinesEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Detail Lines")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.runeyMuted)
+            RuneyFormLabel(title: "Detail Lines")
 
             VStack(spacing: 8) {
                 ForEach(Array(lines.enumerated()), id: \.offset) { index, _ in
                     HStack(spacing: 8) {
                         TextField("", text: lineBinding(at: index))
-                            .textFieldStyle(.plain)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                            }
+                            .runeyFieldInput()
 
                         Button(role: .destructive) {
                             removeLine(at: index)
                         } label: {
                             Image(systemName: "minus.circle")
-                                .foregroundStyle(Color.runeyDestructive)
                                 .frame(width: 28, height: 28)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(RuneyButtonStyle(variant: .destructiveIcon))
                         .disabled(lines.count == 1 && lines[0].isEmpty)
                         .opacity(lines.count == 1 && lines[0].isEmpty ? 0.4 : 1.0)
                     }
@@ -483,17 +373,8 @@ struct PaymentDetailLinesEditor: View {
                 appendLine()
             } label: {
                 Label("Add Detail Line", systemImage: "plus")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.runeyPrimary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                    }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(RuneyButtonStyle())
         }
     }
 

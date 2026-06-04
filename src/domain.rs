@@ -327,8 +327,8 @@ impl InvoiceBook {
         let mut book = Self {
             schema_version: CURRENT_SCHEMA_VERSION,
             business_profile: BusinessProfile {
-                name: "InvoiceGen Creative".to_string(),
-                email: "hello@invoicegen.local".to_string(),
+                name: "Local Invoice Creative".to_string(),
+                email: "hello@localinvoice.local".to_string(),
                 address: "Local-only business profile".to_string(),
                 tax_identifier: "TAX-LOCAL".to_string(),
                 currency_code: "USD".to_string(),

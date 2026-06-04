@@ -15,13 +15,8 @@ struct InvoicePreviewView: View {
                     printInvoice()
                 }) {
                     Label("Print or Export PDF...", systemImage: "printer.fill")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(Color.runeySecondary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.runeyPrimary, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(RuneyButtonStyle(variant: .prominent))
             }
             .padding(.horizontal, 24)
             .padding(.top, 12)
@@ -32,10 +27,10 @@ struct InvoicePreviewView: View {
                     .frame(width: 612) // Fixed width for standard Letter layout aspect
                     .padding(36)
                     .background(Color.white) // Fixed white paper sheet background
-                    .cornerRadius(12)
+                    .cornerRadius(8)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.runeyBorder, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
                     }
                     .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
                     .padding(.vertical, 16)

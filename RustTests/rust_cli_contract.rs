@@ -577,7 +577,7 @@ fn seed_sample_summary_and_backup_match_local_first_store_behavior() {
     assert_success(run(&store, &["seed-sample", "--force"]));
     let initial_json = fs::read_to_string(&store).unwrap();
     assert!(
-        initial_json.contains("InvoiceGen Creative"),
+        initial_json.contains("Local Invoice Creative"),
         "{initial_json}"
     );
     assert!(
@@ -597,7 +597,10 @@ fn seed_sample_summary_and_backup_match_local_first_store_behavior() {
     ));
     let backup = store.with_extension("json.bak");
     let backup_json = fs::read_to_string(&backup).unwrap();
-    assert!(backup_json.contains("InvoiceGen Creative"), "{backup_json}");
+    assert!(
+        backup_json.contains("Local Invoice Creative"),
+        "{backup_json}"
+    );
     let updated_json = fs::read_to_string(&store).unwrap();
     assert!(updated_json.contains("Updated Business"), "{updated_json}");
 }

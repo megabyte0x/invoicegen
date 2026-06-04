@@ -24,11 +24,19 @@ export interface FAQItem {
 }
 
 export const assetPaths = {
-  logo: '/assets/invoicegen-logo.png',
+  logo: '/assets/invoicegen-logo-128.png',
+  logoWebp: '/assets/invoicegen-logo-128.webp',
   preview: '/assets/invoicegen-preview.png',
+  previewWebp: '/assets/invoicegen-preview.webp',
+  previewSrcSet: '/assets/invoicegen-preview-640.webp 640w, /assets/invoicegen-preview-960.webp 960w, /assets/invoicegen-preview-1280.webp 1280w, /assets/invoicegen-preview.webp 1536w',
+  previewFallbackSrcSet:
+    '/assets/invoicegen-preview-640.png 640w, /assets/invoicegen-preview-960.png 960w, /assets/invoicegen-preview-1280.png 1280w, /assets/invoicegen-preview.png 1536w',
+  previewSizes: '(max-width: 720px) calc(100vw - 36px), 1180px',
 } as const;
 
 export const releaseVersion = __INVOICEGEN_VERSION__;
+export const brandName = 'InvoiceGen';
+export const siteUrl = 'https://invoicegen.megabyte.sh';
 
 export const fallbackRelease: ReleaseInfo = {
   versionLabel: `Version v${releaseVersion}`,
@@ -49,7 +57,7 @@ export const facts: readonly FactItem[] = [
 ];
 
 export const agentPrompt =
-  'Install this InvoiceGen skill from https://invoicegen.megabyte.sh/SKILL.md, then set up a new invoice.';
+  `Install this InvoiceGen skill from ${siteUrl}/SKILL.md, then set up a new invoice.`;
 
 export const featureCopy = {
   drafting: {

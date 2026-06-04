@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
@@ -12,6 +13,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = resolve(root, "dist/site");
 const skill = resolve(root, "SKILL.md");
 const viteBin = resolve(root, "node_modules/vite/bin/vite.js");
+const dateModified = new Date().toISOString().slice(0, 10);
 
 if (!existsSync(viteBin)) {
   throw new Error("Vite is not installed. Run `pnpm install` before building the site.");
@@ -28,5 +30,12 @@ if (viteBuild.status !== 0) {
 
 mkdirSync(output, { recursive: true });
 copyFileSync(skill, resolve(output, "SKILL.md"));
+replaceBuiltPlaceholders(resolve(output, "sitemap.xml"));
 
 console.log(`Built Vite site at ${output}`);
+
+function replaceBuiltPlaceholders(path) {
+  if (!existsSync(path)) return;
+  const source = readFileSync(path, "utf8");
+  writeFileSync(path, source.replaceAll("__INVOICEGEN_DATE_MODIFIED__", dateModified));
+}

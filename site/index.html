@@ -44,6 +44,20 @@
             "description": "Local-first macOS invoicing app and Rust CLI for managing invoices, clients, projects, and payment details."
           },
           {
+            "@type": "WebPage",
+            "@id": "https://invoicegen.megabyte.sh/#webpage",
+            "url": "https://invoicegen.megabyte.sh/",
+            "name": "InvoiceGen - Local-first macOS invoicing",
+            "description": "InvoiceGen is a native, local-first macOS app and CLI for managing invoices, clients, projects, and payment details on your Mac.",
+            "isPartOf": {
+              "@id": "https://invoicegen.megabyte.sh/#website"
+            },
+            "mainEntity": {
+              "@id": "https://invoicegen.megabyte.sh/#software"
+            },
+            "dateModified": "__INVOICEGEN_DATE_MODIFIED__"
+          },
+          {
             "@type": "SoftwareApplication",
             "@id": "https://invoicegen.megabyte.sh/#software",
             "name": "InvoiceGen",
@@ -83,7 +97,139 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main id="top" class="static-seo-content" aria-label="InvoiceGen overview">
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <img class="hero-icon" src="/assets/invoicegen-logo-128.png" alt="" width="84" height="84" />
+            <p class="lead-line">InvoiceGen for macOS.</p>
+            <h1 id="hero-title">Local-first invoices, built for your Mac.</h1>
+            <p class="hero-subtitle">
+              A focused native workspace for clients, projects, payment details, invoices, and PDF-ready exports. No account, no hosted backend.
+            </p>
+            <div class="actions" aria-label="Primary actions">
+              <a class="button primary" href="https://github.com/megabyte0x/invoicegen/releases/download/v__INVOICEGEN_VERSION__/InvoiceGen-__INVOICEGEN_VERSION__.dmg">
+                <span>Download for macOS</span>
+              </a>
+              <a class="button secondary" href="https://invoicegen.megabyte.sh/SKILL.md">Agent workflow</a>
+            </div>
+            <div class="download-meta">
+              <span>Version v__INVOICEGEN_VERSION__</span>
+              <span>macOS 14.0+ required</span>
+            </div>
+          </div>
+
+          <figure class="hero-window" aria-label="InvoiceGen product preview">
+            <picture class="hero-window-picture">
+              <source
+                type="image/webp"
+                srcset="/assets/invoicegen-preview-640.webp 640w, /assets/invoicegen-preview-960.webp 960w, /assets/invoicegen-preview-1280.webp 1280w, /assets/invoicegen-preview.webp 1536w"
+                sizes="(max-width: 720px) calc(100vw - 36px), 1180px"
+              />
+              <source
+                type="image/png"
+                srcset="/assets/invoicegen-preview-640.png 640w, /assets/invoicegen-preview-960.png 960w, /assets/invoicegen-preview-1280.png 1280w, /assets/invoicegen-preview.png 1536w"
+                sizes="(max-width: 720px) calc(100vw - 36px), 1180px"
+              />
+              <img
+                src="/assets/invoicegen-preview.png"
+                srcset="/assets/invoicegen-preview-640.png 640w, /assets/invoicegen-preview-960.png 960w, /assets/invoicegen-preview-1280.png 1280w, /assets/invoicegen-preview.png 1536w"
+                sizes="(max-width: 720px) calc(100vw - 36px), 1180px"
+                alt="InvoiceGen macOS app window showing invoice lists, client revenue charts, and native sidebar tabs"
+                width="1536"
+                height="1024"
+                fetchpriority="high"
+              />
+            </picture>
+          </figure>
+        </section>
+
+        <section class="overview-section" id="overview" aria-labelledby="overview-title">
+          <div class="overview-copy">
+            <p class="section-label">Overview</p>
+            <h2 id="overview-title">A native invoice workspace without a service account.</h2>
+            <p>
+              InvoiceGen keeps invoice data on your Mac while giving you enough structure for real client work: contacts, projects, line items,
+              due dates, tax, payment notes, exports, backups, and a Rust CLI that reads the same local store.
+            </p>
+          </div>
+          <dl class="fact-list" aria-label="InvoiceGen facts">
+            <div>
+              <dt>Storage</dt>
+              <dd>Local files on your Mac</dd>
+            </div>
+            <div>
+              <dt>Exports</dt>
+              <dd>PDF-ready invoice output</dd>
+            </div>
+            <div>
+              <dt>Automation</dt>
+              <dd>Rust CLI, same data model</dd>
+            </div>
+            <div>
+              <dt>License</dt>
+              <dd>Open source, Apache 2.0</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="overview-section" aria-labelledby="what-is-invoicegen">
+          <div class="overview-copy">
+            <p class="section-label">Definition</p>
+            <h2 id="what-is-invoicegen">What is InvoiceGen?</h2>
+            <p>
+              InvoiceGen is a local-first invoicing workspace for macOS that combines a native Swift app with a Rust command-line interface. It is
+              designed for freelancers, consultants, and small teams who want to manage clients, projects, invoice line items, due dates, payment
+              details, taxes, notes, backups, and PDF-ready invoice exports without creating a cloud account or storing billing data on a hosted
+              service. The macOS app and CLI use the same local store format, so users and AI agents can inspect, create, list, render, export, and
+              restore invoice data through scripts while preserving compatibility with the desktop app. InvoiceGen is open source under the Apache
+              2.0 license, targets macOS 14 Sonoma or newer, and publishes its source, releases, and agent workflow at github.com/megabyte0x/invoicegen
+              and invoicegen.megabyte.sh/SKILL.md. This combination differentiates it from browser-only invoice generators and cloud accounting tools
+              by emphasizing privacy, local ownership, and scriptable workflows.
+            </p>
+          </div>
+          <dl class="fact-list" aria-label="InvoiceGen citation facts">
+            <div>
+              <dt>Cloud</dt>
+              <dd>No account or hosted invoice store required</dd>
+            </div>
+            <div>
+              <dt>CLI</dt>
+              <dd>Script invoice, client, project, render, export, and restore workflows</dd>
+            </div>
+            <div>
+              <dt>Source</dt>
+              <dd>github.com/megabyte0x/invoicegen</dd>
+            </div>
+            <div>
+              <dt>Agent skill</dt>
+              <dd>invoicegen.megabyte.sh/SKILL.md</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="faq-section" id="faq" aria-labelledby="faq-title">
+          <div class="feature-heading">
+            <p class="section-label">FAQ</p>
+            <h2 id="faq-title">Practical details before you install.</h2>
+          </div>
+          <div class="faq-list">
+            <article class="faq-item">
+              <h3>Is my invoicing data sent to any servers?</h3>
+              <p>No. InvoiceGen is local-first. App data, settings, client records, and exports are processed on your Mac.</p>
+            </article>
+            <article class="faq-item">
+              <h3>Is there a subscription fee?</h3>
+              <p>No. InvoiceGen is open source and free to download. There are no billing tiers or paid seats.</p>
+            </article>
+            <article class="faq-item">
+              <h3>What versions of macOS are supported?</h3>
+              <p>The macOS app requires macOS 14.0 Sonoma or newer.</p>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

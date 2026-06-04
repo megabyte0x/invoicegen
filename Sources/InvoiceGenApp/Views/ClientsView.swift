@@ -38,13 +38,9 @@ struct ClientsView: View {
                     model.addClient()
                 }) {
                     Label("New Client", systemImage: "plus")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(Color.runeySecondary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.runeyPrimary, in: RoundedRectangle(cornerRadius: 8))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(RuneyButtonStyle(variant: .prominent))
                 .padding()
             }
         } detail: {
@@ -106,13 +102,9 @@ struct ClientEditorView: View {
                         isConfirmingDelete = true
                     }) {
                         Label("Delete Client", systemImage: "trash.fill")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(Color.white)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color.runeyDestructive, in: RoundedRectangle(cornerRadius: 8))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(RuneyButtonStyle(variant: .destructive))
                 }
                 .runeyCard()
             }
@@ -132,21 +124,12 @@ struct ClientEditorView: View {
 
     private func runeyField(_ label: String, text: Binding<String>, isMultiline: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.runeyMuted)
+            RuneyFormLabel(title: label)
             if isMultiline {
                 RuneyMultilineEditor(text: text)
             } else {
                 TextField("", text: text)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                    }
+                    .runeyFieldInput()
             }
         }
     }

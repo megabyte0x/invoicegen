@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { assetPaths, navItems } from '../data/siteContent';
+import { assetPaths, brandName, navItems } from '../data/siteContent';
 
 interface HeaderProps {
   readonly downloadUrl: string;
@@ -9,11 +9,11 @@ interface HeaderProps {
 export function Header({ downloadUrl, onToggleTheme }: HeaderProps): ReactElement {
   return (
     <header className="site-header" aria-label="Primary navigation">
-      <a className="brand" href="#top" aria-label="InvoiceGen home">
+      <a className="brand" href="#top" aria-label={`${brandName} home`}>
         <span className="brand-mark" aria-hidden="true">
           <img src={assetPaths.logo} alt="" width="32" height="32" />
         </span>
-        <span>InvoiceGen</span>
+        <span>{brandName}</span>
       </a>
       <nav className="nav-links">
         {navItems.map((item) => (

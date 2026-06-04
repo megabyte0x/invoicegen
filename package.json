@@ -9,6 +9,7 @@
     "build:site": "node script/build_site.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc -p site/tsconfig.json --noEmit",
+    "test:site-seo": "node script/verify_site_seo.mjs",
     "build:cli-release": "node script/build_cli_release.mjs",
     "stage:npm-cli": "node script/stage_npm_packages.mjs",
     "render:homebrew-cli": "node script/render_homebrew_formula.mjs",

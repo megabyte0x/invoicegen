@@ -70,8 +70,8 @@ public extension InvoiceBook {
 
         var book = InvoiceBook(
             businessProfile: BusinessProfile(
-                name: "InvoiceGen Creative",
-                email: "hello@invoicegen.local",
+                name: "Local Invoice Creative",
+                email: "hello@localinvoice.local",
                 address: "Local-only business profile",
                 taxIdentifier: "TAX-LOCAL",
                 currencyCode: "USD",

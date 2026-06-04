@@ -11,17 +11,22 @@ struct InvoiceEditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Tab Switcher
             Picker("", selection: $selectedTab) {
-                Text("Edit Details").tag(0)
-                Text("Invoice Preview").tag(1)
+                Text("Details").tag(0)
+                Text("Preview").tag(1)
             }
             .pickerStyle(.segmented)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 14)
+            .frame(width: 260)
+            .padding(10)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.runeyBorder.opacity(0.65), lineWidth: 1)
+            }
+            .padding(.vertical, 12)
             
             Divider()
-                .background(Color.runeyBorder)
+                .background(Color.runeyBorder.opacity(0.65))
 
             if selectedTab == 1 {
                 InvoicePreviewView(invoice: invoice, book: model.book)
@@ -114,17 +119,8 @@ struct InvoiceEditorView: View {
                                     model.save()
                                 }) {
                                     Label("Add Item", systemImage: "plus")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(Color.runeyPrimary)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                        }
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(RuneyButtonStyle())
                             }
                             
                             ForEach($invoice.lineItems) { $item in
@@ -136,11 +132,9 @@ struct InvoiceEditorView: View {
                                             lineItemIDPendingDeletion = item.id
                                         } label: {
                                             Image(systemName: "trash")
-                                                .foregroundStyle(Color.runeyDestructive)
                                                 .frame(width: 28, height: 28)
-                                                .background(Color.runeyDestructive.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(RuneyButtonStyle(variant: .destructiveIcon))
                                     }
                                     
                                     Divider()
@@ -201,10 +195,10 @@ struct InvoiceEditorView: View {
                                         .toggleStyle(.checkbox)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         .padding(10)
-                                        .background(Color.runeyBackground.opacity(0.55), in: RoundedRectangle(cornerRadius: 8))
+                                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                                         .overlay {
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .strokeBorder(Color.runeyBorder, lineWidth: 1)
+                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                .strokeBorder(Color.runeyBorder.opacity(0.7), lineWidth: 1)
                                         }
                                     }
                                 }
@@ -247,34 +241,18 @@ struct InvoiceEditorView: View {
                                 model.save()
                             }) {
                                 Label("Mark as Sent", systemImage: "paperplane.fill")
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(Color.runeyPrimary)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                    }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(RuneyButtonStyle())
 
                             if invoice.status == .paid {
                                 Button(action: {
                                     isConfirmingMarkUnpaid = true
                                 }) {
                                     Label("Mark as Unpaid", systemImage: "arrow.uturn.backward.circle.fill")
-                                        .font(.body.weight(.medium))
-                                        .foregroundStyle(Color.runeyPrimary)
                                         .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                        }
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(RuneyButtonStyle())
                             } else {
                                 Button(action: {
                                     invoice.payments.append(Payment(amountMinorUnits: invoice.balanceDueMinorUnits))
@@ -282,13 +260,9 @@ struct InvoiceEditorView: View {
                                     model.save()
                                 }) {
                                     Label("Mark as Paid", systemImage: "checkmark.circle.fill")
-                                        .font(.body.weight(.medium))
-                                        .foregroundStyle(Color.white)
                                         .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(Color.runeySuccess, in: RoundedRectangle(cornerRadius: 8))
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(RuneyButtonStyle(variant: .success))
                                 .disabled(invoice.balanceDueMinorUnits == 0)
                                 .opacity(invoice.balanceDueMinorUnits == 0 ? 0.5 : 1.0)
                             }
@@ -298,32 +272,19 @@ struct InvoiceEditorView: View {
                                 NSPasteboard.general.setString(InvoiceTextRenderer.render(invoice: invoice, book: model.book), forType: .string)
                             }) {
                                 Label("Copy Raw Text", systemImage: "doc.on.doc.fill")
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(Color.runeyPrimary)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 8))
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                                    }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(RuneyButtonStyle())
                         }
                         
-                        // Danger Zone: Delete Button
                         VStack(alignment: .leading, spacing: 14) {
                             Button(role: .destructive, action: {
                                 isConfirmingDelete = true
                             }) {
                                 Label("Delete Invoice", systemImage: "trash.fill")
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(Color.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(Color.runeyDestructive, in: RoundedRectangle(cornerRadius: 8))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(RuneyButtonStyle(variant: .destructive))
                         }
                         .runeyCard()
                         .padding(.bottom, 24)
@@ -410,18 +371,9 @@ struct InvoiceEditorView: View {
 
     private func runeyField(_ label: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.runeyMuted)
+            RuneyFormLabel(title: label)
             TextField("", text: text)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                }
+                .runeyFieldInput()
         }
     }
 
@@ -479,57 +431,25 @@ struct LineItemEditor: View {
                     .gridCellColumns(2)
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Qty")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.runeyMuted)
+                    RuneyFormLabel(title: "Qty")
                     TextField("", value: $item.quantity, format: .number)
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .frame(width: 60)
-                        .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                        }
+                        .runeyFieldInput(width: 60)
                 }
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Unit Price")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.runeyMuted)
+                    RuneyFormLabel(title: "Unit Price")
                     TextField("", text: $item.unitPriceMinorUnits.moneyString(currencyCode: currencyCode))
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .frame(width: 84)
-                        .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                        }
+                        .runeyFieldInput(width: 84)
                 }
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Tax %")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.runeyMuted)
+                    RuneyFormLabel(title: "Tax %")
                     TextField("", value: $item.taxRatePercent, format: .number)
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .frame(width: 56)
-                        .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                        }
+                        .runeyFieldInput(width: 56)
                 }
                 
                 VStack(alignment: .trailing, spacing: 6) {
-                    Text("Total")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.runeyMuted)
+                    RuneyFormLabel(title: "Total")
                     Text(Money.format(minorUnits: item.totalMinorUnits, currencyCode: currencyCode).replacingOccurrences(of: currencyCode + " ", with: ""))
                         .font(.system(.body, design: .monospaced).weight(.semibold))
                         .foregroundStyle(Color.runeyPrimary)
@@ -546,18 +466,9 @@ struct LineItemEditor: View {
 
     private func runeyField(_ label: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Color.runeyMuted)
+            RuneyFormLabel(title: label)
             TextField("", text: text)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                }
+                .runeyFieldInput()
         }
     }
 }

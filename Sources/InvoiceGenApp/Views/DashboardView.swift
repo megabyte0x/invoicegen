@@ -23,11 +23,8 @@ struct DashboardView: View {
                 header
 
                 LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible()),
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], spacing: 16) {
+                    GridItem(.adaptive(minimum: 180, maximum: 260), spacing: 14)
+                ], spacing: 14) {
                     MetricTile(
                         title: "Outstanding",
                         value: money(outstandingMinorUnits),
@@ -109,11 +106,11 @@ struct DashboardView: View {
                             )
                         }
                     }
-                    .background(Color.runeySecondary.opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(.thinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.runeyBorder, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
                     }
                 }
                 .padding(.top, 8)
@@ -125,7 +122,7 @@ struct DashboardView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .top, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(model.book.businessProfile.name)
                     .font(.title.weight(.bold))
@@ -136,7 +133,14 @@ struct DashboardView: View {
             }
 
             Spacer()
-            LocalBadge()
+
+            VStack(alignment: .trailing, spacing: 8) {
+                LocalBadge()
+                HStack(spacing: 8) {
+                    HeaderStat(value: "\(model.book.invoices.count)", title: "Invoices")
+                    HeaderStat(value: "\(model.book.clients.count)", title: "Clients")
+                }
+            }
         }
         .padding(20)
         .background(TahoeHeaderBackground())
@@ -144,6 +148,29 @@ struct DashboardView: View {
 
     private func money(_ value: Int64) -> String {
         Money.format(minorUnits: value, currencyCode: model.book.businessProfile.currencyCode)
+    }
+}
+
+struct HeaderStat: View {
+    var value: String
+    var title: String
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 1) {
+            Text(value)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(Color.runeyPrimary)
+            Text(title)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(Color.runeyMuted)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(Color.runeyBorder.opacity(0.55), lineWidth: 1)
+        }
     }
 }
 
@@ -165,7 +192,7 @@ struct MetricTile: View {
                     .font(.body)
                     .foregroundStyle(iconColor)
                     .frame(width: 28, height: 28)
-                    .background(iconColor.opacity(0.12), in: Circle())
+                    .background(iconColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
             
             Text(value)
@@ -193,17 +220,8 @@ struct SectionHeader: View {
             if let actionTitle, let action {
                 Button(action: action) {
                     Label(actionTitle, systemImage: "plus")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(Color.runeyPrimary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.runeySecondary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(Color.runeyBorder, lineWidth: 1)
-                        }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(RuneyButtonStyle())
             }
         }
     }

@@ -97,7 +97,7 @@ final class AppModel: ObservableObject {
 
     private func save(allowingOverwriteAfterLoadFailure: Bool) {
         guard loadedStoreSuccessfully || allowingOverwriteAfterLoadFailure else {
-            errorMessage = "InvoiceGen did not save because the local store could not be loaded. Fix or reload the store file before saving, or use Seed Sample Data to intentionally replace it."
+            errorMessage = "Local Invoice did not save because the local store could not be loaded. Fix or reload the store file before saving, or use Seed Sample Data to intentionally replace it."
             return
         }
 

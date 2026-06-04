@@ -1,10 +1,10 @@
 # @megabyte0x/invoicegen
 
-Local-first invoice management CLI for InvoiceGen.
+Local-first invoice generation CLI for Local Invoice.
 
 The package installs the `invoicegen` command and selects the matching native
 binary package for your operating system and CPU. Invoice data stays on your
-machine in the same local `store.json` format used by the InvoiceGen macOS app.
+machine in the same local `store.json` format used by the Local Invoice macOS app.
 
 ## Install
 

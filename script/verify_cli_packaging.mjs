@@ -83,9 +83,11 @@ assert.ok(!/discounts?/i.test(site), "site must not claim discount support until
 
 const buildSitePath = path.join(root, "script", "build_site.mjs");
 assert.ok(fs.existsSync(buildSitePath), "missing static site build script");
-const buildSite = fs.readFileSync(buildSitePath, "utf8");
+const viteConfigPath = path.join(root, "vite.config.ts");
+assert.ok(fs.existsSync(viteConfigPath), "missing Vite config");
+const viteConfig = fs.readFileSync(viteConfigPath, "utf8");
 assert.ok(
-  buildSite.includes("package.json"),
+  viteConfig.includes("Cargo.toml") && viteConfig.includes("package.json"),
   "site build must fall back to package.json when Cargo.toml is excluded from Vercel",
 );
 

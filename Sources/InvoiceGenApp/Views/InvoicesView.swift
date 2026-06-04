@@ -23,6 +23,7 @@ struct InvoicesView: View {
             List(selection: $model.selectedInvoiceID) {
                 ForEach(filteredInvoices) { invoice in
                     InvoiceSummaryRow(invoice: invoice, client: model.book.client(for: invoice))
+                        .padding(.vertical, 2)
                         .tag(invoice.id)
                         .contextMenu {
                             Button("Delete", role: .destructive) {
@@ -37,13 +38,9 @@ struct InvoicesView: View {
                     model.addInvoice()
                 }) {
                     Label("New Invoice", systemImage: "plus")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(Color.runeySecondary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.runeyPrimary, in: RoundedRectangle(cornerRadius: 8))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(RuneyButtonStyle(variant: .prominent))
                 .padding()
             }
         } detail: {
@@ -95,6 +92,7 @@ struct InvoiceSummaryRow: View {
                     Text(invoice.number)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(Color.runeyPrimary)
+                        .lineLimit(1)
                     StatusBadge(status: invoice.status)
                 }
                 Text(client?.name ?? "Unassigned client")
@@ -108,6 +106,7 @@ struct InvoiceSummaryRow: View {
                 Text(Money.format(minorUnits: invoice.balanceDueMinorUnits, currencyCode: invoice.currencyCode).replacingOccurrences(of: invoice.currencyCode + " ", with: ""))
                     .font(.system(.body, design: .monospaced).weight(.semibold))
                     .foregroundStyle(Color.runeyPrimary)
+                    .lineLimit(1)
                 Text(DateFormatting.short.string(from: invoice.dueDate))
                     .font(.caption2)
                     .foregroundStyle(Color.runeyMuted)

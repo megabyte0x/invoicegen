@@ -1,5 +1,5 @@
 class Invoicegen < Formula
-  desc "Local-first invoice management CLI"
+  desc "Local-first invoice generation CLI"
   homepage "https://github.com/megabyte0x/invoicegen"
   url "https://github.com/megabyte0x/invoicegen/archive/refs/tags/v0.1.6.tar.gz"
   sha256 "REPLACE_WITH_SOURCE_TARBALL_SHA256"
@@ -14,6 +14,6 @@ class Invoicegen < Formula
   end
 
   test do
-    assert_match "InvoiceGen Rust CLI", shell_output("#{bin}/invoicegen --help")
+    assert_match "Local Invoice", shell_output("#{bin}/invoicegen --help")
   end
 end

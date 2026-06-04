@@ -1,6 +1,6 @@
-# InvoiceGen
+# Local Invoice
 
-InvoiceGen is a local-first invoice management app for freelancers and small teams.
+Local Invoice is a local-first invoice generation app for freelancers and small teams.
 It ships as a native macOS SwiftUI app.
 
 All data is stored locally. There is no server, sync service, telemetry service, or
@@ -11,6 +11,9 @@ remote database.
 The macOS app uses:
 - `~/Library/Application Support/InvoiceGen/store.json`
 - set `INVOICEGEN_APP_STORE` only if you want to force a specific app store file
+
+The Application Support directory keeps the original `InvoiceGen` name so
+existing local stores continue to load after the public brand rename.
 
 The store is a versioned JSON document written atomically by `InvoiceCore`.
 
@@ -135,7 +138,7 @@ The Codex app Run action is wired to the same script.
 ./script/package_release.sh
 ```
 
-The package script builds `InvoiceGen` in release mode, stages
+The package script builds the native macOS app in release mode, stages
 `dist/release/InvoiceGen.app`, signs it, verifies the app bundle, and creates
 `dist/release/InvoiceGen-<version>.dmg`.
 

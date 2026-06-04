@@ -1,9 +1,11 @@
 {
   "name": "@megabyte0x/invoicegen",
   "version": "0.1.6",
-  "description": "Local-first invoice management CLI for InvoiceGen",
+  "description": "Local-first invoice generation CLI for Local Invoice",
   "keywords": [
     "invoice",
+    "invoice-generation",
+    "invoice-generator",
     "invoicing",
     "cli",
     "local-first",

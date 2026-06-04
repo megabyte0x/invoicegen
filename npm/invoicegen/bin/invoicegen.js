@@ -40,7 +40,7 @@ function resolveBinary() {
       return devBinary;
     }
     throw new Error(
-      `Could not find native InvoiceGen binary package ${packageName}. Reinstall @megabyte0x/invoicegen or set INVOICEGEN_RS_BINARY.`,
+      `Could not find native Local Invoice binary package ${packageName}. Reinstall @megabyte0x/invoicegen or set INVOICEGEN_RS_BINARY.`,
     );
   }
 }

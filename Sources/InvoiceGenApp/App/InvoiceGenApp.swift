@@ -8,7 +8,7 @@ struct InvoiceGenApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup("InvoiceGen", id: "main") {
+        WindowGroup("Local Invoice", id: "main") {
             ContentView()
                 .environmentObject(model)
                 .frame(minWidth: 1080, minHeight: 680)

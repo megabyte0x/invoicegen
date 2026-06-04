@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { assetPaths } from '../data/siteContent';
+import { assetPaths, brandName } from '../data/siteContent';
 
 export function Footer(): ReactElement {
   return (
@@ -7,7 +7,7 @@ export function Footer(): ReactElement {
       <div className="footer-inner">
         <div className="footer-brand">
           <img src={assetPaths.logo} alt="" width="28" height="28" />
-          <span>InvoiceGen</span>
+          <span>{brandName}</span>
         </div>
         <nav className="footer-links" aria-label="Footer navigation">
           <a href="#features">Features</a>
@@ -22,7 +22,7 @@ export function Footer(): ReactElement {
             License
           </a>
         </nav>
-        <p>&copy; 2026 InvoiceGen. Native macOS invoicing, kept local.</p>
+        <p>&copy; 2026 {brandName}. Native macOS invoice generation, kept local.</p>
       </div>
     </footer>
   );
