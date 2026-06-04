@@ -23,7 +23,7 @@ const mainPackage = JSON.parse(fs.readFileSync(mainPackagePath, "utf8"));
 assert.equal(mainPackage.name, "@megabyte0x/invoicegen");
 assert.equal(mainPackage.version, version);
 assert.equal(mainPackage.bin.invoicegen, "bin/invoicegen.js");
-assert.equal(mainPackage.license, "MIT");
+assert.equal(mainPackage.license, "Apache-2.0");
 assert.equal(mainPackage.publishConfig?.access, "public");
 assert.ok(
   mainPackage.keywords.includes("invoice"),
@@ -55,6 +55,7 @@ for (const [suffix, os, cpu, binaryName] of platforms) {
   const pkg = JSON.parse(fs.readFileSync(packagePath, "utf8"));
   assert.equal(pkg.name, `@megabyte0x/invoicegen-${suffix}`);
   assert.equal(pkg.version, version);
+  assert.equal(pkg.license, "Apache-2.0");
   assert.deepEqual(pkg.os, [os]);
   assert.deepEqual(pkg.cpu, [cpu]);
   assert.deepEqual(pkg.files, [`bin/${binaryName}`]);

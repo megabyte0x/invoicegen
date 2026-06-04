@@ -88,7 +88,7 @@ Implemented:
 
 - `WebSite`
 - `SoftwareApplication`
-- Creator, code repository, MIT license, price, operating system, version, download URL, and canonical product image
+- Creator, code repository, Apache 2.0 license, price, operating system, version, download URL, and canonical product image
 
 Avoided:
 

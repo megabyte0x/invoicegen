@@ -9,7 +9,7 @@
     "local-first",
     "freelancers"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://github.com/megabyte0x/invoicegen#readme",
   "repository": {
     "type": "git",

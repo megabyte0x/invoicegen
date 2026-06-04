@@ -2,7 +2,7 @@
   "name": "@megabyte0x/invoicegen-linux-x64",
   "version": "0.1.6",
   "description": "Native Linux x64 binary for @megabyte0x/invoicegen",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "os": [
     "linux"
   ],

@@ -3,7 +3,7 @@ class Invoicegen < Formula
   homepage "https://github.com/megabyte0x/invoicegen"
   url "https://github.com/megabyte0x/invoicegen/archive/refs/tags/v0.1.6.tar.gz"
   sha256 "REPLACE_WITH_SOURCE_TARBALL_SHA256"
-  license "MIT"
+  license "Apache-2.0"
   head "https://github.com/megabyte0x/invoicegen.git", branch: "main"
 
   depends_on "rust" => :build

@@ -3,7 +3,7 @@ name = "invoicegen-rs"
 version = "0.1.6"
 edition = "2021"
 description = "Local-first invoice management CLI for InvoiceGen"
-license = "MIT"
+license = "Apache-2.0"
 repository = "https://github.com/megabyte0x/invoicegen"
 readme = "README.md"
 

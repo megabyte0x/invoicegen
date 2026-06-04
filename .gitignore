@@ -2,6 +2,8 @@
 .swiftpm/
 target/
 .omx/
+.agents/
+skills-lock.json
 DerivedData/
 dist/
 .DS_Store
