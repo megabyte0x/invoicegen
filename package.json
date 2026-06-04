@@ -2,12 +2,27 @@
   "name": "invoicegen-site",
   "version": "0.1.6",
   "private": true,
+  "packageManager": "pnpm@11.5.1",
   "scripts": {
-    "build": "npm run build:site",
+    "dev": "vite --host 127.0.0.1",
+    "build": "pnpm build:site",
     "build:site": "node script/build_site.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc -p site/tsconfig.json --noEmit",
     "build:cli-release": "node script/build_cli_release.mjs",
     "stage:npm-cli": "node script/stage_npm_packages.mjs",
     "render:homebrew-cli": "node script/render_homebrew_formula.mjs",
     "test:cli-packaging": "node script/verify_cli_packaging.mjs"
+  },
+  "dependencies": {
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "typescript": "latest",
+    "vite": "latest"
   }
 }
