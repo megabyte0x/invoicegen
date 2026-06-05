@@ -31,6 +31,7 @@ struct ProjectsView: View {
                     .tag(project.id)
                 }
             }
+            .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 320)
             .safeAreaInset(edge: .bottom) {
                 Button(action: {
@@ -39,7 +40,8 @@ struct ProjectsView: View {
                     Label("New Project", systemImage: "plus")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(RuneyButtonStyle(variant: .prominent))
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .padding()
             }
         } detail: {
@@ -89,7 +91,7 @@ struct ProjectEditorView: View {
                         }
                         
                         GridRow {
-                            runeyField("Hourly Billing Rate", text: $project.hourlyRateMinorUnits.moneyString(currencyCode: project.currencyCode))
+                            runeyMoneyField("Hourly Billing Rate", minorUnits: $project.hourlyRateMinorUnits, resetID: project.id)
                             
                             runeyField("Project Summary", text: $project.summary, isMultiline: true)
                         }
@@ -110,8 +112,9 @@ struct ProjectEditorView: View {
                 .runeyCard()
             }
             .padding(24)
+            .frame(maxWidth: 860, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .background(Color.runeyBackground)
         .navigationTitle(project.name)
         .alert("Delete project?", isPresented: $isConfirmingDelete) {
             Button("Delete Project", role: .destructive) {
@@ -128,6 +131,13 @@ struct ProjectEditorView: View {
             get: { project.clientId },
             set: { project.clientId = $0 }
         )
+    }
+
+    private func runeyMoneyField(_ label: String, minorUnits: Binding<Int64>, resetID: UUID) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: label)
+            RuneyMoneyTextField(minorUnits: minorUnits, resetID: resetID)
+        }
     }
 
     private func runeyField(_ label: String, text: Binding<String>, isMultiline: Bool = false) -> some View {

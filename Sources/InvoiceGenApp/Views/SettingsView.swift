@@ -39,10 +39,9 @@ struct SettingsView: View {
                                         .font(.body)
                                         .foregroundStyle(Color.runeyPrimary)
 
-                                    TextField("", value: paymentTermsDaysBinding, format: .number)
+                                    RuneyIntegerTextField(value: paymentTermsDaysBinding, width: 56)
                                         .font(.system(.body, design: .monospaced))
                                         .multilineTextAlignment(.trailing)
-                                        .runeyFieldInput(width: 56)
 
                                     Text("Days")
                                         .font(.body)
@@ -174,8 +173,9 @@ struct SettingsView: View {
                 .runeyCard()
             }
             .padding(24)
+            .frame(maxWidth: 980, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .background(Color.runeyBackground)
         .onChange(of: model.book.businessProfile) { _, _ in
             model.save()
         }

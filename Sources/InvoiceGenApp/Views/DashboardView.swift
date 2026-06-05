@@ -116,6 +116,7 @@ struct DashboardView: View {
                 .padding(.top, 8)
             }
             .padding(24)
+            .frame(maxWidth: 1120, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle("Dashboard")

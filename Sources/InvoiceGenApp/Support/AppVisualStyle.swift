@@ -7,6 +7,8 @@ extension Color {
     static let runeySecondary = Color(nsColor: .controlBackgroundColor)
     
     static let runeyBackground = Color(nsColor: .windowBackgroundColor)
+
+    static let runeyPreviewBackground = Color(nsColor: .underPageBackgroundColor)
     
     static let runeyBorder = Color(nsColor: .separatorColor)
     
@@ -29,22 +31,11 @@ struct RuneyCardModifier: ViewModifier {
             .padding(padding)
             .background {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.thinMaterial)
-                    .shadow(
-                        color: Color.black.opacity(isHovered ? 0.10 : 0.035),
-                        radius: isHovered ? 12 : 6,
-                        x: 0,
-                        y: isHovered ? 5 : 2
-                    )
+                    .fill(Color.runeySecondary.opacity(isHovered ? 1 : 0.84))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.runeyBorder.opacity(0.7), lineWidth: 1)
-            }
-            .overlay(alignment: .top) {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(.white.opacity(0.16), lineWidth: 1)
-                    .blendMode(.plusLighter)
+                    .strokeBorder(Color.runeyBorder.opacity(0.55), lineWidth: 1)
             }
     }
 }
@@ -61,14 +52,8 @@ struct RuneyFieldInputModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         let styled = content
-            .textFieldStyle(.plain)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
-            }
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.regular)
 
         if let width {
             styled.frame(width: width)
@@ -103,10 +88,9 @@ struct RuneyButtonStyle: ButtonStyle {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(borderColor, lineWidth: 1)
+                    .strokeBorder(borderColor, lineWidth: variant == .prominent ? 0 : 1)
             }
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .opacity(configuration.isPressed ? 0.86 : 1.0)
+            .opacity(configuration.isPressed ? 0.72 : 1.0)
     }
 
     private var labelFont: Font {
@@ -152,13 +136,13 @@ struct RuneyButtonStyle: ButtonStyle {
         case .prominent:
             return .runeyAccent
         case .success:
-            return .runeySuccess
+            return .runeyAccent
         case .destructive:
             return .runeyDestructive
         case .destructiveIcon:
             return .runeyDestructive.opacity(0.10)
         case .secondary, .icon:
-            return .runeySecondary.opacity(0.7)
+            return Color(nsColor: .controlBackgroundColor)
         }
     }
 
@@ -231,22 +215,10 @@ struct InvoiceGenLogoMark: View {
 struct TahoeHeaderBackground: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(.regularMaterial)
-            .overlay(alignment: .topTrailing) {
-                LinearGradient(
-                    colors: [
-                        Color.runeyAccent.opacity(0.18),
-                        Color.runeyInfo.opacity(0.10),
-                        Color.clear
-                    ],
-                    startPoint: .topTrailing,
-                    endPoint: .bottomLeading
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
+            .fill(Color.runeySecondary.opacity(0.88))
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
+                    .strokeBorder(Color.runeyBorder.opacity(0.55), lineWidth: 1)
             }
     }
 }
@@ -258,7 +230,7 @@ struct LocalBadge: View {
             .foregroundStyle(Color.runeyMuted)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.thinMaterial, in: Capsule())
+            .background(Color.runeySecondary, in: Capsule())
             .overlay {
                 Capsule()
                     .strokeBorder(Color.runeyBorder.opacity(0.55), lineWidth: 1)
@@ -276,7 +248,7 @@ struct RuneyMultilineEditor: View {
             .scrollContentBackground(.hidden)
             .frame(minHeight: minHeight)
             .padding(4)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)

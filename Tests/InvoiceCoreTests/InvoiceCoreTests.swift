@@ -65,6 +65,139 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(invoice.status, .sent)
     }
 
+    func testAutomaticGenerationIntervalDaysClampToSupportedRange() {
+        XCTAssertEqual(InvoiceAutoGenerationSettings.normalizedIntervalDays(0), 1)
+        XCTAssertEqual(InvoiceAutoGenerationSettings.normalizedIntervalDays(30), 30)
+        XCTAssertEqual(InvoiceAutoGenerationSettings.normalizedIntervalDays(4_000), 3_650)
+    }
+
+    func testAutomaticGenerationNextDateIsDerivedFromIntervalDays() {
+        let baseDate = Date(timeIntervalSince1970: 0)
+
+        XCTAssertEqual(
+            InvoiceAutoGenerationSettings.nextGenerationDate(intervalDays: 7, from: baseDate),
+            Date(timeIntervalSince1970: 7 * 86_400)
+        )
+        XCTAssertEqual(
+            InvoiceAutoGenerationSettings.nextGenerationDate(intervalDays: 0, from: baseDate),
+            Date(timeIntervalSince1970: 86_400)
+        )
+    }
+
+    func testAutomaticGenerationSettingsEncodeIntervalDays() throws {
+        let settings = InvoiceAutoGenerationSettings(
+            isEnabled: true,
+            intervalDays: 30,
+            nextGenerationDate: Date(timeIntervalSince1970: 0)
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        let data = try encoder.encode(settings)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertEqual(json["intervalDays"] as? Int, 30)
+        XCTAssertNil(json["intervalSeconds"])
+    }
+
+    func testAutomaticGenerationSettingsDecodeLegacyIntervalSecondsAsDays() throws {
+        let legacyJSON = """
+        {
+          "isEnabled": true,
+          "intervalSeconds": 172800,
+          "nextGenerationDate": "1970-01-01T00:00:00Z"
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let settings = try decoder.decode(InvoiceAutoGenerationSettings.self, from: Data(legacyJSON.utf8))
+
+        XCTAssertEqual(settings.intervalDays, 2)
+    }
+
+    func testDueAutomaticGenerationCreatesDraftInvoiceCopyAndAdvancesSchedule() {
+        let issueDate = date(year: 2026, month: 1, day: 1)
+        let generationDate = date(year: 2026, month: 1, day: 8)
+        let sourceInvoice = Invoice(
+            number: "INV-2026-0001",
+            clientId: UUID(uuidString: "00000000-0000-0000-0000-000000000201")!,
+            projectId: UUID(uuidString: "00000000-0000-0000-0000-000000000301")!,
+            issueDate: issueDate,
+            dueDate: date(year: 2026, month: 1, day: 15),
+            status: .sent,
+            currencyCode: "USD",
+            lineItems: [
+                InvoiceLineItem(title: "Retainer", quantity: 1, unitPriceMinorUnits: 250_000)
+            ],
+            payments: [
+                Payment(amountMinorUnits: 250_000, paidAt: issueDate)
+            ],
+            notes: "Monthly support",
+            terms: "Net 14.",
+            acceptedPaymentDetailIDs: [UUID(uuidString: "00000000-0000-0000-0000-000000000401")!],
+            autoGeneration: InvoiceAutoGenerationSettings(
+                isEnabled: true,
+                intervalDays: 7,
+                nextGenerationDate: generationDate
+            )
+        )
+        var book = InvoiceBook(invoices: [sourceInvoice])
+
+        let generated = book.generateAutomaticInvoices(now: date(year: 2026, month: 1, day: 9))
+
+        XCTAssertEqual(generated.count, 1)
+        XCTAssertEqual(book.invoices.count, 2)
+        XCTAssertEqual(book.invoices[0].autoGeneration.nextGenerationDate, date(year: 2026, month: 1, day: 15))
+
+        let generatedInvoice = book.invoices[1]
+        XCTAssertEqual(generatedInvoice.number, "INV-2026-0002")
+        XCTAssertEqual(generatedInvoice.issueDate, generationDate)
+        XCTAssertEqual(generatedInvoice.dueDate, date(year: 2026, month: 1, day: 22))
+        XCTAssertEqual(generatedInvoice.status, .draft)
+        XCTAssertEqual(generatedInvoice.clientId, sourceInvoice.clientId)
+        XCTAssertEqual(generatedInvoice.projectId, sourceInvoice.projectId)
+        XCTAssertEqual(generatedInvoice.lineItems.map(\.title), ["Retainer"])
+        XCTAssertEqual(generatedInvoice.payments, [])
+        XCTAssertEqual(generatedInvoice.notes, "Monthly support")
+        XCTAssertEqual(generatedInvoice.terms, "Net 14.")
+        XCTAssertEqual(generatedInvoice.acceptedPaymentDetailIDs, sourceInvoice.acceptedPaymentDetailIDs)
+        XCTAssertFalse(generatedInvoice.autoGeneration.isEnabled)
+    }
+
+    func testAutomaticGenerationCatchesUpMissedPeriodsWithoutGeneratingFromGeneratedCopies() {
+        let sourceInvoice = Invoice(
+            number: "INV-2026-0001",
+            issueDate: date(year: 2026, month: 1, day: 1),
+            dueDate: date(year: 2026, month: 1, day: 2),
+            lineItems: [
+                InvoiceLineItem(title: "Weekly service", unitPriceMinorUnits: 100_000)
+            ],
+            autoGeneration: InvoiceAutoGenerationSettings(
+                isEnabled: true,
+                intervalDays: 7,
+                nextGenerationDate: date(year: 2026, month: 1, day: 8)
+            )
+        )
+        var book = InvoiceBook(invoices: [sourceInvoice])
+
+        let generated = book.generateAutomaticInvoices(now: date(year: 2026, month: 1, day: 23))
+
+        XCTAssertEqual(generated.map(\.issueDate), [
+            date(year: 2026, month: 1, day: 8),
+            date(year: 2026, month: 1, day: 15),
+            date(year: 2026, month: 1, day: 22)
+        ])
+        XCTAssertEqual(book.invoices.map(\.number), [
+            "INV-2026-0001",
+            "INV-2026-0002",
+            "INV-2026-0003",
+            "INV-2026-0004"
+        ])
+        XCTAssertEqual(book.invoices[0].autoGeneration.nextGenerationDate, date(year: 2026, month: 1, day: 29))
+        XCTAssertEqual(book.invoices.dropFirst().filter { $0.autoGeneration.isEnabled }.count, 0)
+    }
+
     func testLocalStoreRoundTrip() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let url = directory.appendingPathComponent("store.json")
@@ -260,5 +393,16 @@ final class InvoiceCoreTests: XCTestCase {
 
         XCTAssertEqual(book.paymentAcceptanceDetails, [])
         XCTAssertEqual(book.invoices.first?.acceptedPaymentDetailIDs, [])
+        XCTAssertEqual(book.invoices.first?.autoGeneration, .disabled)
+    }
+
+    private func date(year: Int, month: Int, day: Int) -> Date {
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        return components.date!
     }
 }

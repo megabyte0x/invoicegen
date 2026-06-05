@@ -11,8 +11,9 @@ struct InvoiceGenApp: App {
         WindowGroup("Local Invoice", id: "main") {
             ContentView()
                 .environmentObject(model)
-                .frame(minWidth: 1440, minHeight: 680)
+                .frame(minWidth: 1040, minHeight: 640)
         }
+        .defaultSize(width: 1280, height: 760)
         .commands {
             CommandGroup(after: .newItem) {
                 Button("New Invoice") {

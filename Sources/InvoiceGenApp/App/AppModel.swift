@@ -2,12 +2,11 @@ import Foundation
 import SwiftUI
 import InvoiceCore
 
-enum AppSection: String, CaseIterable, Identifiable {
+enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case dashboard
     case invoices
     case clients
     case projects
-    case settings
 
     var id: String { rawValue }
 
@@ -17,7 +16,6 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .invoices: return "Invoices"
         case .clients: return "Clients"
         case .projects: return "Projects"
-        case .settings: return "Settings"
         }
     }
 
@@ -27,7 +25,6 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .invoices: return "doc.text"
         case .clients: return "person.2"
         case .projects: return "folder"
-        case .settings: return "gearshape"
         }
     }
 }
@@ -41,9 +38,11 @@ final class AppModel: ObservableObject {
     @Published var selectedProjectID: UUID?
     @Published var searchText = ""
     @Published var errorMessage: String?
+    @Published private(set) var automaticGenerationCheckScheduledFor: Date?
 
     let store: LocalInvoiceStore
     private var loadedStoreSuccessfully: Bool
+    private var automaticGenerationCheckTask: Task<Void, Never>?
 
     init(store: LocalInvoiceStore = LocalInvoiceStore()) {
         self.store = store
@@ -55,6 +54,11 @@ final class AppModel: ObservableObject {
             self.loadedStoreSuccessfully = false
             self.errorMessage = error.localizedDescription
         }
+        runScheduledAutomaticGenerationCheck(now: Date())
+    }
+
+    deinit {
+        automaticGenerationCheckTask?.cancel()
     }
 
     func reload() {
@@ -62,9 +66,11 @@ final class AppModel: ObservableObject {
             book = try store.load()
             loadedStoreSuccessfully = true
             errorMessage = nil
+            runScheduledAutomaticGenerationCheck(now: Date())
         } catch {
             loadedStoreSuccessfully = false
             errorMessage = error.localizedDescription
+            clearScheduledAutomaticGenerationCheck()
         }
     }
 
@@ -86,26 +92,29 @@ final class AppModel: ObservableObject {
             selectedClientID = book.clients.first?.id
             selectedProjectID = book.projects.first?.id
             errorMessage = "Restored local store from \(sourceURL.path)"
+            scheduleAutomaticGenerationCheck()
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func save() {
-        save(allowingOverwriteAfterLoadFailure: false)
+    func save(now: Date = Date()) {
+        save(now: now, allowingOverwriteAfterLoadFailure: false)
     }
 
-    private func save(allowingOverwriteAfterLoadFailure: Bool) {
+    private func save(now: Date = Date(), allowingOverwriteAfterLoadFailure: Bool) {
         guard loadedStoreSuccessfully || allowingOverwriteAfterLoadFailure else {
             errorMessage = "Local Invoice did not save because the local store could not be loaded. Fix or reload the store file before saving, or use Seed Sample Data to intentionally replace it."
             return
         }
 
         do {
-            book.refreshInvoiceStatuses()
+            book.generateAutomaticInvoices(now: now)
+            book.refreshInvoiceStatuses(now: now)
             try store.save(book)
             loadedStoreSuccessfully = true
             errorMessage = nil
+            scheduleAutomaticGenerationCheck(now: now)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -116,6 +125,61 @@ final class AppModel: ObservableObject {
         selectedSection = .dashboard
         selectedInvoiceID = book.invoices.first?.id
         save(allowingOverwriteAfterLoadFailure: true)
+    }
+
+    func runScheduledAutomaticGenerationCheck(now: Date = Date()) {
+        persistAutomaticInvoicesIfNeeded(now: now)
+        scheduleAutomaticGenerationCheck(now: now)
+    }
+
+    private func persistAutomaticInvoicesIfNeeded(now: Date) {
+        guard loadedStoreSuccessfully else { return }
+
+        let generatedInvoices = book.generateAutomaticInvoices(now: now)
+        guard !generatedInvoices.isEmpty else { return }
+
+        do {
+            book.refreshInvoiceStatuses(now: now)
+            try store.save(book)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func scheduleAutomaticGenerationCheck(now: Date = Date()) {
+        automaticGenerationCheckTask?.cancel()
+
+        guard loadedStoreSuccessfully, let nextGenerationDate = nextAutomaticGenerationDate() else {
+            automaticGenerationCheckTask = nil
+            automaticGenerationCheckScheduledFor = nil
+            return
+        }
+
+        automaticGenerationCheckScheduledFor = nextGenerationDate
+        let delaySeconds = max(0, nextGenerationDate.timeIntervalSince(now))
+        let delayNanoseconds = UInt64(min(delaySeconds * 1_000_000_000, Double(UInt64.max)))
+
+        automaticGenerationCheckTask = Task { [weak self] in
+            if delayNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: delayNanoseconds)
+            }
+            guard !Task.isCancelled else { return }
+            self?.runScheduledAutomaticGenerationCheck()
+        }
+    }
+
+    private func clearScheduledAutomaticGenerationCheck() {
+        automaticGenerationCheckTask?.cancel()
+        automaticGenerationCheckTask = nil
+        automaticGenerationCheckScheduledFor = nil
+    }
+
+    private func nextAutomaticGenerationDate() -> Date? {
+        book.invoices
+            .filter { $0.autoGeneration.isEnabled }
+            .map(\.autoGeneration.nextGenerationDate)
+            .min()
     }
 
     func addInvoice() {
@@ -196,7 +260,6 @@ final class AppModel: ObservableObject {
             details: ""
         )
         book.paymentAcceptanceDetails.append(detail)
-        selectedSection = .settings
         save()
     }
 

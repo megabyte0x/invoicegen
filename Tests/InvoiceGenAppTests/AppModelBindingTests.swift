@@ -62,6 +62,115 @@ final class AppModelBindingTests: XCTestCase {
         XCTAssertNil(model.book.invoices.first?.clientId)
     }
 
+    func testSaveGeneratesAndPersistsDueAutomaticInvoices() throws {
+        let store = LocalInvoiceStore(url: temporaryStoreURL())
+        let model = AppModel(store: store)
+        let generationDate = Date(timeIntervalSince1970: 0)
+        let sourceInvoice = Invoice(
+            number: "INV-1970-0001",
+            issueDate: generationDate.addingTimeInterval(-86_400),
+            dueDate: generationDate,
+            lineItems: [
+                InvoiceLineItem(title: "Retainer", unitPriceMinorUnits: 10_000)
+            ],
+            autoGeneration: InvoiceAutoGenerationSettings(
+                isEnabled: true,
+                intervalDays: 1,
+                nextGenerationDate: generationDate
+            )
+        )
+        model.book.invoices = [sourceInvoice]
+
+        model.save(now: generationDate)
+
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.invoices.count, 2)
+        XCTAssertEqual(loaded.invoices.last?.number, "INV-1970-0002")
+        XCTAssertEqual(loaded.invoices.last?.status, .draft)
+        XCTAssertFalse(loaded.invoices.last?.autoGeneration.isEnabled ?? true)
+    }
+
+    func testSaveSchedulesNextAutomaticGenerationCheck() {
+        let store = LocalInvoiceStore(url: temporaryStoreURL())
+        let model = AppModel(store: store)
+        let now = Date(timeIntervalSince1970: 1_000)
+        let nextGenerationDate = now.addingTimeInterval(10)
+        let sourceInvoice = Invoice(
+            number: "INV-1970-0001",
+            issueDate: now,
+            dueDate: now,
+            lineItems: [
+                InvoiceLineItem(title: "Retainer", unitPriceMinorUnits: 10_000)
+            ],
+            autoGeneration: InvoiceAutoGenerationSettings(
+                isEnabled: true,
+                intervalDays: 1,
+                nextGenerationDate: nextGenerationDate
+            )
+        )
+        model.book.invoices = [sourceInvoice]
+
+        model.save(now: now)
+
+        XCTAssertEqual(model.automaticGenerationCheckScheduledFor, nextGenerationDate)
+    }
+
+    func testScheduledAutomaticGenerationCheckPersistsDueInvoicesWithoutManualSave() throws {
+        let store = LocalInvoiceStore(url: temporaryStoreURL())
+        let model = AppModel(store: store)
+        let generationDate = Date(timeIntervalSince1970: 1_000)
+        let sourceInvoice = Invoice(
+            number: "INV-1970-0001",
+            issueDate: generationDate.addingTimeInterval(-86_400),
+            dueDate: generationDate,
+            lineItems: [
+                InvoiceLineItem(title: "Retainer", unitPriceMinorUnits: 10_000)
+            ],
+            autoGeneration: InvoiceAutoGenerationSettings(
+                isEnabled: true,
+                intervalDays: 1,
+                nextGenerationDate: generationDate
+            )
+        )
+        model.book.invoices = [sourceInvoice]
+
+        model.runScheduledAutomaticGenerationCheck(now: generationDate)
+
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.invoices.count, 2)
+        XCTAssertEqual(loaded.invoices.last?.number, "INV-1970-0002")
+        XCTAssertEqual(model.automaticGenerationCheckScheduledFor, generationDate.addingTimeInterval(86_400))
+    }
+
+    func testAutomaticGenerationTimerFiresWithoutManualSaveOrInteraction() async throws {
+        let store = LocalInvoiceStore(url: temporaryStoreURL())
+        let model = AppModel(store: store)
+        let now = Date()
+        let generationDate = now.addingTimeInterval(0.1)
+        let sourceInvoice = Invoice(
+            number: "INV-1970-0001",
+            issueDate: now.addingTimeInterval(-86_400),
+            dueDate: now,
+            lineItems: [
+                InvoiceLineItem(title: "Retainer", unitPriceMinorUnits: 10_000)
+            ],
+            autoGeneration: InvoiceAutoGenerationSettings(
+                isEnabled: true,
+                intervalDays: 1,
+                nextGenerationDate: generationDate
+            )
+        )
+        model.book.invoices = [sourceInvoice]
+
+        model.save(now: now)
+        try await Task.sleep(nanoseconds: 800_000_000)
+
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.invoices.count, 2)
+        XCTAssertEqual(loaded.invoices.last?.status, .draft)
+        XCTAssertFalse(loaded.invoices.last?.autoGeneration.isEnabled ?? true)
+    }
+
     private func temporaryStoreURL() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

@@ -92,4 +92,11 @@ public enum DateFormatting {
         formatter.timeStyle = .none
         return formatter
     }()
+
+    public static let dateTime: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+        return formatter
+    }()
 }

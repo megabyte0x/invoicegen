@@ -26,16 +26,14 @@ struct InvoicePreviewView: View {
                 Button(action: {
                     isChoosingMailMethod = true
                 }) {
-                    Label("Mail Invoice", systemImage: "envelope.fill")
+                    Label("Mail Invoice", systemImage: "envelope")
                 }
-                .buttonStyle(RuneyButtonStyle())
 
                 Button(action: {
                     printInvoice()
                 }) {
-                    Label("Print or Export PDF...", systemImage: "printer.fill")
+                    Label("Print or Export PDF...", systemImage: "printer")
                 }
-                .buttonStyle(RuneyButtonStyle(variant: .prominent))
             }
             .padding(.horizontal, 24)
             .padding(.top, 12)
@@ -56,7 +54,7 @@ struct InvoicePreviewView: View {
                     .frame(maxWidth: .infinity)
             }
         }
-        .background(Color.runeyBackground)
+        .background(Color.runeyPreviewBackground)
         .sheet(isPresented: $isChoosingMailMethod) {
             MailInvoiceMethodSheet {
                 isChoosingMailMethod = false
@@ -256,7 +254,6 @@ private struct MailInvoiceMethodSheet: View {
         }
         .padding(22)
         .frame(width: 430)
-        .background(Color.runeyBackground)
     }
 }
 

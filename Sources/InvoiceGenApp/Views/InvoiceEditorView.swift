@@ -7,11 +7,13 @@ struct InvoiceEditorView: View {
     @State private var isConfirmingMarkUnpaid = false
     @State private var isConfirmingDelete = false
     @State private var lineItemIDPendingDeletion: UUID?
+    @State private var autoGenerationIntervalDraft: String?
+    @FocusState private var focusedField: FocusedField?
 
     var body: some View {
         HSplitView {
             ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 16) {
                         // Section 1: Basic Information
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Invoice Details")
@@ -85,8 +87,50 @@ struct InvoiceEditorView: View {
                             }
                         }
                         .runeyCard()
+
+                        // Section 2: Automatic Generation
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text("Automatic Generation")
+                                .font(.headline)
+                                .foregroundStyle(Color.runeyPrimary)
+
+                            Toggle("Generate invoice copies", isOn: autoGenerationEnabledBinding)
+                                .toggleStyle(.switch)
+
+                            if invoice.autoGeneration.isEnabled {
+                                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
+                                    GridRow {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            RuneyFormLabel(title: "Interval")
+                                            HStack(spacing: 8) {
+                                                TextField("", text: autoGenerationIntervalTextBinding)
+                                                    .font(.system(.body, design: .monospaced))
+                                                    .multilineTextAlignment(.trailing)
+                                                    .runeyFieldInput(width: 72)
+                                                    .focused($focusedField, equals: .autoGenerationInterval)
+                                                    .onSubmit {
+                                                        resetAutoGenerationIntervalDraft()
+                                                    }
+
+                                                Text("days")
+                                                    .foregroundStyle(Color.runeyPrimary)
+                                            }
+                                            .frame(height: 30)
+                                        }
+
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            RuneyFormLabel(title: "Next Date")
+                                            Text(DateFormatting.dateTime.string(from: invoice.autoGeneration.nextGenerationDate))
+                                                .foregroundStyle(Color.runeyPrimary)
+                                                .frame(height: 30, alignment: .center)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .runeyCard()
                         
-                        // Section 2: Line Items
+                        // Section 3: Line Items
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Line Items")
@@ -131,7 +175,7 @@ struct InvoiceEditorView: View {
                         }
                         .runeyCard()
                         
-                        // Section 3: Notes & Terms
+                        // Section 4: Notes & Terms
                         VStack(alignment: .leading, spacing: 14) {
                             Text("Notes & Terms")
                                 .font(.headline)
@@ -153,7 +197,7 @@ struct InvoiceEditorView: View {
                         }
                         .runeyCard()
 
-                        // Section 4: Payment Acceptance
+                        // Section 5: Payment Acceptance
                         VStack(alignment: .leading, spacing: 14) {
                             Text("Payment Acceptance")
                                 .font(.headline)
@@ -185,7 +229,7 @@ struct InvoiceEditorView: View {
                         }
                         .runeyCard()
 
-                        // Section 5: Totals & Summary
+                        // Section 6: Totals & Summary
                         VStack(alignment: .leading, spacing: 14) {
                             Text("Summary")
                                 .font(.headline)
@@ -268,14 +312,14 @@ struct InvoiceEditorView: View {
                         .runeyCard()
                         .padding(.bottom, 24)
                     }
-                    .padding(24)
+                    .padding(20)
+                    .frame(maxWidth: 760, alignment: .topLeading)
                 }
-                .frame(minWidth: 520, idealWidth: 620, maxWidth: .infinity, maxHeight: .infinity)
+                .frame(minWidth: 520, idealWidth: 640, maxWidth: 860, maxHeight: .infinity)
 
                 InvoicePreviewView(invoice: $invoice, book: model.book)
-                    .frame(minWidth: 440, idealWidth: 680, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: 380, idealWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Color.runeyBackground)
         .navigationTitle(invoice.number)
         .alert("Mark invoice as unpaid?", isPresented: $isConfirmingMarkUnpaid) {
             Button("Mark as Unpaid", role: .destructive) {
@@ -311,6 +355,14 @@ struct InvoiceEditorView: View {
         } message: {
             Text("This removes the selected line item from the invoice.")
         }
+        .onChange(of: invoice.id) { _, _ in
+            resetAutoGenerationIntervalDraft()
+        }
+        .onChange(of: focusedField) { _, newValue in
+            if newValue != .autoGenerationInterval {
+                resetAutoGenerationIntervalDraft()
+            }
+        }
     }
 
     private var optionalClientBinding: Binding<UUID?> {
@@ -328,6 +380,43 @@ struct InvoiceEditorView: View {
             get: { invoice.projectId },
             set: { newValue in
                 invoice.projectId = newValue
+                model.save()
+            }
+        )
+    }
+
+    private var autoGenerationEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { invoice.autoGeneration.isEnabled },
+            set: { isEnabled in
+                let intervalDays = InvoiceAutoGenerationSettings.normalizedIntervalDays(invoice.autoGeneration.intervalDays)
+                invoice.autoGeneration.intervalDays = intervalDays
+                if isEnabled,
+                   (!invoice.autoGeneration.isEnabled || invoice.autoGeneration.nextGenerationDate <= Date()) {
+                    invoice.autoGeneration.nextGenerationDate = defaultNextGenerationDate(intervalDays: intervalDays)
+                }
+                invoice.autoGeneration.isEnabled = isEnabled
+                model.save()
+            }
+        )
+    }
+
+    private var autoGenerationIntervalTextBinding: Binding<String> {
+        Binding(
+            get: {
+                autoGenerationIntervalDraft
+                    ?? InvoiceAutoGenerationIntervalInput.text(for: invoice.autoGeneration.intervalDays)
+            },
+            set: { newValue in
+                autoGenerationIntervalDraft = newValue
+                guard let intervalDays = InvoiceAutoGenerationIntervalInput.intervalDays(from: newValue) else {
+                    return
+                }
+                autoGenerationIntervalDraft = InvoiceAutoGenerationIntervalInput.text(for: intervalDays)
+                invoice.autoGeneration.intervalDays = intervalDays
+                if invoice.autoGeneration.isEnabled {
+                    invoice.autoGeneration.nextGenerationDate = defaultNextGenerationDate(intervalDays: intervalDays)
+                }
                 model.save()
             }
         )
@@ -351,6 +440,14 @@ struct InvoiceEditorView: View {
         )
     }
 
+    private func defaultNextGenerationDate(intervalDays: Int) -> Date {
+        InvoiceAutoGenerationSettings.nextGenerationDate(intervalDays: intervalDays)
+    }
+
+    private func resetAutoGenerationIntervalDraft() {
+        autoGenerationIntervalDraft = nil
+    }
+
     private func runeyField(_ label: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: label)
@@ -370,6 +467,10 @@ struct InvoiceEditorView: View {
                 .foregroundStyle(Color.runeyPrimary)
         }
     }
+}
+
+private enum FocusedField: Hashable {
+    case autoGenerationInterval
 }
 
 struct PaymentAcceptanceSelectionLabel: View {
@@ -414,20 +515,17 @@ struct LineItemEditor: View {
                 
                 VStack(alignment: .leading, spacing: 6) {
                     RuneyFormLabel(title: "Qty")
-                    TextField("", value: $item.quantity, format: .number)
-                        .runeyFieldInput(width: 60)
+                    RuneyDecimalTextField(value: $item.quantity, width: 60, resetID: item.id)
                 }
                 
                 VStack(alignment: .leading, spacing: 6) {
                     RuneyFormLabel(title: "Unit Price")
-                    TextField("", text: $item.unitPriceMinorUnits.moneyString(currencyCode: currencyCode))
-                        .runeyFieldInput(width: 84)
+                    RuneyMoneyTextField(minorUnits: $item.unitPriceMinorUnits, width: 84, resetID: item.id)
                 }
                 
                 VStack(alignment: .leading, spacing: 6) {
                     RuneyFormLabel(title: "Tax %")
-                    TextField("", value: $item.taxRatePercent, format: .number)
-                        .runeyFieldInput(width: 56)
+                    RuneyDecimalTextField(value: $item.taxRatePercent, width: 56, resetID: item.id)
                 }
                 
                 VStack(alignment: .trailing, spacing: 6) {

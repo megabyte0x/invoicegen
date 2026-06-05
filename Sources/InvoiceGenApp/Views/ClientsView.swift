@@ -32,6 +32,7 @@ struct ClientsView: View {
                     .tag(client.id)
                 }
             }
+            .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 320)
             .safeAreaInset(edge: .bottom) {
                 Button(action: {
@@ -40,7 +41,8 @@ struct ClientsView: View {
                     Label("New Client", systemImage: "plus")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(RuneyButtonStyle(variant: .prominent))
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .padding()
             }
         } detail: {
@@ -109,8 +111,9 @@ struct ClientEditorView: View {
                 .runeyCard()
             }
             .padding(24)
+            .frame(maxWidth: 860, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .background(Color.runeyBackground)
         .navigationTitle(client.name)
         .alert("Delete client?", isPresented: $isConfirmingDelete) {
             Button("Delete Client", role: .destructive) {

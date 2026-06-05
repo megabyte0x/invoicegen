@@ -201,6 +201,74 @@ public struct Payment: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+public struct InvoiceAutoGenerationSettings: Codable, Equatable, Sendable {
+    public static let maximumIntervalDays = 3_650
+
+    public var isEnabled: Bool
+    public var intervalDays: Int
+    public var nextGenerationDate: Date
+
+    public init(
+        isEnabled: Bool = false,
+        intervalDays: Int = 30,
+        nextGenerationDate: Date = Date(timeIntervalSince1970: 0)
+    ) {
+        self.isEnabled = isEnabled
+        self.intervalDays = Self.normalizedIntervalDays(intervalDays)
+        self.nextGenerationDate = nextGenerationDate
+    }
+
+    public static let disabled = InvoiceAutoGenerationSettings()
+
+    public static func normalizedIntervalDays(_ value: Int) -> Int {
+        min(max(1, value), maximumIntervalDays)
+    }
+
+    public static func nextGenerationDate(
+        intervalDays: Int,
+        from date: Date = Date(),
+        calendar: Calendar = Calendar(identifier: .gregorian)
+    ) -> Date {
+        let normalizedIntervalDays = normalizedIntervalDays(intervalDays)
+        return calendar.date(byAdding: .day, value: normalizedIntervalDays, to: date)
+            ?? date.addingTimeInterval(TimeInterval(normalizedIntervalDays * 86_400))
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
+        nextGenerationDate = try container.decodeIfPresent(Date.self, forKey: .nextGenerationDate) ?? Date(timeIntervalSince1970: 0)
+
+        if let intervalDays = try container.decodeIfPresent(Int.self, forKey: .intervalDays) {
+            self.intervalDays = Self.normalizedIntervalDays(intervalDays)
+        } else if let intervalSeconds = try container.decodeIfPresent(Int.self, forKey: .intervalSeconds) {
+            self.intervalDays = Self.intervalDays(fromLegacySeconds: intervalSeconds)
+        } else {
+            self.intervalDays = 30
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(isEnabled, forKey: .isEnabled)
+        try container.encode(intervalDays, forKey: .intervalDays)
+        try container.encode(nextGenerationDate, forKey: .nextGenerationDate)
+    }
+
+    private static func intervalDays(fromLegacySeconds value: Int) -> Int {
+        let normalizedSeconds = min(max(1, value), maximumIntervalDays * 86_400)
+        let days = Int((Double(normalizedSeconds) / 86_400).rounded(.up))
+        return normalizedIntervalDays(days)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case isEnabled
+        case intervalSeconds
+        case intervalDays
+        case nextGenerationDate
+    }
+}
+
 public struct Invoice: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var number: String
@@ -215,6 +283,7 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
     public var notes: String
     public var terms: String
     public var acceptedPaymentDetailIDs: [UUID]
+    public var autoGeneration: InvoiceAutoGenerationSettings
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -232,6 +301,7 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
         notes: String = "",
         terms: String = "Payment due on receipt.",
         acceptedPaymentDetailIDs: [UUID] = [],
+        autoGeneration: InvoiceAutoGenerationSettings = .disabled,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -248,6 +318,7 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
         self.notes = notes
         self.terms = terms
         self.acceptedPaymentDetailIDs = acceptedPaymentDetailIDs
+        self.autoGeneration = autoGeneration
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -305,6 +376,7 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
         case notes
         case terms
         case acceptedPaymentDetailIDs
+        case autoGeneration
         case createdAt
         case updatedAt
     }
@@ -324,6 +396,7 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
         notes = try container.decodeIfPresent(String.self, forKey: .notes) ?? ""
         terms = try container.decodeIfPresent(String.self, forKey: .terms) ?? "Payment due on receipt."
         acceptedPaymentDetailIDs = try container.decodeIfPresent([UUID].self, forKey: .acceptedPaymentDetailIDs) ?? []
+        autoGeneration = try container.decodeIfPresent(InvoiceAutoGenerationSettings.self, forKey: .autoGeneration) ?? .disabled
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? issueDate
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
     }
@@ -365,6 +438,51 @@ public struct InvoiceBook: Codable, Equatable, Sendable {
         }
     }
 
+    @discardableResult
+    public mutating func generateAutomaticInvoices(
+        now: Date = Date(),
+        calendar: Calendar = Calendar(identifier: .gregorian),
+        maxCatchUpPerInvoice: Int = 24
+    ) -> [Invoice] {
+        guard maxCatchUpPerInvoice > 0 else { return [] }
+
+        let originalInvoiceCount = invoices.count
+        var generatedInvoices: [Invoice] = []
+
+        for index in 0..<originalInvoiceCount {
+            guard invoices[index].autoGeneration.isEnabled else { continue }
+
+            var nextGenerationDate = invoices[index].autoGeneration.nextGenerationDate
+            var generatedCount = 0
+
+            while nextGenerationDate <= now && generatedCount < maxCatchUpPerInvoice {
+                let sourceInvoice = invoices[index]
+                let generatedInvoice = automaticInvoiceCopy(
+                    from: sourceInvoice,
+                    number: nextInvoiceNumber(date: nextGenerationDate),
+                    issueDate: nextGenerationDate,
+                    now: now
+                )
+                invoices.append(generatedInvoice)
+                generatedInvoices.append(generatedInvoice)
+                generatedCount += 1
+
+                nextGenerationDate = InvoiceAutoGenerationSettings.nextGenerationDate(
+                    intervalDays: sourceInvoice.autoGeneration.intervalDays,
+                    from: nextGenerationDate,
+                    calendar: calendar
+                )
+            }
+
+            if generatedCount > 0 {
+                invoices[index].autoGeneration.nextGenerationDate = nextGenerationDate
+                invoices[index].updatedAt = now
+            }
+        }
+
+        return generatedInvoices
+    }
+
     public func client(for invoice: Invoice) -> Client? {
         guard let clientId = invoice.clientId else { return nil }
         return clients.first { $0.id == clientId }
@@ -389,6 +507,40 @@ public struct InvoiceBook: Codable, Equatable, Sendable {
             .compactMap { Int($0.dropFirst(prefix.count)) }
             .max() ?? 0
         return "\(prefix)\(String(format: "%04d", maxSequence + 1))"
+    }
+
+    private func automaticInvoiceCopy(
+        from sourceInvoice: Invoice,
+        number: String,
+        issueDate: Date,
+        now: Date
+    ) -> Invoice {
+        let dueOffset = max(0, sourceInvoice.dueDate.timeIntervalSince(sourceInvoice.issueDate))
+        return Invoice(
+            number: number,
+            clientId: sourceInvoice.clientId,
+            projectId: sourceInvoice.projectId,
+            issueDate: issueDate,
+            dueDate: issueDate.addingTimeInterval(dueOffset),
+            status: .draft,
+            currencyCode: sourceInvoice.currencyCode,
+            lineItems: sourceInvoice.lineItems.map { item in
+                InvoiceLineItem(
+                    title: item.title,
+                    details: item.details,
+                    quantity: item.quantity,
+                    unitPriceMinorUnits: item.unitPriceMinorUnits,
+                    taxRatePercent: item.taxRatePercent
+                )
+            },
+            payments: [],
+            notes: sourceInvoice.notes,
+            terms: sourceInvoice.terms,
+            acceptedPaymentDetailIDs: sourceInvoice.acceptedPaymentDetailIDs,
+            autoGeneration: .disabled,
+            createdAt: now,
+            updatedAt: now
+        )
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -457,6 +609,10 @@ public extension InvoiceBook {
 
             if invoice.dueDate < invoice.issueDate {
                 issues.append("Due date cannot be before issue date for invoice \(displayNumber(for: invoice))")
+            }
+
+            if invoice.autoGeneration.isEnabled, !(1...InvoiceAutoGenerationSettings.maximumIntervalDays).contains(invoice.autoGeneration.intervalDays) {
+                issues.append("Automatic generation interval must be between 1 and 3650 days for invoice \(displayNumber(for: invoice))")
             }
 
             if !isValidCurrencyCode(invoice.currencyCode) {

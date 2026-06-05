@@ -23,7 +23,7 @@ struct InvoicesView: View {
             List(selection: $model.selectedInvoiceID) {
                 ForEach(filteredInvoices) { invoice in
                     InvoiceSummaryRow(invoice: invoice, client: model.book.client(for: invoice))
-                        .padding(.vertical, 2)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 10))
                         .tag(invoice.id)
                         .contextMenu {
                             Button("Delete", role: .destructive) {
@@ -32,6 +32,7 @@ struct InvoicesView: View {
                         }
                 }
             }
+            .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 340)
             .safeAreaInset(edge: .bottom) {
                 Button(action: {
@@ -40,7 +41,8 @@ struct InvoicesView: View {
                     Label("New Invoice", systemImage: "plus")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(RuneyButtonStyle(variant: .prominent))
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .padding()
             }
         } detail: {
@@ -86,33 +88,72 @@ struct InvoiceSummaryRow: View {
     var client: Client?
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(invoice.number)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Color.runeyPrimary)
-                        .lineLimit(1)
-                    StatusBadge(status: invoice.status)
-                }
-                Text(client?.name ?? "Unassigned client")
-                    .font(.caption)
-                    .foregroundStyle(Color.runeyMuted)
-            }
+        let content = InvoiceSummaryRowContent(
+            invoice: invoice,
+            clientName: client?.name ?? "Unassigned client"
+        )
 
-            Spacer()
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(content.invoiceNumber)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.runeyPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .layoutPriority(1)
 
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(Money.format(minorUnits: invoice.balanceDueMinorUnits, currencyCode: invoice.currencyCode).replacingOccurrences(of: invoice.currencyCode + " ", with: ""))
+                Spacer(minLength: 8)
+
+                Text(content.amountText)
                     .font(.system(.body, design: .monospaced).weight(.semibold))
                     .foregroundStyle(Color.runeyPrimary)
                     .lineLimit(1)
-                Text(DateFormatting.short.string(from: invoice.dueDate))
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+
+            HStack(alignment: .center, spacing: 6) {
+                Text(content.clientName)
+                    .font(.caption)
+                    .foregroundStyle(Color.runeyMuted)
+                    .lineLimit(1)
+                    .layoutPriority(1)
+
+                StatusBadge(status: invoice.status)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                Spacer(minLength: 8)
+
+                Text(content.dueDateText)
                     .font(.caption2)
                     .foregroundStyle(Color.runeyMuted)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
-        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, minHeight: content.minimumHeight, alignment: .center)
+        .contentShape(Rectangle())
+    }
+}
+
+struct InvoiceSummaryRowContent {
+    let invoiceNumber: String
+    let statusLabel: String
+    let amountText: String
+    let clientName: String
+    let dueDateText: String
+    let minimumHeight: CGFloat
+
+    init(invoice: Invoice, clientName: String) {
+        self.invoiceNumber = invoice.number
+        self.statusLabel = invoice.status.label
+        self.amountText = Money.format(
+            minorUnits: invoice.balanceDueMinorUnits,
+            currencyCode: invoice.currencyCode
+        )
+        .replacingOccurrences(of: invoice.currencyCode + " ", with: "")
+        self.clientName = clientName
+        self.dueDateText = DateFormatting.short.string(from: invoice.dueDate)
+        self.minimumHeight = 58
     }
 }
 
