@@ -30,6 +30,10 @@ assert.ok(
   mainPackage.keywords.includes("invoice"),
   "main package should be discoverable by invoice keyword",
 );
+assert.deepEqual(mainPackage.repository, {
+  type: "git",
+  url: "git+ssh://git@github.com/megabyte0x/invoicegen.git",
+});
 assert.deepEqual(mainPackage.files, ["bin/", "README.md"]);
 
 const wrapperPath = path.join(root, "npm", "invoicegen", "bin", "invoicegen.js");
@@ -61,6 +65,14 @@ for (const [suffix, os, cpu, binaryName] of platforms) {
   assert.deepEqual(pkg.cpu, [cpu]);
   assert.deepEqual(pkg.files, [`bin/${binaryName}`]);
   assert.equal(pkg.publishConfig?.access, "public");
+  assert.deepEqual(
+    pkg.repository,
+    {
+      type: "git",
+      url: "git+ssh://git@github.com/megabyte0x/invoicegen.git",
+    },
+    `${pkg.name} must declare the GitHub repository for npm trusted publishing`,
+  );
   assert.equal(
     mainPackage.optionalDependencies[pkg.name],
     version,
@@ -100,8 +112,12 @@ assert.ok(releaseWorkflow.includes("actions/setup-node@v6"), "workflow must set 
 assert.ok(releaseWorkflow.includes("node-version: \"24\""), "workflow must use Node 24 for npm trusted publishing");
 assert.ok(releaseWorkflow.includes("NPM_CONFIG_PROVENANCE"), "workflow must publish npm packages with provenance");
 assert.ok(
-  releaseWorkflow.includes("NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}"),
-  "workflow must support the configured npm token as a publish fallback",
+  !releaseWorkflow.includes("NODE_AUTH_TOKEN"),
+  "workflow must use npm trusted publishing instead of NODE_AUTH_TOKEN",
+);
+assert.ok(
+  !releaseWorkflow.includes("NPM_TOKEN"),
+  "workflow must not use the legacy NPM_TOKEN publish path",
 );
 assert.ok(
   !releaseWorkflow.includes("//registry.npmjs.org/:_authToken"),

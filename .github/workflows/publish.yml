@@ -144,7 +144,6 @@ jobs:
 
       - name: Publish npm packages
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
           NPM_PUBLISH_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.npm_publish_dry_run && '1' || '0' }}
         shell: bash
