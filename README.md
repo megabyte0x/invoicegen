@@ -152,8 +152,9 @@ The Codex app Run action is wired to the same script.
 
 The package script builds the native macOS app in release mode, stages
 `dist/release/InvoiceGen.app`, signs it, verifies the app bundle, and creates
-`dist/release/InvoiceGen-<version>.dmg` with `InvoiceGen.app` and an
-`Applications` install shortcut at the volume root.
+`dist/release/InvoiceGen-<version>.dmg` with a drag-to-Applications Finder
+layout, custom instruction background, and positioned `InvoiceGen.app` and
+`Applications` icons.
 
 By default the script uses ad-hoc signing for local validation. For a
 distributable build, provide a Developer ID identity:
