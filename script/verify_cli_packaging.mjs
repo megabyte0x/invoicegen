@@ -99,8 +99,10 @@ assert.ok(releaseWorkflow.includes("id-token: write"), "workflow must support np
 assert.ok(releaseWorkflow.includes("actions/setup-node@v6"), "workflow must set up a trusted-publishing capable npm");
 assert.ok(releaseWorkflow.includes("node-version: \"24\""), "workflow must use Node 24 for npm trusted publishing");
 assert.ok(releaseWorkflow.includes("NPM_CONFIG_PROVENANCE"), "workflow must publish npm packages with provenance");
-assert.ok(!releaseWorkflow.includes("NODE_AUTH_TOKEN"), "workflow must not use token auth for npm publishing");
-assert.ok(!releaseWorkflow.includes("NPM_TOKEN"), "workflow must not require an npm token for trusted publishing");
+assert.ok(
+  releaseWorkflow.includes("NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}"),
+  "workflow must support the configured npm token as a publish fallback",
+);
 assert.ok(
   !releaseWorkflow.includes("//registry.npmjs.org/:_authToken"),
   "workflow must not write npm token auth to .npmrc",
