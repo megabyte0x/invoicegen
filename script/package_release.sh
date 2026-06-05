@@ -182,7 +182,8 @@ tell application "Finder"
   set viewOptions to icon view options of dmgWindow
   set arrangement of viewOptions to not arranged
   set icon size of viewOptions to 96
-  set background picture of viewOptions to file "$DMG_BACKGROUND_NAME" of folder ".background" of dmgFolder
+  set backgroundImage to POSIX file "$DMG_MOUNT_DIR/.background/$DMG_BACKGROUND_NAME" as alias
+  set background picture of viewOptions to backgroundImage
   set position of item "$APP_NAME.app" of dmgFolder to {190, 250}
   set position of item "Applications" of dmgFolder to {565, 250}
   update dmgFolder without registering applications
