@@ -58,6 +58,7 @@ Use `--store PATH` for experiments so agent work does not mutate the user's real
 cargo run -- --store /tmp/invoicegen-store.json seed-sample --force
 cargo run -- --store /tmp/invoicegen-store.json summary
 cargo run -- --store /tmp/invoicegen-store.json invoice list --status overdue --format json
+cargo run -- --store /tmp/invoicegen-store.json invoice generate-due
 cargo run -- --store /tmp/invoicegen-store.json invoice render INV-2026-0001
 cargo run -- --store /tmp/invoicegen-store.json store export /tmp/invoicegen-backup.json
 cargo run -- --store /tmp/invoicegen-store.json store restore /tmp/invoicegen-backup.json --force
@@ -101,6 +102,17 @@ cargo run -- --store /tmp/invoicegen-store.json invoice accept-payment INV-2026-
 cargo run -- --store /tmp/invoicegen-store.json invoice render INV-2026-0001
 ```
 
+Automatic invoice generation:
+
+```sh
+cargo run -- --store /tmp/invoicegen-store.json invoice update INV-2026-0001 --auto-generate --auto-interval-days 30 --next-generation-date 2026-02-01
+cargo run -- --store /tmp/invoicegen-store.json invoice generate-due
+cargo run -- --store /tmp/invoicegen-store.json invoice generate-due --now 2026-03-01 --format json
+cargo run -- --store /tmp/invoicegen-store.json invoice update INV-2026-0001 --disable-auto-generate
+```
+
+The macOS app runs automatic generation while it is open and on save; the CLI is not a daemon, so `invoice generate-due` is the explicit command for cron jobs, launchd jobs, scripts, and manual catch-up. Generated invoices must match Swift behavior: draft status, copied client/project/line-items/notes/terms/payment acceptance details, no payments, `autoGeneration` disabled on generated copies, and the source invoice's `nextGenerationDate` advanced by `intervalDays`.
+
 Payment and status commands:
 
 ```sh
@@ -121,13 +133,14 @@ Destructive delete commands require `--force`; do not remove that guard when ext
 - Keep backup behavior intact: saving over an existing store creates `store.json.bak`.
 - Use `store export PATH` and `store restore PATH --force` for explicit backup and recovery workflows.
 - Keep shared validation intact so invalid invoice numbers, duplicate invoice numbers, invalid dates, invalid currency codes, non-positive quantities, negative prices, invalid tax rates, and overpayments cannot replace the store.
-- Preserve legacy decoding behavior for stores missing v2 fields such as `paymentAcceptanceDetails` and `acceptedPaymentDetailIDs`.
+- Preserve legacy decoding behavior for stores missing v2 fields such as `paymentAcceptanceDetails`, `acceptedPaymentDetailIDs`, and `autoGeneration`.
 
 ## Compatibility Notes
 
 - Money parsing and formatting must match `Sources/InvoiceCore/Money.swift`.
 - Text invoice rendering must match `Sources/InvoiceCore/InvoiceTextRenderer.swift` closely enough for copied raw invoice text to remain compatible.
 - Status refresh behavior must match Swift: paid invoices become `paid`; sent, paid, or overdue invoices can refresh to `sent` or `overdue`; void invoices stay void.
+- Automatic invoice generation must match `Sources/InvoiceCore/Models.swift`: `intervalDays` is clamped to `1...3650`, legacy `intervalSeconds` decodes to days, generated copies are appended with fresh IDs, and catch-up is capped at 24 generated copies per source invoice per run.
 - The Rust CLI intentionally keeps dependencies narrow. Clap and `clap_complete` are accepted for parser, help, validation, and completion behavior; avoid adding more dependencies unless the user explicitly accepts that tradeoff.
 
 ## Verification

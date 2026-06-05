@@ -172,6 +172,33 @@ pub struct Payment {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct InvoiceAutoGenerationSettings {
+    pub is_enabled: bool,
+    pub interval_days: i64,
+    pub next_generation_date: String,
+}
+
+impl InvoiceAutoGenerationSettings {
+    pub const MAXIMUM_INTERVAL_DAYS: i64 = 3_650;
+
+    pub fn disabled() -> Self {
+        Self {
+            is_enabled: false,
+            interval_days: 30,
+            next_generation_date: "1970-01-01T00:00:00Z".to_string(),
+        }
+    }
+
+    pub fn normalized_interval_days(value: i64) -> i64 {
+        value.clamp(1, Self::MAXIMUM_INTERVAL_DAYS)
+    }
+
+    pub fn next_generation_date(interval_days: i64, from: &str) -> String {
+        add_days_iso(from, Self::normalized_interval_days(interval_days))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Invoice {
     pub id: String,
     pub number: String,
@@ -186,6 +213,7 @@ pub struct Invoice {
     pub notes: String,
     pub terms: String,
     pub accepted_payment_detail_ids: Vec<String>,
+    pub auto_generation: InvoiceAutoGenerationSettings,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -372,6 +400,7 @@ impl InvoiceBook {
                         bank_details.id.clone(),
                         crypto_details.id.clone(),
                     ],
+                    auto_generation: InvoiceAutoGenerationSettings::disabled(),
                     created_at: now.to_string(),
                     updated_at: now.to_string(),
                 },
@@ -396,6 +425,7 @@ impl InvoiceBook {
                     notes: String::new(),
                     terms: "Net 14.".to_string(),
                     accepted_payment_detail_ids: vec![bank_details.id.clone()],
+                    auto_generation: InvoiceAutoGenerationSettings::disabled(),
                     created_at: now.to_string(),
                     updated_at: now.to_string(),
                 },
@@ -454,6 +484,62 @@ impl InvoiceBook {
         format!("{prefix}{:04}", max_sequence + 1)
     }
 
+    pub fn generate_automatic_invoices(&mut self, now: &str) -> Vec<Invoice> {
+        self.generate_automatic_invoices_with_limit(now, 24)
+    }
+
+    pub fn generate_automatic_invoices_with_limit(
+        &mut self,
+        now: &str,
+        max_catch_up_per_invoice: usize,
+    ) -> Vec<Invoice> {
+        if max_catch_up_per_invoice == 0 {
+            return Vec::new();
+        }
+
+        let original_invoice_count = self.invoices.len();
+        let mut generated_invoices = Vec::new();
+
+        for index in 0..original_invoice_count {
+            if !self.invoices[index].auto_generation.is_enabled {
+                continue;
+            }
+
+            let mut next_generation_date = self.invoices[index]
+                .auto_generation
+                .next_generation_date
+                .clone();
+            let mut generated_count = 0;
+
+            while !date_before(now, &next_generation_date)
+                && generated_count < max_catch_up_per_invoice
+            {
+                let source_invoice = self.invoices[index].clone();
+                let generated_invoice = automatic_invoice_copy(
+                    &source_invoice,
+                    self.next_invoice_number(&next_generation_date),
+                    &next_generation_date,
+                    now,
+                );
+                self.invoices.push(generated_invoice.clone());
+                generated_invoices.push(generated_invoice);
+                generated_count += 1;
+
+                next_generation_date = InvoiceAutoGenerationSettings::next_generation_date(
+                    source_invoice.auto_generation.interval_days,
+                    &next_generation_date,
+                );
+            }
+
+            if generated_count > 0 {
+                self.invoices[index].auto_generation.next_generation_date = next_generation_date;
+                self.invoices[index].updated_at = now.to_string();
+            }
+        }
+
+        generated_invoices
+    }
+
     pub fn validate_for_save(&self) -> Result<(), String> {
         let mut issues = Vec::new();
 
@@ -506,6 +592,15 @@ impl InvoiceBook {
             if date_before(&invoice.due_date, &invoice.issue_date) {
                 issues.push(format!(
                     "Due date cannot be before issue date for invoice {}",
+                    invoice_display_number(invoice)
+                ));
+            }
+            if invoice.auto_generation.is_enabled
+                && !(1..=InvoiceAutoGenerationSettings::MAXIMUM_INTERVAL_DAYS)
+                    .contains(&invoice.auto_generation.interval_days)
+            {
+                issues.push(format!(
+                    "Automatic generation interval must be between 1 and 3650 days for invoice {}",
                     invoice_display_number(invoice)
                 ));
             }
@@ -670,6 +765,48 @@ impl InvoiceBook {
                 json::number(CURRENT_SCHEMA_VERSION),
             ),
         ])
+    }
+}
+
+fn automatic_invoice_copy(
+    source_invoice: &Invoice,
+    number: String,
+    issue_date: &str,
+    now: &str,
+) -> Invoice {
+    let due_offset_seconds =
+        seconds_between_iso(&source_invoice.issue_date, &source_invoice.due_date)
+            .unwrap_or(0)
+            .max(0);
+
+    Invoice {
+        id: new_id(),
+        number,
+        client_id: source_invoice.client_id.clone(),
+        project_id: source_invoice.project_id.clone(),
+        issue_date: issue_date.to_string(),
+        due_date: add_seconds_iso(issue_date, due_offset_seconds),
+        status: InvoiceStatus::Draft,
+        currency_code: source_invoice.currency_code.clone(),
+        line_items: source_invoice
+            .line_items
+            .iter()
+            .map(|item| InvoiceLineItem {
+                id: new_id(),
+                title: item.title.clone(),
+                details: item.details.clone(),
+                quantity: item.quantity,
+                unit_price_minor_units: item.unit_price_minor_units,
+                tax_rate_percent: item.tax_rate_percent,
+            })
+            .collect(),
+        payments: Vec::new(),
+        notes: source_invoice.notes.clone(),
+        terms: source_invoice.terms.clone(),
+        accepted_payment_detail_ids: source_invoice.accepted_payment_detail_ids.clone(),
+        auto_generation: InvoiceAutoGenerationSettings::disabled(),
+        created_at: now.to_string(),
+        updated_at: now.to_string(),
     }
 }
 
@@ -952,6 +1089,45 @@ impl Payment {
     }
 }
 
+impl InvoiceAutoGenerationSettings {
+    fn from_json(value: &JsonValue) -> Result<Self, String> {
+        let object = value
+            .as_object()
+            .ok_or_else(|| "autoGeneration must be an object".to_string())?;
+        let interval_days = if let Some(interval_days) = get_i64(object, "intervalDays") {
+            Self::normalized_interval_days(interval_days)
+        } else if let Some(interval_seconds) = get_i64(object, "intervalSeconds") {
+            Self::interval_days_from_legacy_seconds(interval_seconds)
+        } else {
+            30
+        };
+
+        Ok(Self {
+            is_enabled: get_bool(object, "isEnabled").unwrap_or(false),
+            interval_days,
+            next_generation_date: get_string(object, "nextGenerationDate")
+                .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string()),
+        })
+    }
+
+    fn to_json(&self) -> JsonValue {
+        json::object([
+            ("intervalDays".to_string(), json::number(self.interval_days)),
+            ("isEnabled".to_string(), JsonValue::Bool(self.is_enabled)),
+            (
+                "nextGenerationDate".to_string(),
+                json::string(&self.next_generation_date),
+            ),
+        ])
+    }
+
+    fn interval_days_from_legacy_seconds(value: i64) -> i64 {
+        let normalized_seconds = value.clamp(1, Self::MAXIMUM_INTERVAL_DAYS * 86_400);
+        let days = (normalized_seconds + 86_399) / 86_400;
+        Self::normalized_interval_days(days)
+    }
+}
+
 impl Invoice {
     pub fn new(number: String, due_date: String, now: &str) -> Self {
         Self {
@@ -968,6 +1144,7 @@ impl Invoice {
             notes: String::new(),
             terms: "Payment due on receipt.".to_string(),
             accepted_payment_detail_ids: Vec::new(),
+            auto_generation: InvoiceAutoGenerationSettings::disabled(),
             created_at: now.to_string(),
             updated_at: now.to_string(),
         }
@@ -1009,6 +1186,11 @@ impl Invoice {
                 .filter_map(JsonValue::as_str)
                 .map(str::to_string)
                 .collect(),
+            auto_generation: object
+                .get("autoGeneration")
+                .map(InvoiceAutoGenerationSettings::from_json)
+                .transpose()?
+                .unwrap_or_else(InvoiceAutoGenerationSettings::disabled),
             updated_at: get_string(object, "updatedAt").unwrap_or_else(|| created_at.clone()),
             created_at,
         })
@@ -1025,6 +1207,7 @@ impl Invoice {
                     .collect(),
             ),
         );
+        entries.insert("autoGeneration".to_string(), self.auto_generation.to_json());
         if let Some(client_id) = &self.client_id {
             entries.insert("clientId".to_string(), json::string(client_id));
         }
@@ -1435,6 +1618,12 @@ pub fn add_days_iso(value: &str, days: i64) -> String {
     }
 }
 
+fn add_seconds_iso(value: &str, seconds: i64) -> String {
+    unix_seconds_from_iso(value)
+        .map(|base| iso_from_unix_seconds(base + seconds))
+        .unwrap_or_else(|| value.to_string())
+}
+
 pub fn format_date_medium(value: &str) -> String {
     let Some((year, month, day)) = parse_ymd(value) else {
         return value.to_string();
@@ -1463,6 +1652,13 @@ fn get_array<'a>(object: &'a BTreeMap<String, JsonValue>, key: &str) -> Option<&
 
 fn get_i64(object: &BTreeMap<String, JsonValue>, key: &str) -> Option<i64> {
     object.get(key).and_then(JsonValue::as_i64)
+}
+
+fn get_bool(object: &BTreeMap<String, JsonValue>, key: &str) -> Option<bool> {
+    match object.get(key) {
+        Some(JsonValue::Bool(value)) => Some(*value),
+        _ => None,
+    }
 }
 
 fn get_f64(object: &BTreeMap<String, JsonValue>, key: &str) -> Option<f64> {
@@ -1557,6 +1753,20 @@ fn date_before(left: &str, right: &str) -> bool {
         (Some(left), Some(right)) => left < right,
         _ => left < right,
     }
+}
+
+fn seconds_between_iso(start: &str, end: &str) -> Option<i64> {
+    Some(unix_seconds_from_iso(end)? - unix_seconds_from_iso(start)?)
+}
+
+fn unix_seconds_from_iso(value: &str) -> Option<i64> {
+    let (year, month, day, hour, minute, second) = parse_iso_parts(value)?;
+    Some(
+        days_from_civil(year, month, day) * 86_400
+            + i64::from(hour) * 3_600
+            + i64::from(minute) * 60
+            + i64::from(second),
+    )
 }
 
 fn parse_iso_parts(value: &str) -> Option<(i32, u32, u32, u32, u32, u32)> {

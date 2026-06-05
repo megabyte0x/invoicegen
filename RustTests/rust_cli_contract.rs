@@ -571,6 +571,180 @@ fn cli_creates_entities_persists_swift_compatible_json_and_renders_invoice_text(
 }
 
 #[test]
+fn cli_configures_and_persists_invoice_auto_generation_settings() {
+    let store = temp_store("auto-config");
+
+    let invoice_id = id_from_created_line(
+        &assert_success(run(
+            &store,
+            &[
+                "invoice",
+                "add",
+                "--number",
+                "INV-2099-0001",
+                "--issue-date",
+                "2099-01-01",
+                "--due-date",
+                "2099-01-15",
+                "--auto-generate",
+                "--auto-interval-days",
+                "7",
+                "--next-generation-date",
+                "2099-01-08",
+            ],
+        )),
+        "invoice",
+    );
+
+    let saved_json = fs::read_to_string(&store).unwrap();
+    assert!(saved_json.contains("\"autoGeneration\""), "{saved_json}");
+    assert!(saved_json.contains("\"isEnabled\": true"), "{saved_json}");
+    assert!(saved_json.contains("\"intervalDays\": 7"), "{saved_json}");
+    assert!(
+        saved_json.contains("\"nextGenerationDate\": \"2099-01-08T00:00:00Z\""),
+        "{saved_json}"
+    );
+
+    assert_success(run(
+        &store,
+        &["invoice", "update", &invoice_id, "--disable-auto-generate"],
+    ));
+    let disabled_json = fs::read_to_string(&store).unwrap();
+    assert!(
+        disabled_json.contains("\"isEnabled\": false"),
+        "{disabled_json}"
+    );
+}
+
+#[test]
+fn cli_generates_due_automatic_invoices_from_swift_compatible_store() {
+    let store = temp_store("auto-generate-due");
+    fs::create_dir_all(store.parent().unwrap()).unwrap();
+    fs::write(
+        &store,
+        r#"{
+          "schemaVersion": 2,
+          "businessProfile": {
+            "name": "Auto Co",
+            "email": "",
+            "address": "",
+            "taxIdentifier": "",
+            "currencyCode": "USD",
+            "paymentTermsDays": 14
+          },
+          "clients": [
+            {
+              "id": "00000000-0000-0000-0000-000000000201",
+              "name": "Retainer Client",
+              "company": "",
+              "email": "",
+              "address": "",
+              "notes": "",
+              "createdAt": "2026-01-01T00:00:00Z",
+              "updatedAt": "2026-01-01T00:00:00Z"
+            }
+          ],
+          "projects": [
+            {
+              "id": "00000000-0000-0000-0000-000000000301",
+              "clientId": "00000000-0000-0000-0000-000000000201",
+              "name": "Monthly support",
+              "summary": "",
+              "hourlyRateMinorUnits": 0,
+              "currencyCode": "USD",
+              "createdAt": "2026-01-01T00:00:00Z",
+              "updatedAt": "2026-01-01T00:00:00Z"
+            }
+          ],
+          "paymentAcceptanceDetails": [
+            {
+              "id": "00000000-0000-0000-0000-000000000401",
+              "kind": "bankDetails",
+              "label": "Primary bank",
+              "details": "Account: 123",
+              "createdAt": "2026-01-01T00:00:00Z",
+              "updatedAt": "2026-01-01T00:00:00Z"
+            }
+          ],
+          "invoices": [
+            {
+              "id": "00000000-0000-0000-0000-000000000101",
+              "number": "INV-2026-0001",
+              "clientId": "00000000-0000-0000-0000-000000000201",
+              "projectId": "00000000-0000-0000-0000-000000000301",
+              "issueDate": "2026-01-01T00:00:00Z",
+              "dueDate": "2026-01-02T00:00:00Z",
+              "status": "sent",
+              "currencyCode": "USD",
+              "lineItems": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000501",
+                  "title": "Retainer",
+                  "details": "Monthly support",
+                  "quantity": 1,
+                  "unitPriceMinorUnits": 100000,
+                  "taxRatePercent": 0
+                }
+              ],
+              "payments": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000601",
+                  "amountMinorUnits": 100000,
+                  "paidAt": "2026-01-02T00:00:00Z",
+                  "reference": "paid-source",
+                  "notes": ""
+                }
+              ],
+              "notes": "Monthly support",
+              "terms": "Net 1.",
+              "acceptedPaymentDetailIDs": [
+                "00000000-0000-0000-0000-000000000401"
+              ],
+              "autoGeneration": {
+                "isEnabled": true,
+                "intervalDays": 7,
+                "nextGenerationDate": "2026-01-08T00:00:00Z"
+              },
+              "createdAt": "2026-01-01T00:00:00Z",
+              "updatedAt": "2026-01-01T00:00:00Z"
+            }
+          ]
+        }"#,
+    )
+    .unwrap();
+
+    let generated = assert_success(run(
+        &store,
+        &["invoice", "generate-due", "--now", "2026-01-23"],
+    ));
+
+    assert!(generated.contains("Generated 3 invoices"), "{generated}");
+    assert!(generated.contains("INV-2026-0002"), "{generated}");
+    assert!(generated.contains("INV-2026-0003"), "{generated}");
+    assert!(generated.contains("INV-2026-0004"), "{generated}");
+
+    let saved_json = fs::read_to_string(&store).unwrap();
+    assert!(
+        saved_json.contains("\"nextGenerationDate\": \"2026-01-29T00:00:00Z\""),
+        "{saved_json}"
+    );
+    assert_eq!(saved_json.matches("\"isEnabled\": false").count(), 3);
+    assert_eq!(saved_json.matches("\"payments\": []").count(), 3);
+
+    let rendered = assert_success(run(&store, &["invoice", "render", "INV-2026-0002"]));
+    assert!(rendered.contains("INVOICE INV-2026-0002"), "{rendered}");
+    assert!(rendered.contains("Issue Date: Jan 8, 2026"), "{rendered}");
+    assert!(rendered.contains("Due Date:   Jan 9, 2026"), "{rendered}");
+    assert!(rendered.contains("Bill To: Retainer Client"), "{rendered}");
+    assert!(rendered.contains("Project: Monthly support"), "{rendered}");
+    assert!(rendered.contains("Payment Acceptance"), "{rendered}");
+    assert!(
+        rendered.contains("Bank Details: Primary bank"),
+        "{rendered}"
+    );
+}
+
+#[test]
 fn seed_sample_summary_and_backup_match_local_first_store_behavior() {
     let store = temp_store("seed-backup");
 

@@ -1,8 +1,8 @@
 use crate::domain::{
     add_days_iso, format_money, invoice_pdf_file_name, normalize_date_input, now_iso,
     parse_minor_units, render_invoice_pdf, render_invoice_text, BusinessProfile, Client, Invoice,
-    InvoiceBook, InvoiceLineItem, InvoiceStatus, Payment, PaymentAcceptanceDetail,
-    PaymentAcceptanceKind, Project,
+    InvoiceAutoGenerationSettings, InvoiceBook, InvoiceLineItem, InvoiceStatus, Payment,
+    PaymentAcceptanceDetail, PaymentAcceptanceKind, Project,
 };
 use crate::json::{self, JsonValue};
 use crate::store::LocalInvoiceStore;
@@ -578,6 +578,21 @@ fn command_invoice(
 ) -> Result<String, String> {
     let subcommand = next_arg(&mut args, "invoice command")?;
     match subcommand.as_str() {
+        "generate-due" => {
+            let format = output_format_for(&mut args, context)?;
+            let now = take_option(&mut args, "--now")
+                .map(|value| normalize_date_input(&value))
+                .transpose()?
+                .unwrap_or_else(now_iso);
+            reject_unknown(args)?;
+            let mut book = store.load()?;
+            let generated_invoices = book.generate_automatic_invoices(&now);
+            if !generated_invoices.is_empty() {
+                book.refresh_invoice_statuses(&now);
+                store.save(&book)?;
+            }
+            format_generated_invoices(&generated_invoices, format)
+        }
         "list" => {
             let format = output_format_for(&mut args, context)?;
             let status_filter = take_option(&mut args, "--status")
@@ -658,6 +673,7 @@ fn command_invoice(
             if let Some(status) = take_option(&mut args, "--status") {
                 invoice.status = InvoiceStatus::parse(&status)?;
             }
+            apply_auto_generation_options(&mut invoice, &mut args, &now)?;
             if !take_flag(&mut args, "--no-default-item") {
                 invoice
                     .line_items
@@ -674,8 +690,9 @@ fn command_invoice(
             let mut book = store.load()?;
             let index = find_invoice_index(&book, &id)?;
             let mut invoice = book.invoices[index].clone();
-            apply_invoice_options(&book, &mut invoice, &mut args)?;
-            invoice.updated_at = now_iso();
+            let now = now_iso();
+            apply_invoice_options(&book, &mut invoice, &mut args, &now)?;
+            invoice.updated_at = now;
             reject_unknown(args)?;
             book.invoices[index] = invoice;
             save_book_with_refresh(&store, &mut book)?;
@@ -934,6 +951,7 @@ fn apply_invoice_options(
     book: &InvoiceBook,
     invoice: &mut Invoice,
     args: &mut Vec<String>,
+    now: &str,
 ) -> Result<(), String> {
     if let Some(number) = take_option(args, "--number") {
         invoice.number = number;
@@ -968,6 +986,60 @@ fn apply_invoice_options(
     if let Some(terms) = take_option(args, "--terms") {
         invoice.terms = terms;
     }
+    apply_auto_generation_options(invoice, args, now)?;
+    Ok(())
+}
+
+fn apply_auto_generation_options(
+    invoice: &mut Invoice,
+    args: &mut Vec<String>,
+    now: &str,
+) -> Result<(), String> {
+    let enable = take_flag(args, "--auto-generate");
+    let disable = take_flag(args, "--disable-auto-generate");
+    if enable && disable {
+        return Err(cli_error(
+            "invalid_arguments",
+            "--auto-generate and --disable-auto-generate cannot be used together",
+            Some("choose one automatic generation mode".to_string()),
+        ));
+    }
+
+    let was_enabled = invoice.auto_generation.is_enabled;
+    let mut interval_changed = false;
+    if let Some(interval_days) = take_option(args, "--auto-interval-days") {
+        invoice.auto_generation.interval_days =
+            parse_auto_generation_interval_days(&interval_days)?;
+        interval_changed = true;
+    }
+
+    let mut next_date_changed = false;
+    if let Some(next_generation_date) = take_option(args, "--next-generation-date") {
+        invoice.auto_generation.next_generation_date = normalize_date_input(&next_generation_date)?;
+        next_date_changed = true;
+    }
+
+    if enable {
+        invoice.auto_generation.is_enabled = true;
+    }
+    if disable {
+        invoice.auto_generation.is_enabled = false;
+    }
+
+    if invoice.auto_generation.is_enabled
+        && !next_date_changed
+        && (enable
+            && (!was_enabled
+                || date_has_passed_or_is_now(&invoice.auto_generation.next_generation_date, now))
+            || interval_changed)
+    {
+        invoice.auto_generation.next_generation_date =
+            InvoiceAutoGenerationSettings::next_generation_date(
+                invoice.auto_generation.interval_days,
+                now,
+            );
+    }
+
     Ok(())
 }
 
@@ -1327,8 +1399,11 @@ fn invoice_command() -> Command {
     Command::new("invoice")
         .about("Manage invoices")
         .after_help(
-            "Examples:\n  invoicegen-rs invoice list [--status STATUS]\n  invoicegen-rs invoice list --status overdue --format json\n  invoicegen-rs invoice render INV-2026-0001 --output ./exports",
+            "Examples:\n  invoicegen-rs invoice list [--status STATUS]\n  invoicegen-rs invoice list --status overdue --format json\n  invoicegen-rs invoice add --auto-generate --auto-interval-days 30\n  invoicegen-rs invoice generate-due\n  invoicegen-rs invoice render INV-2026-0001 --output ./exports",
         )
+        .subcommand(Command::new("generate-due")
+            .about("Generate due automatic invoice copies")
+            .arg(option("now", "now", "YYYY-MM-DD")))
         .subcommand(Command::new("list")
             .arg(option("status", "status", "STATUS").value_parser(["draft", "sent", "paid", "overdue", "void"]))
             .arg(option("client", "client", "ID|none"))
@@ -1386,6 +1461,22 @@ fn invoice_write_command(name: &'static str, needs_id: bool) -> Command {
             option("status", "status", "STATUS")
                 .value_parser(["draft", "sent", "paid", "overdue", "void"]),
         )
+        .arg(
+            Arg::new("auto-generate")
+                .long("auto-generate")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("disable-auto-generate")
+                .long("disable-auto-generate")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(option("auto-interval-days", "auto-interval-days", "DAYS"))
+        .arg(option(
+            "next-generation-date",
+            "next-generation-date",
+            "YYYY-MM-DD",
+        ))
         .arg(
             Arg::new("no-default-item")
                 .long("no-default-item")
@@ -1904,6 +1995,61 @@ fn invoices_table(invoices: &[Invoice], book: &InvoiceBook) -> Vec<Vec<String>> 
         .collect()
 }
 
+fn format_generated_invoices(invoices: &[Invoice], format: OutputFormat) -> Result<String, String> {
+    match format {
+        OutputFormat::Json => Ok(json_string(JsonValue::Array(
+            invoices
+                .iter()
+                .map(|invoice| {
+                    json::object([
+                        ("dueDate".to_string(), json::string(&invoice.due_date)),
+                        ("id".to_string(), json::string(&invoice.id)),
+                        ("issueDate".to_string(), json::string(&invoice.issue_date)),
+                        ("number".to_string(), json::string(&invoice.number)),
+                        (
+                            "status".to_string(),
+                            json::string(invoice.status.raw_value()),
+                        ),
+                    ])
+                })
+                .collect(),
+        ))),
+        OutputFormat::Csv => Ok(csv_rows(
+            &["id", "number", "issueDate", "dueDate", "status"],
+            &generated_invoices_table(invoices),
+        )),
+        OutputFormat::Tsv => Ok(tsv_rows(
+            &["id", "number", "issueDate", "dueDate", "status"],
+            &generated_invoices_table(invoices),
+        )),
+        OutputFormat::Text => {
+            let mut output = format!("Generated {} invoices\n", invoices.len());
+            for invoice in invoices {
+                output.push_str(&format!(
+                    "{} {} issue={} due={}\n",
+                    invoice.id, invoice.number, invoice.issue_date, invoice.due_date
+                ));
+            }
+            Ok(output)
+        }
+    }
+}
+
+fn generated_invoices_table(invoices: &[Invoice]) -> Vec<Vec<String>> {
+    invoices
+        .iter()
+        .map(|invoice| {
+            vec![
+                invoice.id.clone(),
+                invoice.number.clone(),
+                invoice.issue_date.clone(),
+                invoice.due_date.clone(),
+                invoice.status.raw_value().to_string(),
+            ]
+        })
+        .collect()
+}
+
 fn invoice_client_name(invoice: &Invoice, book: &InvoiceBook) -> String {
     book.client_for(invoice)
         .map(|client| client.name.clone())
@@ -2091,6 +2237,17 @@ fn parse_i64(value: &str, name: &str) -> Result<i64, String> {
     value
         .parse()
         .map_err(|_| format!("invalid integer for {name}: {value}"))
+}
+
+fn parse_auto_generation_interval_days(value: &str) -> Result<i64, String> {
+    let interval_days = parse_i64(value, "--auto-interval-days")?;
+    Ok(InvoiceAutoGenerationSettings::normalized_interval_days(
+        interval_days,
+    ))
+}
+
+fn date_has_passed_or_is_now(date: &str, now: &str) -> bool {
+    date <= now
 }
 
 fn parse_f64(value: &str, name: &str) -> Result<f64, String> {
