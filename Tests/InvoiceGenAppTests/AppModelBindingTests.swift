@@ -75,7 +75,7 @@ final class AppModelBindingTests: XCTestCase {
             ],
             autoGeneration: InvoiceAutoGenerationSettings(
                 isEnabled: true,
-                intervalDays: 1,
+                intervalSeconds: 86_400,
                 nextGenerationDate: generationDate
             )
         )
@@ -104,7 +104,7 @@ final class AppModelBindingTests: XCTestCase {
             ],
             autoGeneration: InvoiceAutoGenerationSettings(
                 isEnabled: true,
-                intervalDays: 1,
+                intervalSeconds: 10,
                 nextGenerationDate: nextGenerationDate
             )
         )
@@ -128,7 +128,7 @@ final class AppModelBindingTests: XCTestCase {
             ],
             autoGeneration: InvoiceAutoGenerationSettings(
                 isEnabled: true,
-                intervalDays: 1,
+                intervalSeconds: 86_400,
                 nextGenerationDate: generationDate
             )
         )
@@ -156,7 +156,7 @@ final class AppModelBindingTests: XCTestCase {
             ],
             autoGeneration: InvoiceAutoGenerationSettings(
                 isEnabled: true,
-                intervalDays: 1,
+                intervalSeconds: 1,
                 nextGenerationDate: generationDate
             )
         )

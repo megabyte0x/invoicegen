@@ -112,7 +112,7 @@ struct InvoiceEditorView: View {
                                                         resetAutoGenerationIntervalDraft()
                                                     }
 
-                                                Text("days")
+                                                Text("seconds")
                                                     .foregroundStyle(Color.runeyPrimary)
                                             }
                                             .frame(height: 30)
@@ -389,11 +389,11 @@ struct InvoiceEditorView: View {
         Binding(
             get: { invoice.autoGeneration.isEnabled },
             set: { isEnabled in
-                let intervalDays = InvoiceAutoGenerationSettings.normalizedIntervalDays(invoice.autoGeneration.intervalDays)
-                invoice.autoGeneration.intervalDays = intervalDays
+                let intervalSeconds = InvoiceAutoGenerationSettings.normalizedIntervalSeconds(invoice.autoGeneration.intervalSeconds)
+                invoice.autoGeneration.intervalSeconds = intervalSeconds
                 if isEnabled,
                    (!invoice.autoGeneration.isEnabled || invoice.autoGeneration.nextGenerationDate <= Date()) {
-                    invoice.autoGeneration.nextGenerationDate = defaultNextGenerationDate(intervalDays: intervalDays)
+                    invoice.autoGeneration.nextGenerationDate = defaultNextGenerationDate(intervalSeconds: intervalSeconds)
                 }
                 invoice.autoGeneration.isEnabled = isEnabled
                 model.save()
@@ -405,17 +405,17 @@ struct InvoiceEditorView: View {
         Binding(
             get: {
                 autoGenerationIntervalDraft
-                    ?? InvoiceAutoGenerationIntervalInput.text(for: invoice.autoGeneration.intervalDays)
+                    ?? InvoiceAutoGenerationIntervalInput.text(for: invoice.autoGeneration.intervalSeconds)
             },
             set: { newValue in
                 autoGenerationIntervalDraft = newValue
-                guard let intervalDays = InvoiceAutoGenerationIntervalInput.intervalDays(from: newValue) else {
+                guard let intervalSeconds = InvoiceAutoGenerationIntervalInput.intervalSeconds(from: newValue) else {
                     return
                 }
-                autoGenerationIntervalDraft = InvoiceAutoGenerationIntervalInput.text(for: intervalDays)
-                invoice.autoGeneration.intervalDays = intervalDays
+                autoGenerationIntervalDraft = InvoiceAutoGenerationIntervalInput.text(for: intervalSeconds)
+                invoice.autoGeneration.intervalSeconds = intervalSeconds
                 if invoice.autoGeneration.isEnabled {
-                    invoice.autoGeneration.nextGenerationDate = defaultNextGenerationDate(intervalDays: intervalDays)
+                    invoice.autoGeneration.nextGenerationDate = defaultNextGenerationDate(intervalSeconds: intervalSeconds)
                 }
                 model.save()
             }
@@ -440,8 +440,8 @@ struct InvoiceEditorView: View {
         )
     }
 
-    private func defaultNextGenerationDate(intervalDays: Int) -> Date {
-        InvoiceAutoGenerationSettings.nextGenerationDate(intervalDays: intervalDays)
+    private func defaultNextGenerationDate(intervalSeconds: Int) -> Date {
+        InvoiceAutoGenerationSettings.nextGenerationDate(intervalSeconds: intervalSeconds)
     }
 
     private func resetAutoGenerationIntervalDraft() {

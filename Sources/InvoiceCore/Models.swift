@@ -202,36 +202,36 @@ public struct Payment: Identifiable, Codable, Equatable, Sendable {
 }
 
 public struct InvoiceAutoGenerationSettings: Codable, Equatable, Sendable {
-    public static let maximumIntervalDays = 3_650
+    public static let maximumIntervalSeconds = 315_360_000
 
     public var isEnabled: Bool
-    public var intervalDays: Int
+    public var intervalSeconds: Int
     public var nextGenerationDate: Date
 
     public init(
         isEnabled: Bool = false,
-        intervalDays: Int = 30,
+        intervalSeconds: Int = 30,
         nextGenerationDate: Date = Date(timeIntervalSince1970: 0)
     ) {
         self.isEnabled = isEnabled
-        self.intervalDays = Self.normalizedIntervalDays(intervalDays)
+        self.intervalSeconds = Self.normalizedIntervalSeconds(intervalSeconds)
         self.nextGenerationDate = nextGenerationDate
     }
 
     public static let disabled = InvoiceAutoGenerationSettings()
 
-    public static func normalizedIntervalDays(_ value: Int) -> Int {
-        min(max(1, value), maximumIntervalDays)
+    public static func normalizedIntervalSeconds(_ value: Int) -> Int {
+        min(max(1, value), maximumIntervalSeconds)
     }
 
     public static func nextGenerationDate(
-        intervalDays: Int,
+        intervalSeconds: Int,
         from date: Date = Date(),
         calendar: Calendar = Calendar(identifier: .gregorian)
     ) -> Date {
-        let normalizedIntervalDays = normalizedIntervalDays(intervalDays)
-        return calendar.date(byAdding: .day, value: normalizedIntervalDays, to: date)
-            ?? date.addingTimeInterval(TimeInterval(normalizedIntervalDays * 86_400))
+        let normalizedIntervalSeconds = normalizedIntervalSeconds(intervalSeconds)
+        return calendar.date(byAdding: .second, value: normalizedIntervalSeconds, to: date)
+            ?? date.addingTimeInterval(TimeInterval(normalizedIntervalSeconds))
     }
 
     public init(from decoder: Decoder) throws {
@@ -239,26 +239,25 @@ public struct InvoiceAutoGenerationSettings: Codable, Equatable, Sendable {
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
         nextGenerationDate = try container.decodeIfPresent(Date.self, forKey: .nextGenerationDate) ?? Date(timeIntervalSince1970: 0)
 
-        if let intervalDays = try container.decodeIfPresent(Int.self, forKey: .intervalDays) {
-            self.intervalDays = Self.normalizedIntervalDays(intervalDays)
-        } else if let intervalSeconds = try container.decodeIfPresent(Int.self, forKey: .intervalSeconds) {
-            self.intervalDays = Self.intervalDays(fromLegacySeconds: intervalSeconds)
+        if let intervalSeconds = try container.decodeIfPresent(Int.self, forKey: .intervalSeconds) {
+            self.intervalSeconds = Self.normalizedIntervalSeconds(intervalSeconds)
+        } else if let intervalDays = try container.decodeIfPresent(Int.self, forKey: .intervalDays) {
+            self.intervalSeconds = Self.intervalSeconds(fromLegacyDays: intervalDays)
         } else {
-            self.intervalDays = 30
+            self.intervalSeconds = 30
         }
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(isEnabled, forKey: .isEnabled)
-        try container.encode(intervalDays, forKey: .intervalDays)
+        try container.encode(intervalSeconds, forKey: .intervalSeconds)
         try container.encode(nextGenerationDate, forKey: .nextGenerationDate)
     }
 
-    private static func intervalDays(fromLegacySeconds value: Int) -> Int {
-        let normalizedSeconds = min(max(1, value), maximumIntervalDays * 86_400)
-        let days = Int((Double(normalizedSeconds) / 86_400).rounded(.up))
-        return normalizedIntervalDays(days)
+    private static func intervalSeconds(fromLegacyDays value: Int) -> Int {
+        let normalizedDays = min(max(1, value), maximumIntervalSeconds / 86_400)
+        return normalizedDays * 86_400
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -468,7 +467,7 @@ public struct InvoiceBook: Codable, Equatable, Sendable {
                 generatedCount += 1
 
                 nextGenerationDate = InvoiceAutoGenerationSettings.nextGenerationDate(
-                    intervalDays: sourceInvoice.autoGeneration.intervalDays,
+                    intervalSeconds: sourceInvoice.autoGeneration.intervalSeconds,
                     from: nextGenerationDate,
                     calendar: calendar
                 )
@@ -611,8 +610,8 @@ public extension InvoiceBook {
                 issues.append("Due date cannot be before issue date for invoice \(displayNumber(for: invoice))")
             }
 
-            if invoice.autoGeneration.isEnabled, !(1...InvoiceAutoGenerationSettings.maximumIntervalDays).contains(invoice.autoGeneration.intervalDays) {
-                issues.append("Automatic generation interval must be between 1 and 3650 days for invoice \(displayNumber(for: invoice))")
+            if invoice.autoGeneration.isEnabled, !(1...InvoiceAutoGenerationSettings.maximumIntervalSeconds).contains(invoice.autoGeneration.intervalSeconds) {
+                issues.append("Automatic generation interval must be between 1 and 315360000 seconds for invoice \(displayNumber(for: invoice))")
             }
 
             if !isValidCurrencyCode(invoice.currencyCode) {
