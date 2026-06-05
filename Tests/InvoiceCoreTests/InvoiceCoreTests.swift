@@ -65,29 +65,29 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(invoice.status, .sent)
     }
 
-    func testAutomaticGenerationIntervalSecondsClampToSupportedRange() {
-        XCTAssertEqual(InvoiceAutoGenerationSettings.normalizedIntervalSeconds(0), 1)
-        XCTAssertEqual(InvoiceAutoGenerationSettings.normalizedIntervalSeconds(30), 30)
-        XCTAssertEqual(InvoiceAutoGenerationSettings.normalizedIntervalSeconds(400_000_000), 315_360_000)
+    func testAutomaticGenerationIntervalDaysClampToSupportedRange() {
+        XCTAssertEqual(InvoiceAutoGenerationSettings.normalizedIntervalDays(0), 1)
+        XCTAssertEqual(InvoiceAutoGenerationSettings.normalizedIntervalDays(30), 30)
+        XCTAssertEqual(InvoiceAutoGenerationSettings.normalizedIntervalDays(4_000), 3_650)
     }
 
-    func testAutomaticGenerationNextDateIsDerivedFromIntervalSeconds() {
+    func testAutomaticGenerationNextDateIsDerivedFromIntervalDays() {
         let baseDate = Date(timeIntervalSince1970: 0)
 
         XCTAssertEqual(
-            InvoiceAutoGenerationSettings.nextGenerationDate(intervalSeconds: 7, from: baseDate),
-            Date(timeIntervalSince1970: 7)
+            InvoiceAutoGenerationSettings.nextGenerationDate(intervalDays: 7, from: baseDate),
+            Date(timeIntervalSince1970: 7 * 86_400)
         )
         XCTAssertEqual(
-            InvoiceAutoGenerationSettings.nextGenerationDate(intervalSeconds: 0, from: baseDate),
-            Date(timeIntervalSince1970: 1)
+            InvoiceAutoGenerationSettings.nextGenerationDate(intervalDays: 0, from: baseDate),
+            Date(timeIntervalSince1970: 86_400)
         )
     }
 
-    func testAutomaticGenerationSettingsEncodeIntervalSeconds() throws {
+    func testAutomaticGenerationSettingsEncodeIntervalDays() throws {
         let settings = InvoiceAutoGenerationSettings(
             isEnabled: true,
-            intervalSeconds: 30,
+            intervalDays: 30,
             nextGenerationDate: Date(timeIntervalSince1970: 0)
         )
         let encoder = JSONEncoder()
@@ -96,15 +96,15 @@ final class InvoiceCoreTests: XCTestCase {
         let data = try encoder.encode(settings)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-        XCTAssertEqual(json["intervalSeconds"] as? Int, 30)
-        XCTAssertNil(json["intervalDays"])
+        XCTAssertEqual(json["intervalDays"] as? Int, 30)
+        XCTAssertNil(json["intervalSeconds"])
     }
 
-    func testAutomaticGenerationSettingsDecodeLegacyIntervalDaysAsSeconds() throws {
+    func testAutomaticGenerationSettingsDecodeLegacyIntervalSecondsAsDays() throws {
         let legacyJSON = """
         {
           "isEnabled": true,
-          "intervalDays": 2,
+          "intervalSeconds": 172800,
           "nextGenerationDate": "1970-01-01T00:00:00Z"
         }
         """
@@ -113,7 +113,7 @@ final class InvoiceCoreTests: XCTestCase {
 
         let settings = try decoder.decode(InvoiceAutoGenerationSettings.self, from: Data(legacyJSON.utf8))
 
-        XCTAssertEqual(settings.intervalSeconds, 172_800)
+        XCTAssertEqual(settings.intervalDays, 2)
     }
 
     func testDueAutomaticGenerationCreatesDraftInvoiceCopyAndAdvancesSchedule() {
@@ -138,7 +138,7 @@ final class InvoiceCoreTests: XCTestCase {
             acceptedPaymentDetailIDs: [UUID(uuidString: "00000000-0000-0000-0000-000000000401")!],
             autoGeneration: InvoiceAutoGenerationSettings(
                 isEnabled: true,
-                intervalSeconds: 7 * 86_400,
+                intervalDays: 7,
                 nextGenerationDate: generationDate
             )
         )
@@ -175,7 +175,7 @@ final class InvoiceCoreTests: XCTestCase {
             ],
             autoGeneration: InvoiceAutoGenerationSettings(
                 isEnabled: true,
-                intervalSeconds: 7 * 86_400,
+                intervalDays: 7,
                 nextGenerationDate: date(year: 2026, month: 1, day: 8)
             )
         )
