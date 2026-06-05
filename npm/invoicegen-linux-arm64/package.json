@@ -1,6 +1,6 @@
 {
   "name": "@megabyte0x/invoicegen-linux-arm64",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Native Linux arm64 binary for @megabyte0x/invoicegen",
   "license": "Apache-2.0",
   "os": [
