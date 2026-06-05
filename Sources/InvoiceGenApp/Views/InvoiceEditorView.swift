@@ -4,34 +4,13 @@ import InvoiceCore
 struct InvoiceEditorView: View {
     @EnvironmentObject private var model: AppModel
     @Binding var invoice: Invoice
-    @State private var selectedTab = 0 // 0 = Details, 1 = Preview
     @State private var isConfirmingMarkUnpaid = false
     @State private var isConfirmingDelete = false
     @State private var lineItemIDPendingDeletion: UUID?
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("", selection: $selectedTab) {
-                Text("Details").tag(0)
-                Text("Preview").tag(1)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 260)
-            .padding(10)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.runeyBorder.opacity(0.65), lineWidth: 1)
-            }
-            .padding(.vertical, 12)
-            
-            Divider()
-                .background(Color.runeyBorder.opacity(0.65))
-
-            if selectedTab == 1 {
-                InvoicePreviewView(invoice: $invoice, book: model.book)
-            } else {
-                ScrollView {
+        HSplitView {
+            ScrollView {
                     VStack(spacing: 24) {
                         // Section 1: Basic Information
                         VStack(alignment: .leading, spacing: 16) {
@@ -291,7 +270,10 @@ struct InvoiceEditorView: View {
                     }
                     .padding(24)
                 }
-            }
+                .frame(minWidth: 520, idealWidth: 620, maxWidth: .infinity, maxHeight: .infinity)
+
+                InvoicePreviewView(invoice: $invoice, book: model.book)
+                    .frame(minWidth: 440, idealWidth: 680, maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color.runeyBackground)
         .navigationTitle(invoice.number)
