@@ -1,6 +1,6 @@
 {
   "name": "@megabyte0x/invoicegen",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Local-first invoice generation CLI for InvoiceGen",
   "keywords": [
     "invoice",
@@ -28,10 +28,10 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "@megabyte0x/invoicegen-darwin-arm64": "0.1.6",
-    "@megabyte0x/invoicegen-darwin-x64": "0.1.6",
-    "@megabyte0x/invoicegen-linux-arm64": "0.1.6",
-    "@megabyte0x/invoicegen-linux-x64": "0.1.6"
+    "@megabyte0x/invoicegen-darwin-arm64": "0.1.7",
+    "@megabyte0x/invoicegen-darwin-x64": "0.1.7",
+    "@megabyte0x/invoicegen-linux-arm64": "0.1.7",
+    "@megabyte0x/invoicegen-linux-x64": "0.1.7"
   },
   "publishConfig": {
     "access": "public"
