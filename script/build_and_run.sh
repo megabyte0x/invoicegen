@@ -53,6 +53,8 @@ cat >"$INFO_PLIST" <<PLIST
   <string>$MIN_SYSTEM_VERSION</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>InvoiceGen needs permission to open a Mail draft with your invoice PDF attached.</string>
 </dict>
 </plist>
 PLIST

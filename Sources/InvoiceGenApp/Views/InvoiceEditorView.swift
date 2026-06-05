@@ -29,7 +29,7 @@ struct InvoiceEditorView: View {
                 .background(Color.runeyBorder.opacity(0.65))
 
             if selectedTab == 1 {
-                InvoicePreviewView(invoice: invoice, book: model.book)
+                InvoicePreviewView(invoice: $invoice, book: model.book)
             } else {
                 ScrollView {
                     VStack(spacing: 24) {
