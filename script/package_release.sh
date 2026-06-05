@@ -7,6 +7,7 @@ MIN_SYSTEM_VERSION="14.0"
 BUILD_NUMBER="${INVOICEGEN_BUILD_NUMBER:-1}"
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
 NOTARY_PROFILE="${INVOICEGEN_NOTARY_PROFILE:-}"
+NOTARY_KEYCHAIN="${INVOICEGEN_NOTARY_KEYCHAIN:-}"
 NOTARY_TIMEOUT="${INVOICEGEN_NOTARY_TIMEOUT:-30m}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -118,9 +119,14 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
     exit 1
   fi
 
+  NOTARY_AUTH_ARGS=(--keychain-profile "$NOTARY_PROFILE")
+  if [[ -n "$NOTARY_KEYCHAIN" ]]; then
+    NOTARY_AUTH_ARGS+=(--keychain "$NOTARY_KEYCHAIN")
+  fi
+
   echo "Submitting $DMG_PATH for notarization with keychain profile $NOTARY_PROFILE"
   xcrun notarytool submit "$DMG_PATH" \
-    --keychain-profile "$NOTARY_PROFILE" \
+    "${NOTARY_AUTH_ARGS[@]}" \
     --no-s3-acceleration \
     --output-format json >"$NOTARY_SUBMISSION_JSON"
 
@@ -128,12 +134,16 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
   echo "Notary submission ID: $SUBMISSION_ID"
 
   if ! xcrun notarytool wait "$SUBMISSION_ID" \
-    --keychain-profile "$NOTARY_PROFILE" \
+    "${NOTARY_AUTH_ARGS[@]}" \
     --timeout "$NOTARY_TIMEOUT" \
     --output-format json >"$NOTARY_RESULT_JSON"; then
     echo "Notarization did not complete within $NOTARY_TIMEOUT." >&2
     echo "Poll status with:" >&2
-    echo "xcrun notarytool info $SUBMISSION_ID --keychain-profile $NOTARY_PROFILE" >&2
+    if [[ -n "$NOTARY_KEYCHAIN" ]]; then
+      echo "xcrun notarytool info $SUBMISSION_ID --keychain-profile $NOTARY_PROFILE --keychain $NOTARY_KEYCHAIN" >&2
+    else
+      echo "xcrun notarytool info $SUBMISSION_ID --keychain-profile $NOTARY_PROFILE" >&2
+    fi
     exit 1
   fi
 
@@ -141,7 +151,11 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
   if [[ "$NOTARY_STATUS" != "Accepted" ]]; then
     echo "Notarization finished with status: $NOTARY_STATUS" >&2
     echo "Fetch the log with:" >&2
-    echo "xcrun notarytool log $SUBMISSION_ID --keychain-profile $NOTARY_PROFILE" >&2
+    if [[ -n "$NOTARY_KEYCHAIN" ]]; then
+      echo "xcrun notarytool log $SUBMISSION_ID --keychain-profile $NOTARY_PROFILE --keychain $NOTARY_KEYCHAIN" >&2
+    else
+      echo "xcrun notarytool log $SUBMISSION_ID --keychain-profile $NOTARY_PROFILE" >&2
+    fi
     exit 1
   fi
 

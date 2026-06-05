@@ -206,4 +206,16 @@ git push origin v<version>
 ```
 
 The release workflow runs `script/package_release.sh` on macOS and uploads
-`dist/release/InvoiceGen-<version>.dmg` to the matching GitHub Release.
+`dist/release/InvoiceGen-<version>.dmg` to the matching GitHub Release. It
+requires these GitHub Actions secrets so the uploaded DMG passes Gatekeeper:
+
+- `MACOS_CERTIFICATE_P12`: base64-encoded Developer ID Application `.p12`
+  certificate
+- `MACOS_CERTIFICATE_PASSWORD`: password for that `.p12`
+- `APP_STORE_CONNECT_API_ISSUER_ID`: issuer ID for a Team API key
+- `APP_STORE_CONNECT_API_KEY_ID`: key ID for that API key
+- `APP_STORE_CONNECT_API_PRIVATE_KEY`: private `.p8` key for that API key
+
+After those secrets are present, either push a new `v<version>` tag or run the
+GitHub Release workflow manually with a version like `0.1.7` to replace that
+release's DMG.

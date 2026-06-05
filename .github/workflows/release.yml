@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish, without the leading v"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -20,15 +26,106 @@ jobs:
       - name: Derive release version
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          if [[ -z "$version" || "$version" == "$GITHUB_REF_NAME" ]]; then
-            echo "Release tags must use the v<version> format, for example v0.1.0." >&2
+          set -euo pipefail
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+            version="${version#v}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+            if [[ "$version" == "$GITHUB_REF_NAME" ]]; then
+              echo "Release tags must use the v<version> format, for example v0.1.0." >&2
+              exit 1
+            fi
+          fi
+
+          if [[ -z "$version" ]]; then
+            echo "Release version is required." >&2
             exit 1
           fi
           echo "INVOICEGEN_VERSION=$version" >> "$GITHUB_ENV"
+          echo "INVOICEGEN_RELEASE_TAG=v$version" >> "$GITHUB_ENV"
 
-      - name: Build package
+      - name: Prepare Apple signing credentials
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=()
+          for name in MACOS_CERTIFICATE_P12 MACOS_CERTIFICATE_PASSWORD APP_STORE_CONNECT_API_ISSUER_ID APP_STORE_CONNECT_API_KEY_ID APP_STORE_CONNECT_API_PRIVATE_KEY; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing required macOS release secret(s): ${missing[*]}" >&2
+            echo "GitHub Release builds must be Developer ID signed and notarized before the DMG is uploaded." >&2
+            exit 1
+          fi
+
+          keychain_path="$RUNNER_TEMP/invoicegen-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          certificate_path="$RUNNER_TEMP/developer-id-application.p12"
+          notary_key_path="$RUNNER_TEMP/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          notary_profile="invoicegen-notary-ci"
+
+          printf '%s' "$MACOS_CERTIFICATE_P12" | base64 --decode > "$certificate_path"
+          printf '%s' "$APP_STORE_CONNECT_API_PRIVATE_KEY" > "$notary_key_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          security default-keychain -d user -s "$keychain_path"
+          security import "$certificate_path" \
+            -k "$keychain_path" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
+
+          identity="$(security find-identity -v -p codesigning "$keychain_path" | sed -n 's/.*"\(Developer ID Application:.*\)".*/\1/p' | head -n 1)"
+          if [[ -z "$identity" ]]; then
+            echo "The imported certificate did not contain a Developer ID Application identity." >&2
+            security find-identity -v -p codesigning "$keychain_path" >&2
+            exit 1
+          fi
+
+          xcrun notarytool store-credentials "$notary_profile" \
+            --key "$notary_key_path" \
+            --key-id "$APP_STORE_CONNECT_API_KEY_ID" \
+            --issuer "$APP_STORE_CONNECT_API_ISSUER_ID" \
+            --keychain "$keychain_path"
+
+          {
+            echo "CODESIGN_IDENTITY=$identity"
+            echo "INVOICEGEN_NOTARY_PROFILE=$notary_profile"
+            echo "INVOICEGEN_NOTARY_KEYCHAIN=$keychain_path"
+          } >> "$GITHUB_ENV"
+
+      - name: Build signed and notarized package
         run: ./script/package_release.sh
+
+      - name: Validate notarized release artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          asset="dist/release/InvoiceGen-${INVOICEGEN_VERSION}.dmg"
+          if [[ ! -f "$asset" ]]; then
+            echo "Missing release artifact: $asset" >&2
+            exit 1
+          fi
+
+          codesign -dv --verbose=4 "$asset" 2>&1 | tee "$RUNNER_TEMP/dmg-codesign.txt"
+          grep -q "Notarization Ticket=stapled" "$RUNNER_TEMP/dmg-codesign.txt"
+          spctl -a -t open --context context:primary-signature -vv "$asset"
 
       - name: Publish GitHub release
         env:
@@ -43,10 +140,10 @@ jobs:
             exit 1
           fi
 
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$asset" --clobber
+          if gh release view "$INVOICEGEN_RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$INVOICEGEN_RELEASE_TAG" "$asset" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$asset" \
+            gh release create "$INVOICEGEN_RELEASE_TAG" "$asset" \
               --title "InvoiceGen ${INVOICEGEN_VERSION}" \
               --notes "$notes"
           fi
