@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react';
 import type { ReactElement } from 'react';
 import { FAQ } from './components/FAQ';
 import { FeatureFlow } from './components/FeatureFlow';
@@ -22,6 +23,7 @@ export function App(): ReactElement {
         <FAQ />
       </main>
       <Footer />
+      <Analytics />
     </>
   );
 }

@@ -16,6 +16,7 @@
     "test:cli-packaging": "node script/verify_cli_packaging.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "react": "latest",
     "react-dom": "latest"
   },
