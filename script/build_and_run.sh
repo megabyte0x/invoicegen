@@ -43,12 +43,14 @@ install_app_icon() {
 
   iconutil -c icns "$iconset_dir" -o "$APP_RESOURCES/$APP_ICON_NAME.icns"
   rm -rf "$iconset_dir"
+  cp "$APP_ICON_SOURCE" "$APP_RESOURCES/invoicegen-logo.png"
 }
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
 swift build --product "$APP_NAME"
-BUILD_BINARY="$(swift build --show-bin-path)/$APP_NAME"
+BUILD_PRODUCTS_DIR="$(swift build --show-bin-path)"
+BUILD_BINARY="$BUILD_PRODUCTS_DIR/$APP_NAME"
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"

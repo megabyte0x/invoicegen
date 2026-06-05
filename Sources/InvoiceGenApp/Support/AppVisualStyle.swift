@@ -220,7 +220,7 @@ struct InvoiceGenLogoMark: View {
     }
 
     private static let logoImage: NSImage? = {
-        guard let url = Bundle.module.url(forResource: "invoicegen-logo", withExtension: "png") else {
+        guard let url = Bundle.main.url(forResource: "invoicegen-logo", withExtension: "png") else {
             return nil
         }
 
