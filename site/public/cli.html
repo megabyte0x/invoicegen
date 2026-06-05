@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InvoiceGen CLI - Rust invoice CLI for local-first invoice workflows</title>
+    <meta name="description" content="Use the InvoiceGen Rust CLI to create, list, render, export, and restore invoices from the same local store as the native macOS app." />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://invoicegen.megabyte.sh/cli" />
+    <meta property="og:title" content="InvoiceGen CLI - Rust invoice CLI for local-first invoice workflows" />
+    <meta property="og:description" content="Use the InvoiceGen Rust CLI to create, list, render, export, and restore invoices from the same local store as the native macOS app." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://invoicegen.megabyte.sh/cli" />
+    <meta property="og:site_name" content="InvoiceGen" />
+    <meta property="og:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-preview.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="InvoiceGen CLI - Rust invoice CLI for local-first invoice workflows" />
+    <meta name="twitter:description" content="Use the InvoiceGen Rust CLI to create, list, render, export, and restore invoices from the same local store as the native macOS app." />
+    <meta name="twitter:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-preview.png" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/seo-page.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "@id": "https://invoicegen.megabyte.sh/cli#webpage",
+        "url": "https://invoicegen.megabyte.sh/cli",
+        "name": "InvoiceGen CLI - Rust invoice CLI for local-first invoice workflows",
+        "description": "Use the InvoiceGen Rust CLI to create, list, render, export, and restore invoices from the same local store as the native macOS app.",
+        "isPartOf": { "@id": "https://invoicegen.megabyte.sh/#website" },
+        "about": { "@id": "https://invoicegen.megabyte.sh/#software" },
+        "dateModified": "__INVOICEGEN_DATE_MODIFIED__"
+      }
+    </script>
+  </head>
+  <body>
+    <header class="wrap site-top">
+      <a class="brand" href="/" aria-label="InvoiceGen home"><img src="/assets/invoicegen-logo-128.png" alt="" width="34" height="34" /> InvoiceGen</a>
+      <nav class="top-links" aria-label="Resource navigation">
+        <a href="/cli">CLI</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/docs/local-first-invoicing">Local-first guide</a>
+        <a href="/docs/backup-restore">Backup guide</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/open-source-invoice-generator">Open source</a>
+        <a href="/alternatives/manta">Manta alternative</a>
+        <a href="/alternatives/invoice-ninja">Invoice Ninja alternative</a>
+        <a href="/offline-invoice-generator-mac">Offline Mac</a>
+        <a href="/launch-kit">Launch kit</a>
+        <a class="button" href="https://github.com/megabyte0x/invoicegen/releases/download/v__INVOICEGEN_VERSION__/InvoiceGen-__INVOICEGEN_VERSION__.dmg">Download</a>
+      </nav>
+    </header>
+    <main>
+      <section class="wrap hero">
+        <p class="eyebrow">Rust invoice CLI</p>
+        <h1>Script invoice generation without giving up local ownership.</h1>
+        <p class="lede">InvoiceGen includes a native Rust command-line interface for freelancers, developers, and AI agents that need repeatable invoice workflows on macOS and Linux while keeping invoice data in local files.</p>
+        <div class="grid"><article class="card"><strong>Shared store</strong><p>The CLI reads and writes the same versioned JSON store as the macOS app, so scripts and the native UI stay compatible.</p></article>
+<article class="card"><strong>PDF-ready workflows</strong><p>Render invoices, export backups, restore stores, and inspect invoice summaries from shell commands.</p></article>
+<article class="card"><strong>Agent-friendly</strong><p>Structured JSON, CSV, TSV, and text output make InvoiceGen useful for automation and coding agents.</p></article></div>
+      </section>
+      <article class="wrap content">
+        <nav class="toc"><a href="#commands">Commands</a><a href="#automation">Automation use cases</a><a href="#install">Install</a><a href="#compare">Why not a browser generator?</a></nav>
+<h2 id="commands">What can the InvoiceGen CLI do?</h2>
+<p>The InvoiceGen CLI is a local-first invoice generation tool written in Rust. It supports workflows for the business profile, clients, projects, payment details, invoices, local store backups, shell completions, and summaries. The CLI is designed for people who want a private invoice app on macOS but still need scriptable commands for recurring work, audits, exports, and agent-driven operations.</p>
+<pre><code>invoicegen --help
+invoicegen --store ./invoicegen-store.json seed-sample --force
+invoicegen --store ./invoicegen-store.json invoice list --format json
+invoicegen --store ./invoicegen-store.json invoice render INV-2026-0001 --output ./exports
+invoicegen --store ./invoicegen-store.json store export ./invoicegen-backup.json</code></pre>
+<h2 id="automation">Automation use cases</h2>
+<ul><li>Create draft invoices from a client/project workflow and review them in the macOS app before sending.</li><li>Export invoice data before migrations, operating-system upgrades, or machine changes.</li><li>Generate local summaries for outstanding, overdue, sent, paid, and draft invoices.</li><li>Let an AI coding agent inspect invoice data without needing an account, cloud API, or hosted billing system.</li></ul>
+<h2 id="install">Install the CLI</h2>
+<p>The npm wrapper package exposes the shorter <code>invoicegen</code> command and selects the matching native binary package for the current operating system and CPU. Developers can also build directly from source with Cargo.</p>
+<pre><code>npm install -g @megabyte0x/invoicegen
+invoicegen --help
+
+cargo install --git https://github.com/megabyte0x/invoicegen invoicegen-rs</code></pre>
+<h2 id="compare">Why use a CLI instead of a browser-only invoice generator?</h2>
+<p>Browser invoice generators are useful for one-off PDFs, but they are usually poor fits for repeatable invoice operations. InvoiceGen keeps clients, projects, payment details, invoice numbers, line items, and backups in a local store that can be validated and reused. That makes it a better fit for freelancers and small teams who care about privacy, reproducibility, and local control while still wanting fast PDF-ready invoice output.</p>
+<p class="note">Best backlink anchors for this page: <strong>Rust invoice CLI</strong>, <strong>scriptable invoice generator</strong>, <strong>local-first invoice automation</strong>, and <strong>open-source invoice CLI</strong>.</p>
+      </article>
+    </main>
+    <footer class="site-footer">
+      <div class="wrap">
+        <p>Last updated: __INVOICEGEN_DATE_MODIFIED__. InvoiceGen is free, open source, Apache-2.0 licensed software by <a href="https://github.com/megabyte0x">megabyte0x</a>.</p>
+        <p><a href="https://github.com/megabyte0x/invoicegen">GitHub repository</a> · <a href="/SKILL.md">Agent workflow</a> · <a href="https://www.apache.org/licenses/LICENSE-2.0">License</a></p>
+      </div>
+    </footer>
+  </body>
+</html>

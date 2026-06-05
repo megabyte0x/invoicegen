@@ -1,7 +1,7 @@
 {
   "name": "@megabyte0x/invoicegen",
   "version": "0.1.6",
-  "description": "Local-first invoice generation CLI for Local Invoice",
+  "description": "Local-first invoice generation CLI for InvoiceGen",
   "keywords": [
     "invoice",
     "invoice-generation",
@@ -12,7 +12,7 @@
     "freelancers"
   ],
   "license": "Apache-2.0",
-  "homepage": "https://github.com/megabyte0x/invoicegen#readme",
+  "homepage": "https://invoicegen.megabyte.sh/cli",
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/megabyte0x/invoicegen.git"

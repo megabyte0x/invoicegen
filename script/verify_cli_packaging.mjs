@@ -24,6 +24,7 @@ assert.equal(mainPackage.name, "@megabyte0x/invoicegen");
 assert.equal(mainPackage.version, version);
 assert.equal(mainPackage.bin.invoicegen, "bin/invoicegen.js");
 assert.equal(mainPackage.license, "Apache-2.0");
+assert.equal(mainPackage.homepage, "https://invoicegen.megabyte.sh/cli");
 assert.equal(mainPackage.publishConfig?.access, "public");
 assert.ok(
   mainPackage.keywords.includes("invoice"),

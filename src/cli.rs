@@ -1151,7 +1151,7 @@ fn validate_with_clap(args: &[String]) -> Result<Option<String>, String> {
 fn build_command() -> Command {
     Command::new("invoicegen-rs")
         .version(env!("CARGO_PKG_VERSION"))
-        .about("Local-first invoice generation CLI for Local Invoice")
+        .about("Local-first invoice generation CLI for InvoiceGen")
         .disable_colored_help(true)
         .arg(option("store", "store", "PATH"))
         .arg(option("config", "config", "PATH"))

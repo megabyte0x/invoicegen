@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Back up and restore invoice data on macOS with InvoiceGen</title>
+    <meta name="description" content="How to back up and restore local InvoiceGen invoice data using the native macOS app, Rust CLI, exported store files, and normal Mac backup practices." />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://invoicegen.megabyte.sh/docs/backup-restore" />
+    <meta property="og:title" content="Back up and restore invoice data on macOS with InvoiceGen" />
+    <meta property="og:description" content="How to back up and restore local InvoiceGen invoice data using the native macOS app, Rust CLI, exported store files, and normal Mac backup practices." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://invoicegen.megabyte.sh/docs/backup-restore" />
+    <meta property="og:site_name" content="InvoiceGen" />
+    <meta property="og:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-preview.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Back up and restore invoice data on macOS with InvoiceGen" />
+    <meta name="twitter:description" content="How to back up and restore local InvoiceGen invoice data using the native macOS app, Rust CLI, exported store files, and normal Mac backup practices." />
+    <meta name="twitter:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-preview.png" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/seo-page.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "@id": "https://invoicegen.megabyte.sh/docs/backup-restore#webpage",
+        "url": "https://invoicegen.megabyte.sh/docs/backup-restore",
+        "name": "Back up and restore invoice data on macOS with InvoiceGen",
+        "description": "How to back up and restore local InvoiceGen invoice data using the native macOS app, Rust CLI, exported store files, and normal Mac backup practices.",
+        "isPartOf": { "@id": "https://invoicegen.megabyte.sh/#website" },
+        "about": { "@id": "https://invoicegen.megabyte.sh/#software" },
+        "dateModified": "__INVOICEGEN_DATE_MODIFIED__"
+      }
+    </script>
+  </head>
+  <body>
+    <header class="wrap site-top">
+      <a class="brand" href="/" aria-label="InvoiceGen home"><img src="/assets/invoicegen-logo-128.png" alt="" width="34" height="34" /> InvoiceGen</a>
+      <nav class="top-links" aria-label="Resource navigation">
+        <a href="/cli">CLI</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/docs/local-first-invoicing">Local-first guide</a>
+        <a href="/docs/backup-restore">Backup guide</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/open-source-invoice-generator">Open source</a>
+        <a href="/alternatives/manta">Manta alternative</a>
+        <a href="/alternatives/invoice-ninja">Invoice Ninja alternative</a>
+        <a href="/offline-invoice-generator-mac">Offline Mac</a>
+        <a href="/launch-kit">Launch kit</a>
+        <a class="button" href="https://github.com/megabyte0x/invoicegen/releases/download/v__INVOICEGEN_VERSION__/InvoiceGen-__INVOICEGEN_VERSION__.dmg">Download</a>
+      </nav>
+    </header>
+    <main>
+      <section class="wrap hero">
+        <p class="eyebrow">Backup and restore</p>
+        <h1>Keep invoice backups boring, explicit, and local.</h1>
+        <p class="lede">InvoiceGen is designed so invoice records can be exported, restored, and moved deliberately. The backup workflow is important for freelancers because invoice PDFs, client records, payment notes, and store files are business records.</p>
+        <div class="grid"><article class="card"><strong>Export before changes</strong><p>Create a backup before machine moves, bulk edits, CLI experiments, or app upgrades.</p></article>
+<article class="card"><strong>Restore deliberately</strong><p>Restores replace local data and should be done only when the backup file is trusted.</p></article>
+<article class="card"><strong>Use normal Mac backups</strong><p>Time Machine or encrypted external backups can capture local store files and exported PDFs.</p></article></div>
+      </section>
+      <article class="wrap content">
+        <nav class="toc"><a href="#what">What to back up</a><a href="#app">App workflow</a><a href="#cli">CLI workflow</a><a href="#checklist">Checklist</a></nav>
+<h2 id="what">What invoice data should be backed up?</h2>
+<p>Back up both generated invoice PDFs and the InvoiceGen local store. PDF exports are useful for sending and archiving client-facing documents. The local store is useful when you want to continue editing records, inspect invoice history, regenerate output, or move the workflow to another Mac.</p>
+<h2 id="app">Backup from the macOS app</h2>
+<p>The macOS app exposes local backup and restore workflows in Settings. This is the safest path for most users because it keeps the operation visible and deliberate. Before restoring, confirm that the backup file is the one you expect and that any newer invoices have either been exported or are intentionally being replaced.</p>
+<h2 id="cli">Backup from the Rust CLI</h2>
+<p>The Rust CLI can export and restore the same local store format. Use an explicit <code>--store</code> path for experiments so test data does not mutate your real app data. Restore operations require <code>--force</code> because replacing invoice records is destructive.</p>
+<pre><code>invoicegen --store ~/invoices/store.json store export ~/invoices/invoicegen-backup.json
+invoicegen --store ~/invoices/store.json store restore ~/invoices/invoicegen-backup.json --force</code></pre>
+<h2 id="checklist">Backup checklist for freelancers</h2>
+<ul><li>Export the local store before using new scripts or changing machines.</li><li>Keep sent invoice PDFs in a durable client or accounting folder.</li><li>Use encrypted backups for files containing client addresses, tax notes, or payment details.</li><li>After restoring, list invoices and render one known invoice to confirm the backup is valid.</li><li>Do not keep a single backup copy on the same disk as the original data.</li></ul>
+<p class="note">Best backlink anchors for this page: <strong>back up invoice data on Mac</strong>, <strong>restore invoice store</strong>, and <strong>InvoiceGen backup workflow</strong>.</p>
+      </article>
+    </main>
+    <footer class="site-footer">
+      <div class="wrap">
+        <p>Last updated: __INVOICEGEN_DATE_MODIFIED__. InvoiceGen is free, open source, Apache-2.0 licensed software by <a href="https://github.com/megabyte0x">megabyte0x</a>.</p>
+        <p><a href="https://github.com/megabyte0x/invoicegen">GitHub repository</a> · <a href="/SKILL.md">Agent workflow</a> · <a href="https://www.apache.org/licenses/LICENSE-2.0">License</a></p>
+      </div>
+    </footer>
+  </body>
+</html>

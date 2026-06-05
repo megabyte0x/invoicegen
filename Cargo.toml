@@ -2,8 +2,9 @@
 name = "invoicegen-rs"
 version = "0.1.6"
 edition = "2021"
-description = "Local-first invoice generation CLI for Local Invoice"
+description = "Local-first invoice generation CLI for InvoiceGen"
 license = "Apache-2.0"
+homepage = "https://invoicegen.megabyte.sh/cli"
 repository = "https://github.com/megabyte0x/invoicegen"
 readme = "README.md"
 

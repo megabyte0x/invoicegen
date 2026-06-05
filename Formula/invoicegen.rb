@@ -1,6 +1,6 @@
 class Invoicegen < Formula
   desc "Local-first invoice generation CLI"
-  homepage "https://github.com/megabyte0x/invoicegen"
+  homepage "https://invoicegen.megabyte.sh/cli"
   url "https://github.com/megabyte0x/invoicegen/archive/refs/tags/v0.1.6.tar.gz"
   sha256 "REPLACE_WITH_SOURCE_TARBALL_SHA256"
   license "Apache-2.0"
@@ -14,6 +14,6 @@ class Invoicegen < Formula
   end
 
   test do
-    assert_match "Local Invoice", shell_output("#{bin}/invoicegen --help")
+    assert_match "InvoiceGen", shell_output("#{bin}/invoicegen --help")
   end
 end

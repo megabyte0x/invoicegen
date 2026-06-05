@@ -1,9 +1,9 @@
 ---
 name: invoicegen
-description: Use when working in the Local Invoice repository on the Rust CLI, the shared Local Invoice store.json format, invoice/client/project/payment-detail workflows, or when an agent needs to inspect, test, document, or operate the invoicegen-rs command-line tool that mirrors the macOS app.
+description: Use when working in the InvoiceGen repository on the Rust CLI, the shared InvoiceGen store.json format, invoice/client/project/payment-detail workflows, or when an agent needs to inspect, test, document, or operate the invoicegen-rs command-line tool that mirrors the macOS app.
 ---
 
-# Local Invoice CLI
+# InvoiceGen CLI
 
 Use this skill in the repo root at `/Users/megabyte0x/Developer/invoicegen`.
 

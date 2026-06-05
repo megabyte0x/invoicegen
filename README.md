@@ -1,19 +1,31 @@
-# Local Invoice
+# InvoiceGen
 
-Local Invoice is a local-first invoice generation app for freelancers and small teams.
-It ships as a native macOS SwiftUI app.
+InvoiceGen is a local-first invoice generation app for freelancers and small
+teams. It ships as a native macOS SwiftUI app and a Rust CLI that can inspect,
+create, render, export, and restore invoice data from the same local store.
 
 All data is stored locally. There is no server, sync service, telemetry service, or
 remote database.
+
+## Website Resources
+
+- Product page: <https://invoicegen.megabyte.sh/>
+- Rust invoice CLI guide: <https://invoicegen.megabyte.sh/cli>
+- Privacy-first invoice generation: <https://invoicegen.megabyte.sh/privacy>
+- Local-first invoicing guide: <https://invoicegen.megabyte.sh/docs/local-first-invoicing>
+- Backup and restore guide: <https://invoicegen.megabyte.sh/docs/backup-restore>
+- Open-source invoice generator for macOS: <https://invoicegen.megabyte.sh/open-source-invoice-generator>
+- Manta alternative for local-first macOS invoicing: <https://invoicegen.megabyte.sh/alternatives/manta>
+- Invoice Ninja alternative for local-first macOS invoicing: <https://invoicegen.megabyte.sh/alternatives/invoice-ninja>
+- Offline invoice generator for Mac: <https://invoicegen.megabyte.sh/offline-invoice-generator-mac>
+- Launch kit for product directories: <https://invoicegen.megabyte.sh/launch-kit>
+- Changelog: <https://invoicegen.megabyte.sh/changelog>
 
 ## Data Location
 
 The macOS app uses:
 - `~/Library/Application Support/InvoiceGen/store.json`
 - set `INVOICEGEN_APP_STORE` only if you want to force a specific app store file
-
-The Application Support directory keeps the original `InvoiceGen` name so
-existing local stores continue to load after the public brand rename.
 
 The store is a versioned JSON document written atomically by `InvoiceCore`.
 

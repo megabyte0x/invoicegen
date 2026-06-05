@@ -3,13 +3,49 @@
   <url>
     <loc>https://invoicegen.megabyte.sh/</loc>
     <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/cli</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/privacy</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/docs/local-first-invoicing</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/docs/backup-restore</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/changelog</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/open-source-invoice-generator</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/alternatives/manta</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/alternatives/invoice-ninja</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/offline-invoice-generator-mac</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
+  </url>
+  <url>
+    <loc>https://invoicegen.megabyte.sh/launch-kit</loc>
+    <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
   </url>
   <url>
     <loc>https://invoicegen.megabyte.sh/SKILL.md</loc>
     <lastmod>__INVOICEGEN_DATE_MODIFIED__</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
   </url>
 </urlset>

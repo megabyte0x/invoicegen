@@ -1,10 +1,10 @@
 # @megabyte0x/invoicegen
 
-Local-first invoice generation CLI for Local Invoice.
+Local-first invoice generation CLI for InvoiceGen.
 
 The package installs the `invoicegen` command and selects the matching native
 binary package for your operating system and CPU. Invoice data stays on your
-machine in the same local `store.json` format used by the Local Invoice macOS app.
+machine in the same local `store.json` format used by the InvoiceGen macOS app.
 
 ## Install
 
@@ -37,6 +37,19 @@ INVOICEGEN_APP_STORE=~/invoices/store.json invoicegen invoice list
 
 The CLI validates invoice data before replacing the local store and refuses
 destructive restore operations unless `--force` is passed.
+
+## Related InvoiceGen resources
+
+- CLI guide: https://invoicegen.megabyte.sh/cli
+- Privacy-first invoice generation: https://invoicegen.megabyte.sh/privacy
+- Local-first invoicing guide: https://invoicegen.megabyte.sh/docs/local-first-invoicing
+- Backup and restore guide: https://invoicegen.megabyte.sh/docs/backup-restore
+- Open-source invoice generator for macOS: https://invoicegen.megabyte.sh/open-source-invoice-generator
+- Manta alternative for local-first macOS invoicing: https://invoicegen.megabyte.sh/alternatives/manta
+- Invoice Ninja alternative for local-first macOS invoicing: https://invoicegen.megabyte.sh/alternatives/invoice-ninja
+- Offline invoice generator for Mac: https://invoicegen.megabyte.sh/offline-invoice-generator-mac
+- Launch kit for product directories: https://invoicegen.megabyte.sh/launch-kit
+- Changelog: https://invoicegen.megabyte.sh/changelog
 
 ## Supported Platforms
 

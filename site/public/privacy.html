@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy-first invoice generation for macOS</title>
+    <meta name="description" content="InvoiceGen keeps invoice, client, project, payment, and export data on your Mac with no required cloud account, telemetry, or hosted invoice store." />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical" href="https://invoicegen.megabyte.sh/privacy" />
+    <meta property="og:title" content="Privacy-first invoice generation for macOS" />
+    <meta property="og:description" content="InvoiceGen keeps invoice, client, project, payment, and export data on your Mac with no required cloud account, telemetry, or hosted invoice store." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://invoicegen.megabyte.sh/privacy" />
+    <meta property="og:site_name" content="InvoiceGen" />
+    <meta property="og:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-preview.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Privacy-first invoice generation for macOS" />
+    <meta name="twitter:description" content="InvoiceGen keeps invoice, client, project, payment, and export data on your Mac with no required cloud account, telemetry, or hosted invoice store." />
+    <meta name="twitter:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-preview.png" />
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/seo-page.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "@id": "https://invoicegen.megabyte.sh/privacy#webpage",
+        "url": "https://invoicegen.megabyte.sh/privacy",
+        "name": "Privacy-first invoice generation for macOS",
+        "description": "InvoiceGen keeps invoice, client, project, payment, and export data on your Mac with no required cloud account, telemetry, or hosted invoice store.",
+        "isPartOf": { "@id": "https://invoicegen.megabyte.sh/#website" },
+        "about": { "@id": "https://invoicegen.megabyte.sh/#software" },
+        "dateModified": "__INVOICEGEN_DATE_MODIFIED__"
+      }
+    </script>
+  </head>
+  <body>
+    <header class="wrap site-top">
+      <a class="brand" href="/" aria-label="InvoiceGen home"><img src="/assets/invoicegen-logo-128.png" alt="" width="34" height="34" /> InvoiceGen</a>
+      <nav class="top-links" aria-label="Resource navigation">
+        <a href="/cli">CLI</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/docs/local-first-invoicing">Local-first guide</a>
+        <a href="/docs/backup-restore">Backup guide</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/open-source-invoice-generator">Open source</a>
+        <a href="/alternatives/manta">Manta alternative</a>
+        <a href="/alternatives/invoice-ninja">Invoice Ninja alternative</a>
+        <a href="/offline-invoice-generator-mac">Offline Mac</a>
+        <a href="/launch-kit">Launch kit</a>
+        <a class="button" href="https://github.com/megabyte0x/invoicegen/releases/download/v__INVOICEGEN_VERSION__/InvoiceGen-__INVOICEGEN_VERSION__.dmg">Download</a>
+      </nav>
+    </header>
+    <main>
+      <section class="wrap hero">
+        <p class="eyebrow">Privacy-first invoicing</p>
+        <h1>Invoice data should not need a hosted account to exist.</h1>
+        <p class="lede">InvoiceGen is built for freelancers and small teams who want a private invoice generator for macOS. Client records, payment details, line items, taxes, notes, and backups are processed locally instead of being sent to a hosted billing service.</p>
+        <div class="grid"><article class="card"><strong>No hosted store</strong><p>InvoiceGen does not require a cloud account or remote database for normal invoice workflows.</p></article>
+<article class="card"><strong>No telemetry service</strong><p>The product positioning is local-first: invoice data is not sent to analytics or tracking systems by the app.</p></article>
+<article class="card"><strong>User-controlled backups</strong><p>Backups are files the user can export, inspect, move, or include in normal Mac backup routines.</p></article></div>
+      </section>
+      <article class="wrap content">
+        <nav class="toc"><a href="#local-data">Local data</a><a href="#cloud-tools">Cloud tradeoffs</a><a href="#sensitive-fields">Sensitive fields</a><a href="#backups">Backups</a></nav>
+<h2 id="local-data">Where does InvoiceGen keep invoice data?</h2>
+<p>InvoiceGen stores its local app data in the user's macOS application support data and lets the CLI point at explicit store files for tests, migrations, and scripted workflows. The local store contains the practical invoice records users expect: business profile details, clients, projects, payment instructions, invoice numbers, line items, status, issue dates, due dates, tax fields, terms, and notes.</p>
+<h2 id="cloud-tools">How is this different from cloud invoice software?</h2>
+<p>Cloud invoicing tools can be helpful when teams need hosted collaboration, online payments, or accounting integrations. They also introduce account management, sync behavior, pricing tiers, data-retention policies, and vendor availability risk. InvoiceGen takes the opposite position for simple freelancer invoicing: the invoice generator should run locally, export a PDF-ready invoice, and let the user decide where backups live.</p>
+<table><thead><tr><th>Need</th><th>InvoiceGen approach</th><th>Hosted-tool approach</th></tr></thead><tbody><tr><td>Data ownership</td><td>Local files on your Mac</td><td>Vendor-controlled hosted records</td></tr><tr><td>Setup</td><td>No account required for the app</td><td>Signup and billing account often required</td></tr><tr><td>Automation</td><td>Rust CLI using the same local store</td><td>Remote API or browser workflow</td></tr></tbody></table>
+<h2 id="sensitive-fields">What sensitive fields should users think about?</h2>
+<p>Invoices can contain names, addresses, emails, tax notes, project context, bank instructions, and payment references. InvoiceGen's local-first model reduces unnecessary exposure by avoiding a hosted invoice database. Users should still protect their Mac account, disk, exported PDFs, and backups because local ownership also means local security practices matter.</p>
+<h2 id="backups">How should privacy-conscious users back up invoices?</h2>
+<p>Use InvoiceGen's export workflow or the CLI store export command before changing machines, testing automations, or doing bulk edits. Store backups in locations that match the sensitivity of client billing data. If Time Machine, encrypted external disks, or private cloud drives are used, treat the invoice backup as business data rather than a generic document.</p>
+<p class="note">Best backlink anchors for this page: <strong>privacy-first invoice app</strong>, <strong>offline invoice generator for Mac</strong>, and <strong>local invoice data on macOS</strong>.</p>
+      </article>
+    </main>
+    <footer class="site-footer">
+      <div class="wrap">
+        <p>Last updated: __INVOICEGEN_DATE_MODIFIED__. InvoiceGen is free, open source, Apache-2.0 licensed software by <a href="https://github.com/megabyte0x">megabyte0x</a>.</p>
+        <p><a href="https://github.com/megabyte0x/invoicegen">GitHub repository</a> · <a href="/SKILL.md">Agent workflow</a> · <a href="https://www.apache.org/licenses/LICENSE-2.0">License</a></p>
+      </div>
+    </footer>
+  </body>
+</html>
