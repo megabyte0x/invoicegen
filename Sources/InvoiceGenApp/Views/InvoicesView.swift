@@ -19,43 +19,12 @@ struct InvoicesView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $model.selectedInvoiceID) {
-                ForEach(filteredInvoices) { invoice in
-                    InvoiceSummaryRow(invoice: invoice, client: model.book.client(for: invoice))
-                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 10))
-                        .tag(invoice.id)
-                        .contextMenu {
-                            Button("Delete", role: .destructive) {
-                                invoiceIDPendingDeletion = invoice.id
-                            }
-                        }
-                }
-            }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 340)
-            .safeAreaInset(edge: .bottom) {
-                Button(action: {
-                    model.addInvoice()
-                }) {
-                    Label("New Invoice", systemImage: "plus")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding()
-            }
-        } detail: {
-            if let id = model.selectedInvoiceID,
-               let binding = model.invoiceBinding(id: id) {
-                InvoiceEditorView(invoice: binding)
-            } else {
-                EmptyStateView(
-                    title: "Select an invoice",
-                    subtitle: "Choose an invoice from the list or create a new one.",
-                    systemImage: "doc.text.magnifyingglass"
-                )
-            }
+        HSplitView {
+            invoiceList
+                .frame(minWidth: 240, idealWidth: 300, maxWidth: 340, maxHeight: .infinity)
+
+            invoiceDetail
+                .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Invoices")
         .onAppear {
@@ -79,6 +48,47 @@ struct InvoicesView: View {
             }
         } message: {
             Text("This permanently removes the selected invoice from the local store.")
+        }
+    }
+
+    private var invoiceList: some View {
+        List(selection: $model.selectedInvoiceID) {
+            ForEach(filteredInvoices) { invoice in
+                InvoiceSummaryRow(invoice: invoice, client: model.book.client(for: invoice))
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 10))
+                    .tag(invoice.id)
+                    .contextMenu {
+                        Button("Delete", role: .destructive) {
+                            invoiceIDPendingDeletion = invoice.id
+                        }
+                    }
+            }
+        }
+        .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom) {
+            Button(action: {
+                model.addInvoice()
+            }) {
+                Label("New Invoice", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding()
+        }
+    }
+
+    @ViewBuilder
+    private var invoiceDetail: some View {
+        if let id = model.selectedInvoiceID,
+           let binding = model.invoiceBinding(id: id) {
+            InvoiceEditorView(invoice: binding)
+        } else {
+            EmptyStateView(
+                title: "Select an invoice",
+                subtitle: "Choose an invoice from the list or create a new one.",
+                systemImage: "doc.text.magnifyingglass"
+            )
         }
     }
 }
