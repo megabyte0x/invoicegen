@@ -22,8 +22,15 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 APP_ICON_NAME="InvoiceGenAppIcon"
 APP_ICON_SOURCE="$ROOT_DIR/Sources/InvoiceGenApp/Resources/invoicegen-logo.png"
 DMG_PATH="$RELEASE_DIR/$APP_NAME-$VERSION.dmg"
+DMG_STAGING_DIR="$RELEASE_DIR/$APP_NAME-$VERSION-dmg-root"
 NOTARY_SUBMISSION_JSON="$RELEASE_DIR/$APP_NAME-$VERSION-notary-submission.json"
 NOTARY_RESULT_JSON="$RELEASE_DIR/$APP_NAME-$VERSION-notary-result.json"
+
+cleanup() {
+  rm -rf "$DMG_STAGING_DIR"
+}
+
+trap cleanup EXIT
 
 install_app_icon() {
   if [[ ! -f "$APP_ICON_SOURCE" ]]; then
@@ -56,6 +63,7 @@ BUILD_PRODUCTS_DIR="$(swift build -c release --show-bin-path)"
 BUILD_BINARY="$BUILD_PRODUCTS_DIR/$APP_NAME"
 
 rm -rf "$APP_BUNDLE"
+rm -rf "$DMG_STAGING_DIR"
 rm -f "$DMG_PATH"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
@@ -102,9 +110,12 @@ else
 fi
 
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+mkdir -p "$DMG_STAGING_DIR"
+ditto "$APP_BUNDLE" "$DMG_STAGING_DIR/$APP_NAME.app"
+ln -s /Applications "$DMG_STAGING_DIR/Applications"
 hdiutil create \
   -volname "$APP_NAME $VERSION" \
-  -srcfolder "$APP_BUNDLE" \
+  -srcfolder "$DMG_STAGING_DIR" \
   -ov \
   -format UDZO \
   "$DMG_PATH"
@@ -166,4 +177,4 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
 fi
 
 echo "Packaged $APP_BUNDLE"
-echo "Created $DMG_PATH"
+echo "Created $DMG_PATH with an Applications install shortcut"
