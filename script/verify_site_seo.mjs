@@ -108,6 +108,10 @@ function verifyIndexHtml(path, label) {
   assertIncludes(html, "<title>InvoiceGen - Local-first macOS invoicing</title>", label);
   assertIncludes(html, `rel="canonical" href="${canonicalHost}/"`, label);
   assertIncludes(html, 'property="og:site_name" content="InvoiceGen"', label);
+  assertIncludes(html, 'property="og:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-social-preview.png"', label);
+  assertIncludes(html, 'property="og:image:width" content="1200"', label);
+  assertIncludes(html, 'property="og:image:height" content="630"', label);
+  assertIncludes(html, 'name="twitter:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-social-preview.png"', label);
   assertIncludes(html, '"@type": "WebPage"', label);
   assertIncludes(html, '"mainEntity"', label);
   assertIncludes(html, '<h1 id="hero-title">Local-first invoices, built for your Mac.</h1>', label);
@@ -195,6 +199,8 @@ function verifyStaticSeoPage(baseDir, page, label) {
   assertIncludes(html, `<title>${page.title}</title>`, `${label}/${page.source}`);
   assertIncludes(html, `rel="canonical" href="${canonicalHost}${page.publicPath}"`, `${label}/${page.source}`);
   assertIncludes(html, 'property="og:site_name" content="InvoiceGen"', `${label}/${page.source}`);
+  assertIncludes(html, 'property="og:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-social-preview.png"', `${label}/${page.source}`);
+  assertIncludes(html, 'name="twitter:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-social-preview.png"', `${label}/${page.source}`);
   assertIncludes(html, '"@type": "WebPage"', `${label}/${page.source}`);
   assertIncludes(html, '<a class="brand" href="/" aria-label="InvoiceGen home">', `${label}/${page.source}`);
   assertIncludes(html, 'https://github.com/megabyte0x/invoicegen', `${label}/${page.source}`);
