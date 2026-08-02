@@ -481,6 +481,7 @@ struct InvoiceEditorView: View {
                             Label("Delete Item", systemImage: "trash")
                         }
                         .buttonStyle(RuneyButtonStyle(variant: .destructive))
+                        .focusable(false)
                     }
 
                     Divider()
