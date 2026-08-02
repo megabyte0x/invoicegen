@@ -86,6 +86,7 @@ struct InvoiceEditorView: View {
                 width: geometry.size.width,
                 requested: requestedPresentation
             )
+            let contentLayout = editorContentLayout(presentation: presentation)
 
             VStack(spacing: 0) {
                 if presentation != .sideBySide {
@@ -107,7 +108,7 @@ struct InvoiceEditorView: View {
                     Divider()
                 }
 
-                editorContentLayout(presentation: presentation) {
+                contentLayout {
                     invoiceFormPane(invoice: invoice, session: session)
                         .frame(
                             minWidth: presentation == .sideBySide ? 520 : nil,

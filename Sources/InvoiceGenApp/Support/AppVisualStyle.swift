@@ -253,7 +253,10 @@ struct RuneyMultilineEditor: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
             }
-            .onKeyPress(.tab) { press in
+            .onKeyPress { press in
+                guard press.key == .tab else {
+                    return .ignored
+                }
                 if press.modifiers.contains(.option) {
                     return .ignored
                 }
