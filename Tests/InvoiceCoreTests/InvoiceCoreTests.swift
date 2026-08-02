@@ -27,6 +27,16 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(invoice.balanceDueMinorUnits, 0)
     }
 
+    func testValidFractionalQuantityCalculatesThirtyEightyFive() {
+        let item = InvoiceLineItem(
+            title: "UX review",
+            quantity: 2.5,
+            unitPriceMinorUnits: 1_234
+        )
+
+        XCTAssertEqual(item.totalMinorUnits, 3_085)
+    }
+
     func testPaidInvoiceCanBeMarkedUnpaid() {
         let now = Date(timeIntervalSince1970: 0)
         var invoice = Invoice(

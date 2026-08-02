@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class AppModelBindingTests: XCTestCase {
-    func testEntityBindingsRemainSafeIfEntityIsDeletedBeforeSwiftUIRefreshes() throws {
+    func testEntityDraftsAreClearedWhenTheirPersistedEntitiesAreDeleted() {
         let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
         let invoice = Invoice(number: "INV-DELETE", dueDate: Date())
         let client = Client(name: "Delete Me")
@@ -17,17 +17,21 @@ final class AppModelBindingTests: XCTestCase {
         model.selectedClientID = client.id
         model.selectedProjectID = project.id
 
-        let invoiceBinding = try XCTUnwrap(model.invoiceBinding(id: invoice.id))
-        let clientBinding = try XCTUnwrap(model.clientBinding(id: client.id))
-        let projectBinding = try XCTUnwrap(model.projectBinding(id: project.id))
+        model.beginEditingInvoice(id: invoice.id)
+        model.beginEditingClient(id: client.id)
+        model.beginEditingProject(id: project.id)
+
+        XCTAssertNotNil(model.invoiceDraft)
+        XCTAssertNotNil(model.clientDraft)
+        XCTAssertNotNil(model.projectDraft)
 
         model.deleteSelectedInvoice()
         model.deleteSelectedClient()
         model.deleteSelectedProject()
 
-        XCTAssertEqual(invoiceBinding.wrappedValue.id, invoice.id)
-        XCTAssertEqual(clientBinding.wrappedValue.id, client.id)
-        XCTAssertEqual(projectBinding.wrappedValue.id, project.id)
+        XCTAssertNil(model.invoiceDraft)
+        XCTAssertNil(model.clientDraft)
+        XCTAssertNil(model.projectDraft)
     }
 
     func testNormalSaveDoesNotOverwriteStoreAfterLoadFailure() throws {
@@ -47,9 +51,16 @@ final class AppModelBindingTests: XCTestCase {
 
     func testDeletingClientUnassignsRelatedProjectsAndInvoices() {
         let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
+        let timestamp = Date()
         let client = Client(name: "Acme")
         let project = Project(clientId: client.id, name: "Launch")
-        let invoice = Invoice(number: "INV-CLIENT", clientId: client.id, projectId: project.id, dueDate: Date())
+        let invoice = Invoice(
+            number: "INV-CLIENT",
+            clientId: client.id,
+            projectId: project.id,
+            issueDate: timestamp,
+            dueDate: timestamp
+        )
 
         model.book.clients = [client]
         model.book.projects = [project]
