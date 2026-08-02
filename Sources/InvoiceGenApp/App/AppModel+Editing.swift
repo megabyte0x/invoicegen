@@ -346,6 +346,7 @@ extension AppModel {
                 clientDraft = nil
                 clearActiveDraftRoute(.client)
             }
+            reconcileDeletedClient(id)
             selectedClientID = book.clients.first?.id
         } catch {
             errorMessage = error.localizedDescription
@@ -366,6 +367,7 @@ extension AppModel {
                 projectDraft = nil
                 clearActiveDraftRoute(.project)
             }
+            reconcileDeletedProject(id)
             selectedProjectID = book.projects.first?.id
         } catch {
             errorMessage = error.localizedDescription
@@ -381,6 +383,7 @@ extension AppModel {
 
         do {
             try applyPersistedCandidate(candidate)
+            reconcileDeletedPaymentAcceptanceDetail(id)
             if var session = settingsDraft {
                 session.baseline.paymentAcceptanceDetails.removeAll { $0.id == id }
                 session.value.paymentAcceptanceDetails.removeAll { $0.id == id }
@@ -503,6 +506,46 @@ extension AppModel {
         } else {
             activeDraftRoute = nil
         }
+    }
+
+    private func reconcileDeletedClient(_ id: UUID) {
+        if var session = invoiceDraft {
+            if session.baseline.clientId == id {
+                session.baseline.clientId = nil
+            }
+            if session.value.clientId == id {
+                session.value.clientId = nil
+            }
+            invoiceDraft = session
+        }
+
+        if var session = projectDraft {
+            if session.baseline.clientId == id {
+                session.baseline.clientId = nil
+            }
+            if session.value.clientId == id {
+                session.value.clientId = nil
+            }
+            projectDraft = session
+        }
+    }
+
+    private func reconcileDeletedProject(_ id: UUID) {
+        guard var session = invoiceDraft else { return }
+        if session.baseline.projectId == id {
+            session.baseline.projectId = nil
+        }
+        if session.value.projectId == id {
+            session.value.projectId = nil
+        }
+        invoiceDraft = session
+    }
+
+    private func reconcileDeletedPaymentAcceptanceDetail(_ id: UUID) {
+        guard var session = invoiceDraft else { return }
+        session.baseline.acceptedPaymentDetailIDs.removeAll { $0 == id }
+        session.value.acceptedPaymentDetailIDs.removeAll { $0 == id }
+        invoiceDraft = session
     }
 
     private func defaultPaymentAcceptanceLabel(for kind: PaymentAcceptanceKind) -> String {

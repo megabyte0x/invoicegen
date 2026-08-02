@@ -6,6 +6,7 @@ struct InvoicePreviewView: View {
     @EnvironmentObject private var model: AppModel
     @Binding var invoice: Invoice
     var book: InvoiceBook
+    var isPaused = false
     @State private var isConfirmingMarkSent = false
     @State private var isChoosingMailMethod = false
     @State private var mailNotice: String?
@@ -17,7 +18,11 @@ struct InvoicePreviewView: View {
 
             Divider()
 
-            InvoicePreviewCanvas(invoice: $invoice, book: book, scaleMode: $scaleMode)
+            if isPaused {
+                pausedPreview
+            } else {
+                InvoicePreviewCanvas(invoice: $invoice, book: book, scaleMode: $scaleMode)
+            }
         }
         .background(Color.runeyPreviewBackground)
         .sheet(isPresented: $isChoosingMailMethod) {
@@ -102,6 +107,8 @@ struct InvoicePreviewView: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
         }
+        .disabled(isPaused)
+        .help(isPaused ? "Fix invalid line-item values before mailing this invoice." : "")
     }
 
     private var printButton: some View {
@@ -110,6 +117,8 @@ struct InvoicePreviewView: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
         }
+        .disabled(isPaused)
+        .help(isPaused ? "Fix invalid line-item values before printing or exporting this invoice." : "")
     }
 
     private var scalePicker: some View {
@@ -120,6 +129,21 @@ struct InvoicePreviewView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+    }
+
+    private var pausedPreview: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.largeTitle)
+                .foregroundStyle(Color.runeyDestructive)
+            Text("Fix invalid line-item values to update this preview.")
+                .font(.headline)
+                .foregroundStyle(Color.runeyPrimary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.runeyPreviewBackground)
     }
 
     private func printInvoice() {

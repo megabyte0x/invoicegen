@@ -206,13 +206,12 @@ struct InvoiceEditorView: View {
         }
     }
 
-    @ViewBuilder
     private func invoicePreviewPane(invoice: Binding<Invoice>) -> some View {
-        if hasInvalidLineItemValues {
-            pausedPreview
-        } else {
-            InvoicePreviewView(invoice: invoice, book: model.book)
-        }
+        InvoicePreviewView(
+            invoice: invoice,
+            book: model.book,
+            isPaused: hasInvalidLineItemValues
+        )
     }
 
     private func invoiceDetailsCard(
@@ -678,21 +677,6 @@ struct InvoiceEditorView: View {
             .buttonStyle(RuneyButtonStyle())
             .disabled(hasInvalidLineItemValues)
         }
-    }
-
-    private var pausedPreview: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-                .foregroundStyle(Color.runeyDestructive)
-            Text("Fix invalid line-item values to update this preview.")
-                .font(.headline)
-                .foregroundStyle(Color.runeyPrimary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.runeyPreviewBackground)
     }
 
     private var hasInvalidNumericDraft: Bool {
