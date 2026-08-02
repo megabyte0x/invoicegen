@@ -10,6 +10,7 @@ struct InvoiceEditorView: View {
     @State private var autoGenerationIntervalDraftIsValid = true
     @State private var touchedFields: Set<EditorField> = []
     @State private var invalidNumericFields: Set<EditorField> = []
+    @State private var requestedPresentation: InvoiceEditorPresentation = .edit
     @FocusState private var focusedField: EditorField?
 
     var body: some View {
@@ -81,7 +82,79 @@ struct InvoiceEditorView: View {
     private func editor(session: DraftSession<Invoice>) -> some View {
         let invoice = draftInvoiceBinding(fallback: session.value)
 
-        return HSplitView {
+        return GeometryReader { geometry in
+            let presentation = WorkspaceLayoutPolicy.invoiceEditor(
+                width: geometry.size.width,
+                requested: requestedPresentation
+            )
+
+            VStack(spacing: 0) {
+                if presentation != .sideBySide {
+                    HStack {
+                        Spacer()
+
+                        Picker("Invoice mode", selection: $requestedPresentation) {
+                            Text("Edit").tag(InvoiceEditorPresentation.edit)
+                            Text("Preview").tag(InvoiceEditorPresentation.preview)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 220)
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+
+                    Divider()
+                }
+
+                editorContentLayout(presentation: presentation) {
+                    invoiceFormPane(invoice: invoice, session: session)
+                        .frame(
+                            minWidth: presentation == .sideBySide ? 520 : nil,
+                            idealWidth: presentation == .sideBySide ? 640 : nil,
+                            maxWidth: presentation == .sideBySide ? 860 : .infinity,
+                            maxHeight: .infinity
+                        )
+                        .opacity(presentation == .preview ? 0 : 1)
+                        .allowsHitTesting(presentation != .preview)
+                        .accessibilityHidden(presentation == .preview)
+
+                    Divider()
+                        .opacity(presentation == .sideBySide ? 1 : 0)
+                        .accessibilityHidden(true)
+
+                    invoicePreviewPane(invoice: invoice)
+                        .frame(
+                            minWidth: presentation == .sideBySide ? 380 : nil,
+                            idealWidth: presentation == .sideBySide ? 560 : nil,
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
+                        .opacity(presentation == .edit ? 0 : 1)
+                        .allowsHitTesting(presentation != .edit)
+                        .accessibilityHidden(presentation == .edit)
+                }
+            }
+        }
+        .navigationTitle(invoice.wrappedValue.number)
+    }
+
+    private func editorContentLayout(
+        presentation: InvoiceEditorPresentation
+    ) -> AnyLayout {
+        if presentation == .sideBySide {
+            AnyLayout(HStackLayout(spacing: 0))
+        } else {
+            AnyLayout(ZStackLayout())
+        }
+    }
+
+    private func invoiceFormPane(
+        invoice: Binding<Invoice>,
+        session: DraftSession<Invoice>
+    ) -> some View {
+        GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -94,9 +167,13 @@ struct InvoiceEditorView: View {
                             cancel: cancelInvoice
                         )
 
-                        invoiceDetailsCard(invoice: invoice)
+                        invoiceDetailsCard(invoice: invoice, availableWidth: geometry.size.width)
                         automaticGenerationCard(invoice: invoice)
-                        lineItemsCard(invoice: invoice, proxy: proxy)
+                        lineItemsCard(
+                            invoice: invoice,
+                            proxy: proxy,
+                            availableWidth: geometry.size.width
+                        )
                         notesAndTermsCard(invoice: invoice)
                         paymentAcceptanceCard(invoice: invoice)
                         summaryCard(invoice: invoice.wrappedValue)
@@ -126,118 +203,156 @@ struct InvoiceEditorView: View {
                     }
                 }
             }
-            .frame(minWidth: 520, idealWidth: 640, maxWidth: 860, maxHeight: .infinity)
-
-            if hasInvalidLineItemValues {
-                pausedPreview
-                    .frame(minWidth: 380, idealWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                InvoicePreviewView(invoice: invoice, book: model.book)
-                    .frame(minWidth: 380, idealWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
-            }
         }
-        .navigationTitle(invoice.wrappedValue.number)
     }
 
-    private func invoiceDetailsCard(invoice: Binding<Invoice>) -> some View {
+    @ViewBuilder
+    private func invoicePreviewPane(invoice: Binding<Invoice>) -> some View {
+        if hasInvalidLineItemValues {
+            pausedPreview
+        } else {
+            InvoicePreviewView(invoice: invoice, book: model.book)
+        }
+    }
+
+    private func invoiceDetailsCard(
+        invoice: Binding<Invoice>,
+        availableWidth: CGFloat
+    ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Invoice Details")
                 .font(.headline)
                 .foregroundStyle(Color.runeyPrimary)
 
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
-                GridRow {
-                    runeyField(
-                        "Invoice Number",
-                        text: invoice.number,
-                        field: .invoiceNumber,
-                        issue: issueMessage(for: .invoiceNumber, invoice: invoice.wrappedValue)
-                    )
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        RuneyFormLabel(title: "Status")
-                        Picker("", selection: invoice.status) {
-                            ForEach(InvoiceStatus.allCases) { status in
-                                Text(status.label).tag(status)
-                            }
-                        }
-                        .frame(height: 30)
-                    }
+            VStack(alignment: .leading, spacing: 14) {
+                AdaptiveFieldRow(availableWidth: availableWidth) {
+                    invoiceNumberField(invoice: invoice)
+                    invoiceStatusField(invoice: invoice)
                 }
 
-                GridRow {
-                    VStack(alignment: .leading, spacing: 6) {
-                        RuneyFormLabel(title: "Client")
-                        Picker("", selection: invoice.clientId) {
-                            Text("Unassigned").tag(UUID?.none)
-                            ForEach(model.book.clients) { client in
-                                Text(client.name).tag(Optional(client.id))
-                            }
-                        }
-                        .frame(height: 30)
-
-                        HStack(spacing: 8) {
-                            Button("Edit Selected Client") {
-                                editSelectedClient(invoice: invoice.wrappedValue)
-                            }
-                            .buttonStyle(RuneyButtonStyle())
-                            .disabled(
-                                invoice.wrappedValue.clientId == nil
-                                    || hasInvalidUncommittedInput
-                            )
-
-                            Button("Manage Clients", action: manageClients)
-                                .buttonStyle(RuneyButtonStyle())
-                                .disabled(hasInvalidUncommittedInput)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        RuneyFormLabel(title: "Project")
-                        Picker("", selection: invoice.projectId) {
-                            Text("None").tag(UUID?.none)
-                            ForEach(model.book.projects) { project in
-                                Text(project.name).tag(Optional(project.id))
-                            }
-                        }
-                        .frame(height: 30)
-                    }
+                AdaptiveFieldRow(availableWidth: availableWidth) {
+                    invoiceClientField(invoice: invoice)
+                    invoiceProjectField(invoice: invoice)
                 }
 
-                GridRow {
-                    VStack(alignment: .leading, spacing: 6) {
-                        RuneyFormLabel(title: "Issue Date")
-                        DatePicker("", selection: invoice.issueDate, displayedComponents: .date)
-                            .labelsHidden()
-                            .frame(height: 30)
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        RuneyFormLabel(title: "Due Date")
-                        DatePicker("", selection: invoice.dueDate, displayedComponents: .date)
-                            .labelsHidden()
-                            .frame(height: 30)
-                        if let issue = issueMessage(
-                            for: .invoiceDueDate,
-                            invoice: invoice.wrappedValue
-                        ) {
-                            inlineIssue(issue)
-                        }
-                    }
+                AdaptiveFieldRow(availableWidth: availableWidth) {
+                    invoiceIssueDateField(invoice: invoice)
+                    invoiceDueDateField(invoice: invoice)
                 }
 
-                GridRow {
-                    runeyField(
-                        "Currency Code",
-                        text: invoice.currencyCode,
-                        field: .invoiceCurrency,
-                        issue: issueMessage(for: .invoiceCurrency, invoice: invoice.wrappedValue)
-                    )
+                AdaptiveFieldRow(availableWidth: availableWidth) {
+                    invoiceCurrencyField(invoice: invoice)
                     Color.clear.frame(height: 1)
                 }
             }
         }
         .runeyCard()
+    }
+
+    private func invoiceNumberField(invoice: Binding<Invoice>) -> some View {
+        runeyField(
+            "Invoice Number",
+            text: invoice.number,
+            field: .invoiceNumber,
+            issue: issueMessage(for: .invoiceNumber, invoice: invoice.wrappedValue)
+        )
+    }
+
+    private func invoiceStatusField(invoice: Binding<Invoice>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Status")
+            Picker("", selection: invoice.status) {
+                ForEach(InvoiceStatus.allCases) { status in
+                    Text(status.label).tag(status)
+                }
+            }
+            .frame(height: 30)
+        }
+    }
+
+    private func invoiceClientField(invoice: Binding<Invoice>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Client")
+            Picker("", selection: invoice.clientId) {
+                Text("Unassigned").tag(UUID?.none)
+                ForEach(model.book.clients) { client in
+                    Text(client.name).tag(Optional(client.id))
+                }
+            }
+            .frame(height: 30)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    editSelectedClientButton(invoice: invoice.wrappedValue)
+                    manageClientsButton
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    editSelectedClientButton(invoice: invoice.wrappedValue)
+                    manageClientsButton
+                }
+            }
+        }
+    }
+
+    private func editSelectedClientButton(invoice: Invoice) -> some View {
+        Button("Edit Selected Client") {
+            editSelectedClient(invoice: invoice)
+        }
+        .buttonStyle(RuneyButtonStyle())
+        .disabled(invoice.clientId == nil || hasInvalidUncommittedInput)
+    }
+
+    private var manageClientsButton: some View {
+        Button("Manage Clients", action: manageClients)
+            .buttonStyle(RuneyButtonStyle())
+            .disabled(hasInvalidUncommittedInput)
+    }
+
+    private func invoiceProjectField(invoice: Binding<Invoice>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Project")
+            Picker("", selection: invoice.projectId) {
+                Text("None").tag(UUID?.none)
+                ForEach(model.book.projects) { project in
+                    Text(project.name).tag(Optional(project.id))
+                }
+            }
+            .frame(height: 30)
+        }
+    }
+
+    private func invoiceIssueDateField(invoice: Binding<Invoice>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Issue Date")
+            DatePicker("", selection: invoice.issueDate, displayedComponents: .date)
+                .labelsHidden()
+                .frame(height: 30)
+        }
+    }
+
+    private func invoiceDueDateField(invoice: Binding<Invoice>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Due Date")
+            DatePicker("", selection: invoice.dueDate, displayedComponents: .date)
+                .labelsHidden()
+                .frame(height: 30)
+            if let issue = issueMessage(
+                for: .invoiceDueDate,
+                invoice: invoice.wrappedValue
+            ) {
+                inlineIssue(issue)
+            }
+        }
+    }
+
+    private func invoiceCurrencyField(invoice: Binding<Invoice>) -> some View {
+        runeyField(
+            "Currency Code",
+            text: invoice.currencyCode,
+            field: .invoiceCurrency,
+            issue: issueMessage(for: .invoiceCurrency, invoice: invoice.wrappedValue)
+        )
     }
 
     private func automaticGenerationCard(invoice: Binding<Invoice>) -> some View {
@@ -294,7 +409,8 @@ struct InvoiceEditorView: View {
 
     private func lineItemsCard(
         invoice: Binding<Invoice>,
-        proxy: ScrollViewProxy
+        proxy: ScrollViewProxy,
+        availableWidth: CGFloat
     ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -351,6 +467,7 @@ struct InvoiceEditorView: View {
                             || numericFields(for: itemID).contains {
                                 invalidNumericFields.contains($0)
                             },
+                        availableWidth: availableWidth,
                         focusedField: $focusedField,
                         touched: { touchedFields.insert($0) },
                         numericValidityChanged: updateNumericValidity
@@ -941,102 +1058,119 @@ struct LineItemEditor: View {
     var unitPriceIssue: String?
     var taxRateIssue: String?
     var isTotalPaused: Bool
+    var availableWidth: CGFloat
     var focusedField: FocusState<EditorField?>.Binding
     var touched: (EditorField) -> Void
     var numericValidityChanged: (EditorField, Bool) -> Void
 
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-            GridRow {
-                VStack(alignment: .leading, spacing: 6) {
-                    RuneyFormLabel(title: "Title")
-                    TextField("", text: $item.title)
-                        .runeyFieldInput()
-                        .focused(focusedField, equals: .lineItemTitle(item.id))
-                    if let titleIssue {
-                        inlineIssue(titleIssue)
-                    }
-                }
-                .gridCellColumns(2)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    RuneyFormLabel(title: "Qty")
-                    RuneyDecimalTextField(
-                        value: $item.quantity,
-                        width: 60,
-                        resetID: item.id,
-                        onValidityChanged: {
-                            numericValidityChanged(.lineItemQuantity(item.id), $0)
-                        },
-                        onCommitDraft: { touched(.lineItemQuantity(item.id)) }
-                    )
-                    .focused(focusedField, equals: .lineItemQuantity(item.id))
-                    if let quantityIssue {
-                        inlineIssue(quantityIssue)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    RuneyFormLabel(title: "Unit Price")
-                    RuneyMoneyTextField(
-                        minorUnits: $item.unitPriceMinorUnits,
-                        width: 84,
-                        resetID: item.id,
-                        onValidityChanged: {
-                            numericValidityChanged(.lineItemUnitPrice(item.id), $0)
-                        },
-                        onCommitDraft: { touched(.lineItemUnitPrice(item.id)) }
-                    )
-                    .focused(focusedField, equals: .lineItemUnitPrice(item.id))
-                    if let unitPriceIssue {
-                        inlineIssue(unitPriceIssue)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    RuneyFormLabel(title: "Tax %")
-                    RuneyDecimalTextField(
-                        value: $item.taxRatePercent,
-                        width: 56,
-                        resetID: item.id,
-                        onValidityChanged: {
-                            numericValidityChanged(.lineItemTaxRate(item.id), $0)
-                        },
-                        onCommitDraft: { touched(.lineItemTaxRate(item.id)) }
-                    )
-                    .focused(focusedField, equals: .lineItemTaxRate(item.id))
-                    if let taxRateIssue {
-                        inlineIssue(taxRateIssue)
-                    }
-                }
-
-                VStack(alignment: .trailing, spacing: 6) {
-                    RuneyFormLabel(title: "Total")
-                    if isTotalPaused {
-                        Text("—")
-                            .foregroundStyle(Color.runeyMuted)
-                            .frame(height: 28, alignment: .trailing)
-                    } else {
-                        Text(Money.format(
-                            minorUnits: item.totalMinorUnits,
-                            currencyCode: currencyCode
-                        ).replacingOccurrences(of: currencyCode + " ", with: ""))
-                        .font(.system(.body, design: .monospaced).weight(.semibold))
-                        .foregroundStyle(Color.runeyPrimary)
-                        .frame(height: 28, alignment: .trailing)
-                    }
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            AdaptiveFieldRow(availableWidth: availableWidth, spacing: 12) {
+                titleField
+                quantityField
+                unitPriceField
+                taxRateField
+                totalField
             }
 
-            GridRow {
-                VStack(alignment: .leading, spacing: 6) {
-                    RuneyFormLabel(title: "Item Details")
-                    RuneyMultilineEditor(text: $item.details, minHeight: 52)
-                }
-                .gridCellColumns(6)
-            }
+            detailsField
         }
         .padding(.vertical, 5)
+    }
+
+    private var titleField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Title")
+            TextField("", text: $item.title)
+                .runeyFieldInput()
+                .focused(focusedField, equals: .lineItemTitle(item.id))
+            if let titleIssue {
+                inlineIssue(titleIssue)
+            }
+        }
+    }
+
+    private var quantityField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Qty")
+            RuneyDecimalTextField(
+                value: $item.quantity,
+                width: 60,
+                resetID: item.id,
+                onValidityChanged: {
+                    numericValidityChanged(.lineItemQuantity(item.id), $0)
+                },
+                onCommitDraft: { touched(.lineItemQuantity(item.id)) }
+            )
+            .focused(focusedField, equals: .lineItemQuantity(item.id))
+            if let quantityIssue {
+                inlineIssue(quantityIssue)
+            }
+        }
+    }
+
+    private var unitPriceField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Unit Price")
+            RuneyMoneyTextField(
+                minorUnits: $item.unitPriceMinorUnits,
+                width: 84,
+                resetID: item.id,
+                onValidityChanged: {
+                    numericValidityChanged(.lineItemUnitPrice(item.id), $0)
+                },
+                onCommitDraft: { touched(.lineItemUnitPrice(item.id)) }
+            )
+            .focused(focusedField, equals: .lineItemUnitPrice(item.id))
+            if let unitPriceIssue {
+                inlineIssue(unitPriceIssue)
+            }
+        }
+    }
+
+    private var taxRateField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Tax %")
+            RuneyDecimalTextField(
+                value: $item.taxRatePercent,
+                width: 56,
+                resetID: item.id,
+                onValidityChanged: {
+                    numericValidityChanged(.lineItemTaxRate(item.id), $0)
+                },
+                onCommitDraft: { touched(.lineItemTaxRate(item.id)) }
+            )
+            .focused(focusedField, equals: .lineItemTaxRate(item.id))
+            if let taxRateIssue {
+                inlineIssue(taxRateIssue)
+            }
+        }
+    }
+
+    private var totalField: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            RuneyFormLabel(title: "Total")
+            if isTotalPaused {
+                Text("—")
+                    .foregroundStyle(Color.runeyMuted)
+                    .frame(height: 28, alignment: .trailing)
+            } else {
+                Text(Money.format(
+                    minorUnits: item.totalMinorUnits,
+                    currencyCode: currencyCode
+                ).replacingOccurrences(of: currencyCode + " ", with: ""))
+                .font(.system(.body, design: .monospaced).weight(.semibold))
+                .foregroundStyle(Color.runeyPrimary)
+                .frame(height: 28, alignment: .trailing)
+            }
+        }
+    }
+
+    private var detailsField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Item Details")
+            RuneyMultilineEditor(text: $item.details, minHeight: 52)
+        }
     }
 
     private func inlineIssue(_ message: String) -> some View {

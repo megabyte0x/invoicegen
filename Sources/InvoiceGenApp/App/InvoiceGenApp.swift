@@ -11,9 +11,9 @@ struct InvoiceGenApp: App {
         WindowGroup("Local Invoice", id: "main") {
             ContentView()
                 .environmentObject(model)
-                .frame(minWidth: 1040, minHeight: 640)
+                .frame(minWidth: 900, minHeight: 640)
         }
-        .defaultSize(width: 1280, height: 760)
+        .defaultSize(width: 1180, height: 760)
         .commands {
             SidebarCommands()
 

@@ -4,6 +4,7 @@ import InvoiceCore
 struct InvoicesView: View {
     @EnvironmentObject private var model: AppModel
     @State private var invoiceIDPendingDeletion: UUID?
+    @State private var isPresentingDetail = false
 
     private var filteredInvoices: [Invoice] {
         let query = model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -19,17 +20,33 @@ struct InvoicesView: View {
     }
 
     var body: some View {
-        HSplitView {
+        AdaptiveMasterDetailView(
+            hasDetail: isPresentingDetail,
+            back: { isPresentingDetail = false }
+        ) {
             invoiceList
-                .frame(minWidth: 240, idealWidth: 300, maxWidth: 340, maxHeight: .infinity)
-
+        } detail: {
             invoiceDetail
-                .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Invoices")
-        .onAppear(perform: activateSelectedInvoiceIfNeeded)
-        .onChange(of: model.selectedInvoiceID) { _, _ in
+        .onAppear {
+            if model.selectedInvoiceID != nil || model.invoiceDraft != nil {
+                isPresentingDetail = true
+            }
             activateSelectedInvoiceIfNeeded()
+        }
+        .onChange(of: model.selectedInvoiceID) { _, _ in
+            if model.selectedInvoiceID != nil {
+                isPresentingDetail = true
+            }
+            activateSelectedInvoiceIfNeeded()
+        }
+        .onChange(of: model.invoiceDraft?.value.id) { _, id in
+            if id != nil {
+                isPresentingDetail = true
+            } else if model.selectedInvoiceID == nil {
+                isPresentingDetail = false
+            }
         }
         .alert("Delete invoice?", isPresented: Binding(
             get: { invoiceIDPendingDeletion != nil },
@@ -66,6 +83,7 @@ struct InvoicesView: View {
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
             Button(action: {
+                isPresentingDetail = true
                 model.addInvoice()
             }) {
                 Label("New Invoice", systemImage: "plus")
@@ -92,9 +110,11 @@ struct InvoicesView: View {
 
     private var invoiceSelection: Binding<UUID?> {
         Binding(
-            get: { model.selectedInvoiceID },
+            get: { isPresentingDetail ? model.selectedInvoiceID : nil },
             set: { id in
-                guard let id, model.invoiceDraft?.value.id != id else { return }
+                guard let id else { return }
+                isPresentingDetail = true
+                guard model.invoiceDraft?.value.id != id else { return }
                 model.requestNavigation(to: .invoice(id))
             }
         )

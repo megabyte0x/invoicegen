@@ -3,6 +3,7 @@ import InvoiceCore
 
 struct ClientsView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var isPresentingDetail = false
 
     private var filteredClients: [Client] {
         let query = model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -17,7 +18,10 @@ struct ClientsView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        AdaptiveMasterDetailView(
+            hasDetail: isPresentingDetail,
+            back: { isPresentingDetail = false }
+        ) {
             List(selection: clientSelection) {
                 ForEach(filteredClients) { client in
                     VStack(alignment: .leading, spacing: 4) {
@@ -33,9 +37,11 @@ struct ClientsView: View {
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 320)
             .safeAreaInset(edge: .bottom) {
-                Button(action: model.beginNewClient) {
+                Button {
+                    isPresentingDetail = true
+                    model.beginNewClient()
+                } label: {
                     Label("New Client", systemImage: "plus")
                         .frame(maxWidth: .infinity)
                 }
@@ -62,17 +68,34 @@ struct ClientsView: View {
             }
         }
         .navigationTitle("Clients")
-        .onAppear(perform: activateSelectedClientIfNeeded)
-        .onChange(of: model.selectedClientID) { _, _ in
+        .onAppear {
+            if model.selectedClientID != nil || model.clientDraft != nil {
+                isPresentingDetail = true
+            }
             activateSelectedClientIfNeeded()
+        }
+        .onChange(of: model.selectedClientID) { _, _ in
+            if model.selectedClientID != nil {
+                isPresentingDetail = true
+            }
+            activateSelectedClientIfNeeded()
+        }
+        .onChange(of: model.clientDraft?.value.id) { _, id in
+            if id != nil {
+                isPresentingDetail = true
+            } else if model.selectedClientID == nil {
+                isPresentingDetail = false
+            }
         }
     }
 
     private var clientSelection: Binding<UUID?> {
         Binding(
-            get: { model.selectedClientID },
+            get: { isPresentingDetail ? model.selectedClientID : nil },
             set: { id in
-                guard let id, model.clientDraft?.value.id != id else { return }
+                guard let id else { return }
+                isPresentingDetail = true
+                guard model.clientDraft?.value.id != id else { return }
                 model.requestNavigation(to: .client(id))
             }
         )
@@ -146,73 +169,75 @@ struct ClientEditorView: View {
     private func editor(session: DraftSession<Client>) -> some View {
         let client = draftClientBinding(fallback: session.value)
 
-        return ScrollView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 10) {
-                    if contextualInvoiceNumber != nil {
-                        Button(returnToInvoiceTitle, action: returnToInvoice)
-                            .buttonStyle(RuneyButtonStyle())
-                            .disabled(session.isDirty)
-                            .help(session.isDirty ? "Save or Cancel client changes before returning." : "")
+        return GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if contextualInvoiceNumber != nil {
+                            Button(returnToInvoiceTitle, action: returnToInvoice)
+                                .buttonStyle(RuneyButtonStyle())
+                                .disabled(session.isDirty)
+                                .help(session.isDirty ? "Save or Cancel client changes before returning." : "")
+                        }
+
+                        EditorActionBar(
+                            title: "Client editor actions",
+                            isDirty: session.isDirty,
+                            save: saveClient,
+                            cancel: cancelClient
+                        )
                     }
 
-                    EditorActionBar(
-                        title: "Client editor actions",
-                        isDirty: session.isDirty,
-                        save: saveClient,
-                        cancel: cancelClient
-                    )
-                }
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Client Information")
+                            .font(.headline)
+                            .foregroundStyle(Color.runeyPrimary)
 
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Client Information")
-                        .font(.headline)
-                        .foregroundStyle(Color.runeyPrimary)
+                        VStack(alignment: .leading, spacing: 14) {
+                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                                runeyField(
+                                    "Client Name",
+                                    text: client.name,
+                                    field: .clientName,
+                                    issue: issueMessage(for: .clientName, client: client.wrappedValue)
+                                )
+                                runeyField("Company / Organization", text: client.company)
+                            }
 
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
-                        GridRow {
-                            runeyField(
-                                "Client Name",
-                                text: client.name,
-                                field: .clientName,
-                                issue: issueMessage(for: .clientName, client: client.wrappedValue)
-                            )
-                            runeyField("Company / Organization", text: client.company)
+                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                                runeyField("Email Address", text: client.email)
+                                runeyField("Billing Address", text: client.address, isMultiline: true)
+                            }
                         }
-
-                        GridRow {
-                            runeyField("Email Address", text: client.email)
-                            runeyField("Billing Address", text: client.address, isMultiline: true)
-                        }
-                    }
-                }
-                .runeyCard()
-
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Internal Notes")
-                        .font(.headline)
-                        .foregroundStyle(Color.runeyPrimary)
-
-                    RuneyMultilineEditor(text: client.notes, minHeight: 120)
-                }
-                .runeyCard()
-
-                if session.origin == .persisted {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Button(role: .destructive) {
-                            isConfirmingDelete = true
-                        } label: {
-                            Label("Delete Client", systemImage: "trash.fill")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(RuneyButtonStyle(variant: .destructive))
                     }
                     .runeyCard()
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Internal Notes")
+                            .font(.headline)
+                            .foregroundStyle(Color.runeyPrimary)
+
+                        RuneyMultilineEditor(text: client.notes, minHeight: 120)
+                    }
+                    .runeyCard()
+
+                    if session.origin == .persisted {
+                        VStack(alignment: .leading, spacing: 14) {
+                            Button(role: .destructive) {
+                                isConfirmingDelete = true
+                            } label: {
+                                Label("Delete Client", systemImage: "trash.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(RuneyButtonStyle(variant: .destructive))
+                        }
+                        .runeyCard()
+                    }
                 }
+                .padding(24)
+                .frame(maxWidth: 860, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(24)
-            .frame(maxWidth: 860, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .navigationTitle(client.wrappedValue.name)
     }

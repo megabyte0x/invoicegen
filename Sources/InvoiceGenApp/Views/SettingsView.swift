@@ -76,144 +76,185 @@ struct SettingsView: View {
     private func settingsEditor(session: DraftSession<WorkspaceSettingsDraft>) -> some View {
         let settings = settingsBinding(fallback: session.value)
 
-        return ScrollView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 10) {
-                    if contextualInvoiceNumber != nil {
-                        Button(returnToInvoiceTitle, action: returnToInvoice)
-                            .buttonStyle(RuneyButtonStyle())
-                            .disabled(session.isDirty)
-                            .help(session.isDirty ? "Save or Cancel business and payment changes before returning." : "")
+        return GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if contextualInvoiceNumber != nil {
+                            Button(returnToInvoiceTitle, action: returnToInvoice)
+                                .buttonStyle(RuneyButtonStyle())
+                                .disabled(session.isDirty)
+                                .help(session.isDirty ? "Save or Cancel business and payment changes before returning." : "")
+                        }
+
+                        EditorActionBar(
+                            title: "Business and payment editor actions",
+                            isDirty: session.isDirty,
+                            save: saveSettings,
+                            cancel: cancelSettings
+                        )
                     }
 
-                    EditorActionBar(
-                        title: "Business and payment editor actions",
-                        isDirty: session.isDirty,
-                        save: saveSettings,
-                        cancel: cancelSettings
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Business Profile")
-                        .font(.headline)
-                        .foregroundStyle(Color.runeyPrimary)
-
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
-                        GridRow {
-                            runeyField("Business Name", text: settings.businessProfile.name)
-                            runeyField("Billing Email Address", text: settings.businessProfile.email)
-                        }
-
-                        GridRow {
-                            runeyField("Tax Identifier (e.g. VAT / EIN)", text: settings.businessProfile.taxIdentifier)
-                            runeyField(
-                                "Currency Code (e.g. USD / EUR)",
-                                text: settings.businessProfile.currencyCode,
-                                field: .businessCurrency,
-                                issue: issueMessage(
-                                    for: .businessCurrency,
-                                    settings: settings.wrappedValue
-                                )
-                            )
-                        }
-
-                        GridRow {
-                            runeyField(
-                                "Business Address",
-                                text: settings.businessProfile.address,
-                                isMultiline: true
-                            )
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                RuneyFormLabel(title: "Payment Terms (Due Date Offset)")
-
-                                HStack(spacing: 8) {
-                                    Text("Net")
-                                        .font(.body)
-                                        .foregroundStyle(Color.runeyPrimary)
-
-                                    RuneyIntegerTextField(
-                                        value: settings.businessProfile.paymentTermsDays,
-                                        width: 56
-                                    )
-                                    .font(.system(.body, design: .monospaced))
-                                    .multilineTextAlignment(.trailing)
-                                    .focused($focusedField, equals: .paymentTermsDays)
-
-                                    Text("Days")
-                                        .font(.body)
-                                        .foregroundStyle(Color.runeyPrimary)
-                                }
-                                .frame(height: 30)
-
-                                if let issue = issueMessage(
-                                    for: .paymentTermsDays,
-                                    settings: settings.wrappedValue
-                                ) {
-                                    Text(issue)
-                                        .font(.caption)
-                                        .foregroundStyle(Color.runeyDestructive)
-                                }
-                            }
-                        }
-                    }
-                }
-                .runeyCard()
-
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .center, spacing: 12) {
-                        Text("Payment Acceptance Details")
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Business Profile")
                             .font(.headline)
                             .foregroundStyle(Color.runeyPrimary)
 
-                        Spacer()
+                        VStack(alignment: .leading, spacing: 14) {
+                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                                businessNameField(settings: settings)
+                                businessEmailField(settings: settings)
+                            }
 
-                        Button {
-                            model.addPaymentAcceptanceDetail(kind: .bankDetails)
-                        } label: {
-                            Label("Add Bank Details", systemImage: "building.columns")
-                        }
-                        .buttonStyle(RuneyButtonStyle())
+                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                                businessTaxIdentifierField(settings: settings)
+                                businessCurrencyField(settings: settings)
+                            }
 
-                        Button {
-                            model.addPaymentAcceptanceDetail(kind: .cryptocurrency)
-                        } label: {
-                            Label("Add Cryptocurrency", systemImage: "bitcoinsign.circle")
-                        }
-                        .buttonStyle(RuneyButtonStyle())
-                    }
-
-                    if settings.wrappedValue.paymentAcceptanceDetails.isEmpty {
-                        Text("No payment details saved.")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.runeyMuted)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 12)
-                    } else {
-                        VStack(spacing: 12) {
-                            ForEach(settings.paymentAcceptanceDetails) { detail in
-                                let detailID = detail.wrappedValue.id
-                                PaymentAcceptanceDetailEditor(
-                                    detail: detail,
-                                    issue: issueMessage(
-                                        for: .paymentDetailLabel(detailID),
-                                        settings: settings.wrappedValue
-                                    ),
-                                    focusedField: $focusedField,
-                                    onDelete: { paymentDetailIDPendingDeletion = detailID }
-                                )
+                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                                businessAddressField(settings: settings)
+                                paymentTermsField(settings: settings)
                             }
                         }
                     }
-                }
-                .runeyCard()
+                    .runeyCard()
 
-                localStorageCard
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(alignment: .center, spacing: 12) {
+                            Text("Payment Acceptance Details")
+                                .font(.headline)
+                                .foregroundStyle(Color.runeyPrimary)
+
+                            Spacer()
+
+                            Button {
+                                model.addPaymentAcceptanceDetail(kind: .bankDetails)
+                            } label: {
+                                Label("Add Bank Details", systemImage: "building.columns")
+                            }
+                            .buttonStyle(RuneyButtonStyle())
+
+                            Button {
+                                model.addPaymentAcceptanceDetail(kind: .cryptocurrency)
+                            } label: {
+                                Label("Add Cryptocurrency", systemImage: "bitcoinsign.circle")
+                            }
+                            .buttonStyle(RuneyButtonStyle())
+                        }
+
+                        if settings.wrappedValue.paymentAcceptanceDetails.isEmpty {
+                            Text("No payment details saved.")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.runeyMuted)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 12)
+                        } else {
+                            VStack(spacing: 12) {
+                                ForEach(settings.paymentAcceptanceDetails) { detail in
+                                    let detailID = detail.wrappedValue.id
+                                    PaymentAcceptanceDetailEditor(
+                                        detail: detail,
+                                        issue: issueMessage(
+                                            for: .paymentDetailLabel(detailID),
+                                            settings: settings.wrappedValue
+                                        ),
+                                        availableWidth: geometry.size.width,
+                                        focusedField: $focusedField,
+                                        onDelete: { paymentDetailIDPendingDeletion = detailID }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .runeyCard()
+
+                    localStorageCard
+                }
+                .padding(24)
+                .frame(maxWidth: 980, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(24)
-            .frame(maxWidth: 980, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private func businessNameField(
+        settings: Binding<WorkspaceSettingsDraft>
+    ) -> some View {
+        runeyField("Business Name", text: settings.businessProfile.name)
+    }
+
+    private func businessEmailField(
+        settings: Binding<WorkspaceSettingsDraft>
+    ) -> some View {
+        runeyField("Billing Email Address", text: settings.businessProfile.email)
+    }
+
+    private func businessTaxIdentifierField(
+        settings: Binding<WorkspaceSettingsDraft>
+    ) -> some View {
+        runeyField(
+            "Tax Identifier (e.g. VAT / EIN)",
+            text: settings.businessProfile.taxIdentifier
+        )
+    }
+
+    private func businessCurrencyField(
+        settings: Binding<WorkspaceSettingsDraft>
+    ) -> some View {
+        runeyField(
+            "Currency Code (e.g. USD / EUR)",
+            text: settings.businessProfile.currencyCode,
+            field: .businessCurrency,
+            issue: issueMessage(
+                for: .businessCurrency,
+                settings: settings.wrappedValue
+            )
+        )
+    }
+
+    private func businessAddressField(
+        settings: Binding<WorkspaceSettingsDraft>
+    ) -> some View {
+        runeyField(
+            "Business Address",
+            text: settings.businessProfile.address,
+            isMultiline: true
+        )
+    }
+
+    private func paymentTermsField(
+        settings: Binding<WorkspaceSettingsDraft>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Payment Terms (Due Date Offset)")
+
+            HStack(spacing: 8) {
+                Text("Net")
+                    .font(.body)
+                    .foregroundStyle(Color.runeyPrimary)
+
+                RuneyIntegerTextField(
+                    value: settings.businessProfile.paymentTermsDays,
+                    width: 56
+                )
+                .font(.system(.body, design: .monospaced))
+                .multilineTextAlignment(.trailing)
+                .focused($focusedField, equals: .paymentTermsDays)
+
+                Text("Days")
+                    .font(.body)
+                    .foregroundStyle(Color.runeyPrimary)
+            }
+            .frame(height: 30)
+
+            if let issue = issueMessage(
+                for: .paymentTermsDays,
+                settings: settings.wrappedValue
+            ) {
+                Text(issue)
+                    .font(.caption)
+                    .foregroundStyle(Color.runeyDestructive)
+            }
         }
     }
 
@@ -442,6 +483,7 @@ struct SettingsView: View {
 struct PaymentAcceptanceDetailEditor: View {
     @Binding var detail: PaymentAcceptanceDetail
     var issue: String?
+    var availableWidth: CGFloat
     var focusedField: FocusState<EditorField?>.Binding
     var onDelete: () -> Void
 
@@ -471,37 +513,13 @@ struct PaymentAcceptanceDetailEditor: View {
                 .buttonStyle(RuneyButtonStyle(variant: .destructiveIcon))
             }
 
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
-                GridRow {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Type")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(Color.runeyMuted)
-                        Picker("", selection: $detail.kind) {
-                            ForEach(PaymentAcceptanceKind.allCases) { kind in
-                                Text(kind.label).tag(kind)
-                            }
-                        }
-                        .frame(height: 30)
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        RuneyFormLabel(title: "Label")
-                        TextField("", text: $detail.label)
-                            .runeyFieldInput()
-                            .focused(focusedField, equals: .paymentDetailLabel(detail.id))
-                        if let issue {
-                            Text(issue)
-                                .font(.caption)
-                                .foregroundStyle(Color.runeyDestructive)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 14) {
+                AdaptiveFieldRow(availableWidth: availableWidth) {
+                    typeField
+                    labelField
                 }
 
-                GridRow {
-                    PaymentDetailLinesEditor(details: $detail.details)
-                        .gridCellColumns(2)
-                }
+                detailsField
             }
         }
         .padding(12)
@@ -510,6 +528,38 @@ struct PaymentAcceptanceDetailEditor: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(Color.runeyBorder.opacity(0.7), lineWidth: 1)
         }
+    }
+
+    private var typeField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Type")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color.runeyMuted)
+            Picker("", selection: $detail.kind) {
+                ForEach(PaymentAcceptanceKind.allCases) { kind in
+                    Text(kind.label).tag(kind)
+                }
+            }
+            .frame(height: 30)
+        }
+    }
+
+    private var labelField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Label")
+            TextField("", text: $detail.label)
+                .runeyFieldInput()
+                .focused(focusedField, equals: .paymentDetailLabel(detail.id))
+            if let issue {
+                Text(issue)
+                    .font(.caption)
+                    .foregroundStyle(Color.runeyDestructive)
+            }
+        }
+    }
+
+    private var detailsField: some View {
+        PaymentDetailLinesEditor(details: $detail.details)
     }
 }
 
