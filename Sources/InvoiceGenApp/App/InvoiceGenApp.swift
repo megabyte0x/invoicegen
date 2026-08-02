@@ -15,16 +15,24 @@ struct InvoiceGenApp: App {
         }
         .defaultSize(width: 1280, height: 760)
         .commands {
+            SidebarCommands()
+
             CommandGroup(after: .newItem) {
                 Button("New Invoice") {
-                    model.addInvoice()
+                    model.beginNewInvoice()
                 }
                 .keyboardShortcut("n", modifiers: [.command])
 
                 Button("Save") {
-                    model.save()
+                    commitActiveDraft()
                 }
                 .keyboardShortcut("s", modifiers: [.command])
+                .disabled(!model.activeDraftIsDirty)
+
+                Button("Cancel Changes") {
+                    model.requestActiveDraftCancellation()
+                }
+                .keyboardShortcut(.cancelAction)
             }
         }
 
@@ -32,6 +40,28 @@ struct InvoiceGenApp: App {
             SettingsView()
                 .environmentObject(model)
                 .frame(width: 680)
+                .onAppear {
+                    activateSettingsDraft()
+                }
+        }
+    }
+
+    private func commitActiveDraft() {
+        do {
+            try model.commitActiveDraft()
+            model.clearEditorIssues()
+        } catch let error as EditorCommitError {
+            model.presentEditorIssues(error.issues)
+        } catch {
+            model.errorMessage = error.localizedDescription
+        }
+    }
+
+    private func activateSettingsDraft() {
+        if model.settingsDraft == nil {
+            model.beginEditingSettings()
+        } else {
+            model.activeDraftRoute = .settings
         }
     }
 }

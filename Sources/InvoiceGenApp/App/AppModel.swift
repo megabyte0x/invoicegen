@@ -7,6 +7,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case invoices
     case clients
     case projects
+    case settings
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .invoices: return "Invoices"
         case .clients: return "Clients"
         case .projects: return "Projects"
+        case .settings: return "Business & Payments"
         }
     }
 
@@ -25,6 +27,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .invoices: return "doc.text"
         case .clients: return "person.2"
         case .projects: return "folder"
+        case .settings: return "gearshape"
         }
     }
 }
@@ -46,6 +49,9 @@ final class AppModel: ObservableObject {
     @Published var pendingNavigation: NavigationIntent?
     @Published var dirtyDraftRequiringDecision: DraftKind?
     @Published var contextualReturnSection: AppSection?
+    @Published var editorIssues: [EditorIssue] = []
+    @Published var focusedEditorField: EditorField?
+    @Published var isConfirmingActiveDraftCancellation = false
     @Published private(set) var automaticGenerationCheckScheduledFor: Date?
 
     let store: LocalInvoiceStore
@@ -67,6 +73,47 @@ final class AppModel: ObservableObject {
 
     deinit {
         automaticGenerationCheckTask?.cancel()
+    }
+
+    var hasDirtyDraft: Bool {
+        invoiceDraft?.isDirty == true ||
+            clientDraft?.isDirty == true ||
+            projectDraft?.isDirty == true ||
+            settingsDraft?.isDirty == true
+    }
+
+    var activeDraftIsDirty: Bool {
+        switch activeDraftRoute {
+        case .invoice:
+            return invoiceDraft?.isDirty == true
+        case .client:
+            return clientDraft?.isDirty == true
+        case .project:
+            return projectDraft?.isDirty == true
+        case .settings:
+            return settingsDraft?.isDirty == true
+        case nil:
+            return false
+        }
+    }
+
+    func presentEditorIssues(_ issues: [EditorIssue]) {
+        editorIssues = issues
+        focusedEditorField = issues.first?.field
+    }
+
+    func clearEditorIssues() {
+        editorIssues = []
+        focusedEditorField = nil
+    }
+
+    func requestActiveDraftCancellation() {
+        guard activeDraftIsDirty else {
+            cancelActiveDraft()
+            return
+        }
+
+        isConfirmingActiveDraftCancellation = true
     }
 
     func reload() {
