@@ -619,10 +619,6 @@ public extension InvoiceBook {
                 issues.append("Invoice currency must be a three-letter uppercase code for invoice \(displayNumber(for: invoice))")
             }
 
-            if invoice.paidMinorUnits > invoice.totalMinorUnits {
-                issues.append("Payments cannot exceed invoice total for invoice \(displayNumber(for: invoice))")
-            }
-
             for payment in invoice.payments where payment.amountMinorUnits <= 0 {
                 issues.append("Payment amount must be greater than zero for invoice \(displayNumber(for: invoice))")
             }
@@ -641,6 +637,19 @@ public extension InvoiceBook {
                 if item.taxRatePercent < 0 || item.taxRatePercent > 100 || !item.taxRatePercent.isFinite {
                     issues.append("Line item tax rate must be between 0 and 100 for \(itemLabel)")
                 }
+            }
+
+            let hasInvalidLineAmount = invoice.lineItems.contains { item in
+                item.quantity <= 0 ||
+                    !item.quantity.isFinite ||
+                    item.unitPriceMinorUnits < 0 ||
+                    item.taxRatePercent < 0 ||
+                    item.taxRatePercent > 100 ||
+                    !item.taxRatePercent.isFinite
+            }
+
+            if !hasInvalidLineAmount, invoice.paidMinorUnits > invoice.totalMinorUnits {
+                issues.append("Payments cannot exceed invoice total for invoice \(displayNumber(for: invoice))")
             }
         }
 

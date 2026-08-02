@@ -49,6 +49,11 @@ extension AppModel {
         var candidate = book
         let savedInvoice = session.value
 
+        let issues = EditorValidator.invoiceIssues(for: savedInvoice, in: book)
+        guard issues.isEmpty else {
+            throw EditorCommitError(issues: issues)
+        }
+
         if let index = candidate.invoices.firstIndex(where: { $0.id == savedInvoice.id }) {
             candidate.invoices[index] = savedInvoice
         } else {
@@ -93,6 +98,11 @@ extension AppModel {
         guard var session = clientDraft else { return }
         var candidate = book
         var savedClient = session.value
+
+        let issues = EditorValidator.clientIssues(for: savedClient)
+        guard issues.isEmpty else {
+            throw EditorCommitError(issues: issues)
+        }
         savedClient.updatedAt = now
 
         if let index = candidate.clients.firstIndex(where: { $0.id == savedClient.id }) {
@@ -143,6 +153,11 @@ extension AppModel {
         guard var session = projectDraft else { return }
         var candidate = book
         var savedProject = session.value
+
+        let issues = EditorValidator.projectIssues(for: savedProject)
+        guard issues.isEmpty else {
+            throw EditorCommitError(issues: issues)
+        }
         savedProject.updatedAt = now
 
         if let index = candidate.projects.firstIndex(where: { $0.id == savedProject.id }) {
@@ -182,6 +197,11 @@ extension AppModel {
         guard var session = settingsDraft else { return }
         var candidate = book
         let savedSettings = session.value
+
+        let issues = EditorValidator.settingsIssues(for: savedSettings)
+        guard issues.isEmpty else {
+            throw EditorCommitError(issues: issues)
+        }
         candidate.businessProfile = savedSettings.businessProfile
         candidate.paymentAcceptanceDetails = savedSettings.paymentAcceptanceDetails
 
