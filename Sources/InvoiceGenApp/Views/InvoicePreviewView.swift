@@ -9,50 +9,15 @@ struct InvoicePreviewView: View {
     @State private var isConfirmingMarkSent = false
     @State private var isChoosingMailMethod = false
     @State private var mailNotice: String?
+    @State private var scaleMode: PreviewScaleMode = .fitWidth
 
     var body: some View {
-        VStack(spacing: 20) {
-            // Actions Toolbar
-            HStack {
-                if let mailNotice {
-                    Label(mailNotice, systemImage: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(Color.runeyMuted)
-                        .lineLimit(2)
-                }
+        VStack(spacing: 0) {
+            previewHeader
 
-                Spacer()
+            Divider()
 
-                Button(action: {
-                    isChoosingMailMethod = true
-                }) {
-                    Label("Mail Invoice", systemImage: "envelope")
-                }
-
-                Button(action: {
-                    printInvoice()
-                }) {
-                    Label("Print or Export PDF...", systemImage: "printer")
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-
-            // Invoice Sheet Container
-            ScrollView([.vertical, .horizontal]) {
-                InvoiceSheetView(invoice: invoice, book: book)
-                    .frame(width: 612) // Fixed width for standard Letter layout aspect
-                    .padding(36)
-                    .background(Color.white) // Fixed white paper sheet background
-                    .cornerRadius(8)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
-                    }
-                    .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: .infinity)
-            }
+            InvoicePreviewCanvas(invoice: $invoice, book: book, scaleMode: $scaleMode)
         }
         .background(Color.runeyPreviewBackground)
         .sheet(isPresented: $isChoosingMailMethod) {
@@ -78,6 +43,83 @@ struct InvoicePreviewView: View {
         } message: {
             Text("The email compose window has been opened. Mark this invoice as sent only if you intend to send it.")
         }
+    }
+
+    private var previewHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                mailNoticeLabel
+
+                Spacer(minLength: 8)
+
+                previewActions
+                    .fixedSize()
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                mailNoticeLabel
+
+                HStack(alignment: .top, spacing: 8) {
+                    mailButton
+                        .frame(maxWidth: .infinity)
+
+                    printButton
+                        .frame(maxWidth: .infinity)
+                }
+
+                scalePicker
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    @ViewBuilder
+    private var mailNoticeLabel: some View {
+        if let mailNotice {
+            Label(mailNotice, systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(Color.runeyMuted)
+                .lineLimit(2)
+        }
+    }
+
+    private var previewActions: some View {
+        HStack(spacing: 8) {
+            mailButton
+            printButton
+            scalePicker
+                .frame(width: 210)
+        }
+    }
+
+    private var mailButton: some View {
+        Button {
+            isChoosingMailMethod = true
+        } label: {
+            Label("Mail Invoice", systemImage: "envelope")
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+    }
+
+    private var printButton: some View {
+        Button(action: printInvoice) {
+            Label("Print or Export PDF...", systemImage: "printer")
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+    }
+
+    private var scalePicker: some View {
+        Picker("Preview scale", selection: $scaleMode) {
+            ForEach(PreviewScaleMode.allCases) { mode in
+                Text(mode.label).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     private func printInvoice() {
