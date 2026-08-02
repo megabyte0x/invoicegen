@@ -18,7 +18,7 @@ struct ClientsView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $model.selectedClientID) {
+            List(selection: clientSelection) {
                 ForEach(filteredClients) { client in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(client.name)
@@ -35,9 +35,7 @@ struct ClientsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 320)
             .safeAreaInset(edge: .bottom) {
-                Button(action: {
-                    model.addClient()
-                }) {
+                Button(action: model.beginNewClient) {
                     Label("New Client", systemImage: "plus")
                         .frame(maxWidth: .infinity)
                 }
@@ -46,75 +44,95 @@ struct ClientsView: View {
                 .padding()
             }
         } detail: {
-            if let id = model.selectedClientID,
-               let binding = model.clientBinding(id: id) {
-                ClientEditorView(client: binding)
+            if model.clientDraft != nil {
+                ClientEditorView()
             } else {
-                EmptyStateView(title: "Select a client", subtitle: "Clients anchor projects and invoices.", systemImage: "person.2.fill")
+                VStack(spacing: 16) {
+                    EmptyStateView(
+                        title: "Select a client",
+                        subtitle: "Clients anchor projects and invoices.",
+                        systemImage: "person.2.fill"
+                    )
+
+                    if contextualInvoiceNumber != nil {
+                        Button(returnToInvoiceTitle, action: returnToInvoice)
+                            .buttonStyle(RuneyButtonStyle())
+                    }
+                }
             }
         }
         .navigationTitle("Clients")
-        .onAppear {
-            if model.selectedClientID == nil {
-                model.selectedClientID = filteredClients.first?.id
-            }
+        .onAppear(perform: activateSelectedClientIfNeeded)
+        .onChange(of: model.selectedClientID) { _, _ in
+            activateSelectedClientIfNeeded()
         }
+    }
+
+    private var clientSelection: Binding<UUID?> {
+        Binding(
+            get: { model.selectedClientID },
+            set: { id in
+                guard let id, model.clientDraft?.value.id != id else { return }
+                model.requestNavigation(to: .client(id))
+            }
+        )
+    }
+
+    private var contextualInvoiceNumber: String? {
+        guard model.contextualReturnSection == .invoices,
+              let invoice = model.invoiceDraft?.value else { return nil }
+        return invoice.number.isEmpty ? "Invoice" : invoice.number
+    }
+
+    private var returnToInvoiceTitle: String {
+        "Return to \(contextualInvoiceNumber ?? "Invoice")"
+    }
+
+    private func activateSelectedClientIfNeeded() {
+        if model.clientDraft != nil {
+            model.activeDraftRoute = .client
+        }
+        let id = model.selectedClientID ?? filteredClients.first?.id
+        guard let id else { return }
+        guard model.clientDraft?.value.id != id else { return }
+        guard model.clientDraft?.isDirty != true else { return }
+        model.beginEditingClient(id: id)
+    }
+
+    private func returnToInvoice() {
+        model.contextualReturnSection = nil
+        model.activeDraftRoute = .invoice
+        model.selectedSection = .invoices
     }
 }
 
 struct ClientEditorView: View {
     @EnvironmentObject private var model: AppModel
-    @Binding var client: Client
     @State private var isConfirmingDelete = false
+    @State private var touchedFields: Set<EditorField> = []
+    @FocusState private var focusedField: EditorField?
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Client Information")
-                        .font(.headline)
-                        .foregroundStyle(Color.runeyPrimary)
-                    
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
-                        GridRow {
-                            runeyField("Client Name", text: $client.name)
-                            runeyField("Company / Organization", text: $client.company)
-                        }
-                        
-                        GridRow {
-                            runeyField("Email Address", text: $client.email)
-                            runeyField("Billing Address", text: $client.address, isMultiline: true)
-                        }
-                    }
-                }
-                .runeyCard()
-                
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Internal Notes")
-                        .font(.headline)
-                        .foregroundStyle(Color.runeyPrimary)
-                    
-                    RuneyMultilineEditor(text: $client.notes, minHeight: 120)
-                }
-                .runeyCard()
-                
-                // Danger Zone: Delete Button
-                VStack(alignment: .leading, spacing: 14) {
-                    Button(role: .destructive, action: {
-                        isConfirmingDelete = true
-                    }) {
-                        Label("Delete Client", systemImage: "trash.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(RuneyButtonStyle(variant: .destructive))
-                }
-                .runeyCard()
+        Group {
+            if let session = model.clientDraft {
+                editor(session: session)
+            } else {
+                EmptyStateView(
+                    title: "Select a client",
+                    subtitle: "Clients anchor projects and invoices.",
+                    systemImage: "person.2.fill"
+                )
             }
-            .padding(24)
-            .frame(maxWidth: 860, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .navigationTitle(client.name)
+        .onChange(of: focusedField) { oldValue, _ in
+            if let oldValue {
+                touchedFields.insert(oldValue)
+            }
+        }
+        .onChange(of: model.focusedEditorField) { _, field in
+            guard field == .clientName else { return }
+            focusedField = field
+        }
         .alert("Delete client?", isPresented: $isConfirmingDelete) {
             Button("Delete Client", role: .destructive) {
                 model.deleteSelectedClient()
@@ -125,14 +143,172 @@ struct ClientEditorView: View {
         }
     }
 
-    private func runeyField(_ label: String, text: Binding<String>, isMultiline: Bool = false) -> some View {
+    private func editor(session: DraftSession<Client>) -> some View {
+        let client = draftClientBinding(fallback: session.value)
+
+        return ScrollView {
+            VStack(spacing: 24) {
+                VStack(alignment: .leading, spacing: 10) {
+                    if contextualInvoiceNumber != nil {
+                        Button(returnToInvoiceTitle, action: returnToInvoice)
+                            .buttonStyle(RuneyButtonStyle())
+                            .disabled(session.isDirty)
+                            .help(session.isDirty ? "Save or Cancel client changes before returning." : "")
+                    }
+
+                    EditorActionBar(
+                        title: "Client editor actions",
+                        isDirty: session.isDirty,
+                        save: saveClient,
+                        cancel: cancelClient
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Client Information")
+                        .font(.headline)
+                        .foregroundStyle(Color.runeyPrimary)
+
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
+                        GridRow {
+                            runeyField(
+                                "Client Name",
+                                text: client.name,
+                                field: .clientName,
+                                issue: issueMessage(for: .clientName, client: client.wrappedValue)
+                            )
+                            runeyField("Company / Organization", text: client.company)
+                        }
+
+                        GridRow {
+                            runeyField("Email Address", text: client.email)
+                            runeyField("Billing Address", text: client.address, isMultiline: true)
+                        }
+                    }
+                }
+                .runeyCard()
+
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Internal Notes")
+                        .font(.headline)
+                        .foregroundStyle(Color.runeyPrimary)
+
+                    RuneyMultilineEditor(text: client.notes, minHeight: 120)
+                }
+                .runeyCard()
+
+                if session.origin == .persisted {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Button(role: .destructive) {
+                            isConfirmingDelete = true
+                        } label: {
+                            Label("Delete Client", systemImage: "trash.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(RuneyButtonStyle(variant: .destructive))
+                    }
+                    .runeyCard()
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: 860, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .navigationTitle(client.wrappedValue.name)
+    }
+
+    private func draftClientBinding(fallback: Client) -> Binding<Client> {
+        Binding(
+            get: { model.clientDraft?.value ?? fallback },
+            set: { value in
+                guard var session = model.clientDraft else { return }
+                session.value = value
+                model.clientDraft = session
+            }
+        )
+    }
+
+    private var contextualInvoiceNumber: String? {
+        guard model.contextualReturnSection == .invoices,
+              let invoice = model.invoiceDraft?.value else { return nil }
+        return invoice.number.isEmpty ? "Invoice" : invoice.number
+    }
+
+    private var returnToInvoiceTitle: String {
+        "Return to \(contextualInvoiceNumber ?? "Invoice")"
+    }
+
+    private func saveClient() {
+        guard let client = model.clientDraft?.value else { return }
+        let issues = EditorValidator.clientIssues(for: client)
+        touchedFields.formUnion(issues.map(\.field))
+
+        do {
+            try model.commitClientDraft()
+            model.clearEditorIssues()
+        } catch let error as EditorCommitError {
+            model.presentEditorIssues(error.issues)
+            focusedField = error.issues.first?.field
+        } catch {
+            model.errorMessage = error.localizedDescription
+        }
+    }
+
+    private func cancelClient() {
+        let wasContextual = contextualInvoiceNumber != nil
+        let baselineID = model.clientDraft?.origin == .persisted
+            ? model.clientDraft?.baseline.id
+            : nil
+
+        model.cancelClientDraft()
+        model.clearEditorIssues()
+        touchedFields.removeAll()
+
+        if wasContextual {
+            returnToInvoice()
+        } else if let baselineID {
+            model.beginEditingClient(id: baselineID)
+        }
+    }
+
+    private func returnToInvoice() {
+        guard model.clientDraft?.isDirty != true else { return }
+        model.cancelClientDraft()
+        model.contextualReturnSection = nil
+        model.activeDraftRoute = .invoice
+        model.selectedSection = .invoices
+    }
+
+    private func issueMessage(for field: EditorField, client: Client) -> String? {
+        guard touchedFields.contains(field) || model.editorIssues.contains(where: { $0.field == field }) else {
+            return nil
+        }
+        return EditorValidator.clientIssues(for: client).first(where: { $0.field == field })?.message
+    }
+
+    private func runeyField(
+        _ label: String,
+        text: Binding<String>,
+        field: EditorField? = nil,
+        issue: String? = nil,
+        isMultiline: Bool = false
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: label)
             if isMultiline {
                 RuneyMultilineEditor(text: text)
+            } else if let field {
+                TextField("", text: text)
+                    .runeyFieldInput()
+                    .focused($focusedField, equals: field)
             } else {
                 TextField("", text: text)
                     .runeyFieldInput()
+            }
+            if let issue {
+                Text(issue)
+                    .font(.caption)
+                    .foregroundStyle(Color.runeyDestructive)
             }
         }
     }

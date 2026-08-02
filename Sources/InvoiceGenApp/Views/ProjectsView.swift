@@ -17,7 +17,7 @@ struct ProjectsView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $model.selectedProjectID) {
+            List(selection: projectSelection) {
                 ForEach(filteredProjects) { project in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(project.name)
@@ -34,9 +34,7 @@ struct ProjectsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 320)
             .safeAreaInset(edge: .bottom) {
-                Button(action: {
-                    model.addProject()
-                }) {
+                Button(action: model.beginNewProject) {
                     Label("New Project", systemImage: "plus")
                         .frame(maxWidth: .infinity)
                 }
@@ -45,77 +43,73 @@ struct ProjectsView: View {
                 .padding()
             }
         } detail: {
-            if let id = model.selectedProjectID,
-               let binding = model.projectBinding(id: id) {
-                ProjectEditorView(project: binding)
+            if model.projectDraft != nil {
+                ProjectEditorView()
             } else {
-                EmptyStateView(title: "Select a project", subtitle: "Projects group invoiceable work by client.", systemImage: "folder.fill")
+                EmptyStateView(
+                    title: "Select a project",
+                    subtitle: "Projects group invoiceable work by client.",
+                    systemImage: "folder.fill"
+                )
             }
         }
         .navigationTitle("Projects")
-        .onAppear {
-            if model.selectedProjectID == nil {
-                model.selectedProjectID = filteredProjects.first?.id
-            }
+        .onAppear(perform: activateSelectedProjectIfNeeded)
+        .onChange(of: model.selectedProjectID) { _, _ in
+            activateSelectedProjectIfNeeded()
         }
+    }
+
+    private var projectSelection: Binding<UUID?> {
+        Binding(
+            get: { model.selectedProjectID },
+            set: { id in
+                guard let id, model.projectDraft?.value.id != id else { return }
+                model.requestNavigation(to: .project(id))
+            }
+        )
+    }
+
+    private func activateSelectedProjectIfNeeded() {
+        if model.projectDraft != nil {
+            model.activeDraftRoute = .project
+        }
+        let id = model.selectedProjectID ?? filteredProjects.first?.id
+        guard let id else { return }
+        guard model.projectDraft?.value.id != id else { return }
+        guard model.projectDraft?.isDirty != true else { return }
+        model.beginEditingProject(id: id)
     }
 }
 
 struct ProjectEditorView: View {
     @EnvironmentObject private var model: AppModel
-    @Binding var project: Project
     @State private var isConfirmingDelete = false
+    @State private var touchedFields: Set<EditorField> = []
+    @State private var hourlyRateDraftIsValid = true
+    @FocusState private var focusedField: EditorField?
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Project Details")
-                        .font(.headline)
-                        .foregroundStyle(Color.runeyPrimary)
-                    
-                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
-                        GridRow {
-                            runeyField("Project Name", text: $project.name)
-                            
-                            VStack(alignment: .leading, spacing: 6) {
-                                RuneyFormLabel(title: "Client Assignment")
-                                Picker("", selection: clientBinding) {
-                                    Text("No Client").tag(UUID?.none)
-                                    ForEach(model.book.clients) { client in
-                                        Text(client.name).tag(Optional(client.id))
-                                    }
-                                }
-                                .frame(height: 30)
-                            }
-                        }
-                        
-                        GridRow {
-                            runeyMoneyField("Hourly Billing Rate", minorUnits: $project.hourlyRateMinorUnits, resetID: project.id)
-                            
-                            runeyField("Project Summary", text: $project.summary, isMultiline: true)
-                        }
-                    }
-                }
-                .runeyCard()
-                
-                // Danger Zone: Delete Button
-                VStack(alignment: .leading, spacing: 14) {
-                    Button(role: .destructive, action: {
-                        isConfirmingDelete = true
-                    }) {
-                        Label("Delete Project", systemImage: "trash.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(RuneyButtonStyle(variant: .destructive))
-                }
-                .runeyCard()
+        Group {
+            if let session = model.projectDraft {
+                editor(session: session)
+            } else {
+                EmptyStateView(
+                    title: "Select a project",
+                    subtitle: "Projects group invoiceable work by client.",
+                    systemImage: "folder.fill"
+                )
             }
-            .padding(24)
-            .frame(maxWidth: 860, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .navigationTitle(project.name)
+        .onChange(of: focusedField) { oldValue, _ in
+            if let oldValue {
+                touchedFields.insert(oldValue)
+            }
+        }
+        .onChange(of: model.focusedEditorField) { _, field in
+            guard field == .projectName || field == .projectHourlyRate else { return }
+            focusedField = field
+        }
         .alert("Delete project?", isPresented: $isConfirmingDelete) {
             Button("Delete Project", role: .destructive) {
                 model.deleteSelectedProject()
@@ -126,28 +120,183 @@ struct ProjectEditorView: View {
         }
     }
 
-    private var clientBinding: Binding<UUID?> {
+    private func editor(session: DraftSession<Project>) -> some View {
+        let project = draftProjectBinding(fallback: session.value)
+
+        return ScrollView {
+            VStack(spacing: 24) {
+                EditorActionBar(
+                    title: "Project editor actions",
+                    isDirty: session.isDirty || !hourlyRateDraftIsValid,
+                    save: saveProject,
+                    cancel: cancelProject
+                )
+
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Project Details")
+                        .font(.headline)
+                        .foregroundStyle(Color.runeyPrimary)
+
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 14) {
+                        GridRow {
+                            runeyField(
+                                "Project Name",
+                                text: project.name,
+                                field: .projectName,
+                                issue: issueMessage(for: .projectName, project: project.wrappedValue)
+                            )
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                RuneyFormLabel(title: "Client Assignment")
+                                Picker("", selection: project.clientId) {
+                                    Text("No Client").tag(UUID?.none)
+                                    ForEach(model.book.clients) { client in
+                                        Text(client.name).tag(Optional(client.id))
+                                    }
+                                }
+                                .frame(height: 30)
+                            }
+                        }
+
+                        GridRow {
+                            VStack(alignment: .leading, spacing: 6) {
+                                RuneyFormLabel(title: "Hourly Billing Rate")
+                                RuneyMoneyTextField(
+                                    minorUnits: project.hourlyRateMinorUnits,
+                                    resetID: project.wrappedValue.id,
+                                    onValidityChanged: { hourlyRateDraftIsValid = $0 },
+                                    onCommitDraft: { touchedFields.insert(.projectHourlyRate) }
+                                )
+                                .focused($focusedField, equals: .projectHourlyRate)
+
+                                if let issue = issueMessage(
+                                    for: .projectHourlyRate,
+                                    project: project.wrappedValue
+                                ) {
+                                    Text(issue)
+                                        .font(.caption)
+                                        .foregroundStyle(Color.runeyDestructive)
+                                }
+                            }
+
+                            runeyField("Project Summary", text: project.summary, isMultiline: true)
+                        }
+                    }
+                }
+                .runeyCard()
+
+                if session.origin == .persisted {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Button(role: .destructive) {
+                            isConfirmingDelete = true
+                        } label: {
+                            Label("Delete Project", systemImage: "trash.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(RuneyButtonStyle(variant: .destructive))
+                    }
+                    .runeyCard()
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: 860, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .navigationTitle(project.wrappedValue.name)
+    }
+
+    private func draftProjectBinding(fallback: Project) -> Binding<Project> {
         Binding(
-            get: { project.clientId },
-            set: { project.clientId = $0 }
+            get: { model.projectDraft?.value ?? fallback },
+            set: { value in
+                guard var session = model.projectDraft else { return }
+                session.value = value
+                model.projectDraft = session
+            }
         )
     }
 
-    private func runeyMoneyField(_ label: String, minorUnits: Binding<Int64>, resetID: UUID) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            RuneyFormLabel(title: label)
-            RuneyMoneyTextField(minorUnits: minorUnits, resetID: resetID)
+    private func saveProject() {
+        guard let project = model.projectDraft?.value else { return }
+        var issues = EditorValidator.projectIssues(for: project)
+        if !hourlyRateDraftIsValid,
+           !issues.contains(where: { $0.field == .projectHourlyRate }) {
+            issues.append(EditorIssue(
+                field: .projectHourlyRate,
+                message: "Enter a valid hourly billing rate."
+            ))
+        }
+        touchedFields.formUnion(issues.map(\.field))
+
+        guard issues.isEmpty else {
+            model.presentEditorIssues(issues)
+            focusedField = issues.first?.field
+            return
+        }
+
+        do {
+            try model.commitProjectDraft()
+            model.clearEditorIssues()
+        } catch let error as EditorCommitError {
+            model.presentEditorIssues(error.issues)
+            focusedField = error.issues.first?.field
+        } catch {
+            model.errorMessage = error.localizedDescription
         }
     }
 
-    private func runeyField(_ label: String, text: Binding<String>, isMultiline: Bool = false) -> some View {
+    private func cancelProject() {
+        let baselineID = model.projectDraft?.origin == .persisted
+            ? model.projectDraft?.baseline.id
+            : nil
+
+        model.cancelProjectDraft()
+        model.clearEditorIssues()
+        touchedFields.removeAll()
+        hourlyRateDraftIsValid = true
+
+        if let baselineID {
+            model.beginEditingProject(id: baselineID)
+        }
+    }
+
+    private func issueMessage(for field: EditorField, project: Project) -> String? {
+        let wasSubmitted = model.editorIssues.contains(where: { $0.field == field })
+        guard touchedFields.contains(field) || wasSubmitted else {
+            return nil
+        }
+        if let issue = EditorValidator.projectIssues(for: project).first(where: { $0.field == field }) {
+            return issue.message
+        }
+        if field == .projectHourlyRate, wasSubmitted, !hourlyRateDraftIsValid {
+            return "Enter a valid hourly billing rate."
+        }
+        return nil
+    }
+
+    private func runeyField(
+        _ label: String,
+        text: Binding<String>,
+        field: EditorField? = nil,
+        issue: String? = nil,
+        isMultiline: Bool = false
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: label)
             if isMultiline {
                 RuneyMultilineEditor(text: text)
+            } else if let field {
+                TextField("", text: text)
+                    .runeyFieldInput()
+                    .focused($focusedField, equals: field)
             } else {
                 TextField("", text: text)
                     .runeyFieldInput()
+            }
+            if let issue {
+                Text(issue)
+                    .font(.caption)
+                    .foregroundStyle(Color.runeyDestructive)
             }
         }
     }

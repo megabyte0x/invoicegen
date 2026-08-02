@@ -27,10 +27,9 @@ struct InvoicesView: View {
                 .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Invoices")
-        .onAppear {
-            if model.selectedInvoiceID == nil {
-                model.selectedInvoiceID = filteredInvoices.first?.id
-            }
+        .onAppear(perform: activateSelectedInvoiceIfNeeded)
+        .onChange(of: model.selectedInvoiceID) { _, _ in
+            activateSelectedInvoiceIfNeeded()
         }
         .alert("Delete invoice?", isPresented: Binding(
             get: { invoiceIDPendingDeletion != nil },
@@ -52,7 +51,7 @@ struct InvoicesView: View {
     }
 
     private var invoiceList: some View {
-        List(selection: $model.selectedInvoiceID) {
+        List(selection: invoiceSelection) {
             ForEach(filteredInvoices) { invoice in
                 InvoiceSummaryRow(invoice: invoice, client: model.book.client(for: invoice))
                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 10))
@@ -80,9 +79,8 @@ struct InvoicesView: View {
 
     @ViewBuilder
     private var invoiceDetail: some View {
-        if let id = model.selectedInvoiceID,
-           let binding = model.invoiceBinding(id: id) {
-            InvoiceEditorView(invoice: binding)
+        if model.invoiceDraft != nil {
+            InvoiceEditorView()
         } else {
             EmptyStateView(
                 title: "Select an invoice",
@@ -90,6 +88,27 @@ struct InvoicesView: View {
                 systemImage: "doc.text.magnifyingglass"
             )
         }
+    }
+
+    private var invoiceSelection: Binding<UUID?> {
+        Binding(
+            get: { model.selectedInvoiceID },
+            set: { id in
+                guard let id, model.invoiceDraft?.value.id != id else { return }
+                model.requestNavigation(to: .invoice(id))
+            }
+        )
+    }
+
+    private func activateSelectedInvoiceIfNeeded() {
+        if model.invoiceDraft != nil {
+            model.activeDraftRoute = .invoice
+        }
+        let id = model.selectedInvoiceID ?? filteredInvoices.first?.id
+        guard let id else { return }
+        guard model.invoiceDraft?.value.id != id else { return }
+        guard model.invoiceDraft?.isDirty != true else { return }
+        model.beginEditingInvoice(id: id)
     }
 }
 

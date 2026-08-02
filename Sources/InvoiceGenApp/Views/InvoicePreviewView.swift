@@ -73,7 +73,6 @@ struct InvoicePreviewView: View {
         .alert("Mark invoice as sent?", isPresented: $isConfirmingMarkSent) {
             Button("Mark as Sent") {
                 invoice.status = .sent
-                model.save()
             }
             Button("Not Now", role: .cancel) {}
         } message: {

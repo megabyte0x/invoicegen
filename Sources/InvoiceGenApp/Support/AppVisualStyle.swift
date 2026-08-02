@@ -253,5 +253,16 @@ struct RuneyMultilineEditor: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
             }
+            .onKeyPress(.tab) { press in
+                if press.modifiers.contains(.option) {
+                    return .ignored
+                }
+                if press.modifiers.contains(.shift) {
+                    NSApp.keyWindow?.selectPreviousKeyView(nil)
+                } else {
+                    NSApp.keyWindow?.selectNextKeyView(nil)
+                }
+                return .handled
+            }
     }
 }
