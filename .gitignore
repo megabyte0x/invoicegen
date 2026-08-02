@@ -1,4 +1,5 @@
 .build/
+.worktrees/
 .swiftpm/
 node_modules/
 .pnpm-store/
