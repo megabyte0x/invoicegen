@@ -51,6 +51,7 @@ final class AppModel: ObservableObject {
     @Published var contextualReturnSection: AppSection?
     @Published var editorIssues: [EditorIssue] = []
     @Published var focusedEditorField: EditorField?
+    @Published var transientEditorInputIssues: [EditorField: String] = [:]
     @Published var isConfirmingActiveDraftCancellation = false
     @Published private(set) var automaticGenerationCheckScheduledFor: Date?
 
@@ -79,19 +80,20 @@ final class AppModel: ObservableObject {
         invoiceDraft?.isDirty == true ||
             clientDraft?.isDirty == true ||
             projectDraft?.isDirty == true ||
-            settingsDraft?.isDirty == true
+            settingsDraft?.isDirty == true ||
+            !transientEditorInputIssues.isEmpty
     }
 
     var activeDraftIsDirty: Bool {
         switch activeDraftRoute {
         case .invoice:
-            return invoiceDraft?.isDirty == true
+            return invoiceDraft?.isDirty == true || hasTransientEditorInputIssue(for: .invoice)
         case .client:
-            return clientDraft?.isDirty == true
+            return clientDraft?.isDirty == true || hasTransientEditorInputIssue(for: .client)
         case .project:
-            return projectDraft?.isDirty == true
+            return projectDraft?.isDirty == true || hasTransientEditorInputIssue(for: .project)
         case .settings:
-            return settingsDraft?.isDirty == true
+            return settingsDraft?.isDirty == true || hasTransientEditorInputIssue(for: .settings)
         case nil:
             return false
         }

@@ -109,7 +109,7 @@ struct ProjectEditorView: View {
     @EnvironmentObject private var model: AppModel
     @State private var isConfirmingDelete = false
     @State private var touchedFields: Set<EditorField> = []
-    @State private var hourlyRateDraftIsValid = true
+    @State private var numericInputResetGeneration = 0
     @FocusState private var focusedField: EditorField?
 
     var body: some View {
@@ -223,8 +223,17 @@ struct ProjectEditorView: View {
             RuneyFormLabel(title: "Hourly Billing Rate")
             RuneyMoneyTextField(
                 minorUnits: project.hourlyRateMinorUnits,
-                resetID: project.wrappedValue.id,
-                onValidityChanged: { hourlyRateDraftIsValid = $0 },
+                resetID: NumericEditorResetID(
+                    entityID: project.wrappedValue.id,
+                    generation: numericInputResetGeneration
+                ),
+                onValidityChanged: {
+                    model.updateTransientEditorInputValidity(
+                        field: .projectHourlyRate,
+                        isValid: $0,
+                        invalidMessage: "Enter a valid hourly billing rate."
+                    )
+                },
                 onCommitDraft: { touchedFields.insert(.projectHourlyRate) }
             )
             .focused($focusedField, equals: .projectHourlyRate)
@@ -288,7 +297,7 @@ struct ProjectEditorView: View {
         model.cancelProjectDraft()
         model.clearEditorIssues()
         touchedFields.removeAll()
-        hourlyRateDraftIsValid = true
+        numericInputResetGeneration += 1
 
         if let baselineID {
             model.beginEditingProject(id: baselineID)
@@ -307,6 +316,10 @@ struct ProjectEditorView: View {
             return "Enter a valid hourly billing rate."
         }
         return nil
+    }
+
+    private var hourlyRateDraftIsValid: Bool {
+        model.transientEditorInputIssue(for: .projectHourlyRate) == nil
     }
 
     private func runeyField(

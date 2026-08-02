@@ -3,6 +3,11 @@ import SwiftUI
 import AppKit
 import InvoiceCore
 
+struct NumericEditorResetID: Hashable {
+    var entityID: UUID
+    var generation: Int
+}
+
 enum MoneyTextFieldFormatter {
     static func text(
         draft: String?,

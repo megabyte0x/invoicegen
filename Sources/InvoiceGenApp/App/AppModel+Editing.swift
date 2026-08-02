@@ -18,6 +18,7 @@ enum AppPersistenceError: LocalizedError {
 
 extension AppModel {
     func beginNewInvoice(now: Date = Date()) {
+        clearTransientEditorInputIssues(for: .invoice)
         let dueDays = book.businessProfile.paymentTermsDays
         let invoice = Invoice(
             number: book.nextInvoiceNumber(date: now),
@@ -38,6 +39,7 @@ extension AppModel {
 
     func beginEditingInvoice(id: UUID) {
         guard let invoice = book.invoices.first(where: { $0.id == id }) else { return }
+        clearTransientEditorInputIssues(for: .invoice)
         invoiceDraft = DraftSession(origin: .persisted, baseline: invoice, value: invoice)
         activeDraftRoute = .invoice
         selectedSection = .invoices
@@ -49,7 +51,11 @@ extension AppModel {
         var candidate = book
         let savedInvoice = session.value
 
-        let issues = EditorValidator.invoiceIssues(for: savedInvoice, in: book)
+        var issues = EditorValidator.invoiceIssues(for: savedInvoice, in: book)
+        for issue in transientInputIssues(for: .invoice)
+        where !issues.contains(where: { $0.field == issue.field }) {
+            issues.append(issue)
+        }
         guard issues.isEmpty else {
             throw EditorCommitError(issues: issues)
         }
@@ -66,6 +72,7 @@ extension AppModel {
         }
         session.markCommitted(committed)
         invoiceDraft = session
+        clearTransientEditorInputIssues(for: .invoice)
         activeDraftRoute = .invoice
         selectedInvoiceID = committed.id
     }
@@ -73,12 +80,14 @@ extension AppModel {
     func cancelInvoiceDraft() {
         guard let session = invoiceDraft else { return }
         invoiceDraft = nil
+        clearTransientEditorInputIssues(for: .invoice)
         clearActiveDraftRoute(.invoice)
         selectedSection = .invoices
         selectedInvoiceID = session.origin == .persisted ? session.baseline.id : nil
     }
 
     func beginNewClient() {
+        clearTransientEditorInputIssues(for: .client)
         let client = Client(name: "New Client")
         clientDraft = DraftSession(origin: .new, baseline: client, value: client)
         activeDraftRoute = .client
@@ -88,6 +97,7 @@ extension AppModel {
 
     func beginEditingClient(id: UUID) {
         guard let client = book.clients.first(where: { $0.id == id }) else { return }
+        clearTransientEditorInputIssues(for: .client)
         clientDraft = DraftSession(origin: .persisted, baseline: client, value: client)
         activeDraftRoute = .client
         selectedSection = .clients
@@ -117,6 +127,7 @@ extension AppModel {
         }
         session.markCommitted(committed)
         clientDraft = session
+        clearTransientEditorInputIssues(for: .client)
         activeDraftRoute = .client
         selectedClientID = committed.id
     }
@@ -124,12 +135,14 @@ extension AppModel {
     func cancelClientDraft() {
         guard let session = clientDraft else { return }
         clientDraft = nil
+        clearTransientEditorInputIssues(for: .client)
         clearActiveDraftRoute(.client)
         selectedSection = .clients
         selectedClientID = session.origin == .persisted ? session.baseline.id : nil
     }
 
     func beginNewProject() {
+        clearTransientEditorInputIssues(for: .project)
         let project = Project(
             clientId: book.clients.first?.id,
             name: "New Project",
@@ -143,6 +156,7 @@ extension AppModel {
 
     func beginEditingProject(id: UUID) {
         guard let project = book.projects.first(where: { $0.id == id }) else { return }
+        clearTransientEditorInputIssues(for: .project)
         projectDraft = DraftSession(origin: .persisted, baseline: project, value: project)
         activeDraftRoute = .project
         selectedSection = .projects
@@ -154,7 +168,11 @@ extension AppModel {
         var candidate = book
         var savedProject = session.value
 
-        let issues = EditorValidator.projectIssues(for: savedProject)
+        var issues = EditorValidator.projectIssues(for: savedProject)
+        for issue in transientInputIssues(for: .project)
+        where !issues.contains(where: { $0.field == issue.field }) {
+            issues.append(issue)
+        }
         guard issues.isEmpty else {
             throw EditorCommitError(issues: issues)
         }
@@ -172,6 +190,7 @@ extension AppModel {
         }
         session.markCommitted(committed)
         projectDraft = session
+        clearTransientEditorInputIssues(for: .project)
         activeDraftRoute = .project
         selectedProjectID = committed.id
     }
@@ -179,12 +198,14 @@ extension AppModel {
     func cancelProjectDraft() {
         guard let session = projectDraft else { return }
         projectDraft = nil
+        clearTransientEditorInputIssues(for: .project)
         clearActiveDraftRoute(.project)
         selectedSection = .projects
         selectedProjectID = session.origin == .persisted ? session.baseline.id : nil
     }
 
     func beginEditingSettings() {
+        clearTransientEditorInputIssues(for: .settings)
         let value = WorkspaceSettingsDraft(
             businessProfile: book.businessProfile,
             paymentAcceptanceDetails: book.paymentAcceptanceDetails
@@ -212,11 +233,13 @@ extension AppModel {
         )
         session.markCommitted(committed)
         settingsDraft = session
+        clearTransientEditorInputIssues(for: .settings)
         activeDraftRoute = .settings
     }
 
     func cancelSettingsDraft() {
         settingsDraft = nil
+        clearTransientEditorInputIssues(for: .settings)
         clearActiveDraftRoute(.settings)
     }
 
@@ -280,12 +303,56 @@ extension AppModel {
         pendingNavigation = nil
         dirtyDraftRequiringDecision = nil
         contextualReturnSection = nil
+        clearAllTransientEditorInputIssues()
         continueNavigation(to: intent)
     }
 
     func cancelPendingNavigation() {
         pendingNavigation = nil
         dirtyDraftRequiringDecision = nil
+    }
+
+    func updateTransientEditorInputValidity(
+        field: EditorField,
+        isValid: Bool,
+        invalidMessage: String
+    ) {
+        if isValid {
+            transientEditorInputIssues.removeValue(forKey: field)
+        } else {
+            transientEditorInputIssues[field] = invalidMessage
+        }
+    }
+
+    func transientEditorInputIssue(for field: EditorField) -> EditorIssue? {
+        guard let message = transientEditorInputIssues[field] else { return nil }
+        return EditorIssue(field: field, message: message)
+    }
+
+    func transientInputIssues(for kind: DraftKind) -> [EditorIssue] {
+        transientEditorInputIssues.compactMap { field, message in
+            guard draftKind(for: field) == kind else { return nil }
+            return EditorIssue(field: field, message: message)
+        }
+        .sorted { String(describing: $0.field) < String(describing: $1.field) }
+    }
+
+    func hasTransientEditorInputIssue(for kind: DraftKind) -> Bool {
+        transientEditorInputIssues.keys.contains { draftKind(for: $0) == kind }
+    }
+
+    func clearTransientEditorInputIssue(for field: EditorField) {
+        transientEditorInputIssues.removeValue(forKey: field)
+    }
+
+    func clearTransientEditorInputIssues(for kind: DraftKind) {
+        transientEditorInputIssues = transientEditorInputIssues.filter {
+            draftKind(for: $0.key) != kind
+        }
+    }
+
+    func clearAllTransientEditorInputIssues() {
+        transientEditorInputIssues.removeAll()
     }
 
     func addInvoice() {
@@ -321,6 +388,7 @@ extension AppModel {
             try applyPersistedCandidate(candidate)
             if invoiceDraft?.value.id == id {
                 invoiceDraft = nil
+                clearTransientEditorInputIssues(for: .invoice)
                 clearActiveDraftRoute(.invoice)
             }
             selectedInvoiceID = book.invoices.first?.id
@@ -344,6 +412,7 @@ extension AppModel {
             try applyPersistedCandidate(candidate)
             if clientDraft?.value.id == id {
                 clientDraft = nil
+                clearTransientEditorInputIssues(for: .client)
                 clearActiveDraftRoute(.client)
             }
             reconcileDeletedClient(id)
@@ -365,6 +434,7 @@ extension AppModel {
             try applyPersistedCandidate(candidate)
             if projectDraft?.value.id == id {
                 projectDraft = nil
+                clearTransientEditorInputIssues(for: .project)
                 clearActiveDraftRoute(.project)
             }
             reconcileDeletedProject(id)
@@ -419,10 +489,10 @@ extension AppModel {
         if let activeDraftKind, isDraftDirty(activeDraftKind) {
             return activeDraftKind
         }
-        if invoiceDraft?.isDirty == true { return .invoice }
-        if clientDraft?.isDirty == true { return .client }
-        if projectDraft?.isDirty == true { return .project }
-        if settingsDraft?.isDirty == true { return .settings }
+        if isDraftDirty(.invoice) { return .invoice }
+        if isDraftDirty(.client) { return .client }
+        if isDraftDirty(.project) { return .project }
+        if isDraftDirty(.settings) { return .settings }
         return nil
     }
 
@@ -486,13 +556,13 @@ extension AppModel {
     private func isDraftDirty(_ kind: DraftKind) -> Bool {
         switch kind {
         case .invoice:
-            return invoiceDraft?.isDirty == true
+            return invoiceDraft?.isDirty == true || hasTransientEditorInputIssue(for: .invoice)
         case .client:
-            return clientDraft?.isDirty == true
+            return clientDraft?.isDirty == true || hasTransientEditorInputIssue(for: .client)
         case .project:
-            return projectDraft?.isDirty == true
+            return projectDraft?.isDirty == true || hasTransientEditorInputIssue(for: .project)
         case .settings:
-            return settingsDraft?.isDirty == true
+            return settingsDraft?.isDirty == true || hasTransientEditorInputIssue(for: .settings)
         }
     }
 
@@ -546,6 +616,26 @@ extension AppModel {
         session.baseline.acceptedPaymentDetailIDs.removeAll { $0 == id }
         session.value.acceptedPaymentDetailIDs.removeAll { $0 == id }
         invoiceDraft = session
+    }
+
+    private func draftKind(for field: EditorField) -> DraftKind {
+        switch field {
+        case .invoiceNumber,
+             .invoiceDueDate,
+             .invoiceCurrency,
+             .automaticGenerationInterval,
+             .lineItemTitle(_),
+             .lineItemQuantity(_),
+             .lineItemUnitPrice(_),
+             .lineItemTaxRate(_):
+            return .invoice
+        case .clientName:
+            return .client
+        case .projectName, .projectHourlyRate:
+            return .project
+        case .businessCurrency, .paymentTermsDays, .paymentDetailLabel(_):
+            return .settings
+        }
     }
 
     private func defaultPaymentAcceptanceLabel(for kind: PaymentAcceptanceKind) -> String {

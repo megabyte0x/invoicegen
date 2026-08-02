@@ -7,9 +7,8 @@ struct InvoiceEditorView: View {
     @State private var isConfirmingDelete = false
     @State private var lineItemIDPendingDeletion: UUID?
     @State private var autoGenerationIntervalDraft: String?
-    @State private var autoGenerationIntervalDraftIsValid = true
     @State private var touchedFields: Set<EditorField> = []
-    @State private var invalidNumericFields: Set<EditorField> = []
+    @State private var numericInputResetGeneration = 0
     @State private var requestedPresentation: InvoiceEditorPresentation = .edit
     @FocusState private var focusedField: EditorField?
 
@@ -464,9 +463,10 @@ struct InvoiceEditorView: View {
                         ),
                         isTotalPaused: lineItemHasInvalidAmount(item.wrappedValue)
                             || numericFields(for: itemID).contains {
-                                invalidNumericFields.contains($0)
+                                model.transientEditorInputIssue(for: $0) != nil
                             },
                         availableWidth: availableWidth,
+                        numericInputResetGeneration: numericInputResetGeneration,
                         focusedField: $focusedField,
                         touched: { touchedFields.insert($0) },
                         numericValidityChanged: updateNumericValidity
@@ -680,7 +680,18 @@ struct InvoiceEditorView: View {
     }
 
     private var hasInvalidNumericDraft: Bool {
-        !invalidNumericFields.isEmpty
+        model.transientInputIssues(for: .invoice).contains {
+            switch $0.field {
+            case .lineItemQuantity(_), .lineItemUnitPrice(_), .lineItemTaxRate(_):
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    private var autoGenerationIntervalDraftIsValid: Bool {
+        model.transientEditorInputIssue(for: .automaticGenerationInterval) == nil
     }
 
     private var hasInvalidLineItemValues: Bool {
@@ -797,6 +808,10 @@ struct InvoiceEditorView: View {
                     )
                 }
                 value.autoGeneration.isEnabled = isEnabled
+                if !isEnabled {
+                    autoGenerationIntervalDraft = nil
+                    model.clearTransientEditorInputIssue(for: .automaticGenerationInterval)
+                }
                 invoice.wrappedValue = value
             }
         )
@@ -813,11 +828,19 @@ struct InvoiceEditorView: View {
             set: { newValue in
                 autoGenerationIntervalDraft = newValue
                 guard let intervalDays = InvoiceAutoGenerationIntervalInput.intervalDays(from: newValue) else {
-                    autoGenerationIntervalDraftIsValid = false
+                    model.updateTransientEditorInputValidity(
+                        field: .automaticGenerationInterval,
+                        isValid: false,
+                        invalidMessage: "Automatic generation interval must be between 1 and 3650 days."
+                    )
                     return
                 }
 
-                autoGenerationIntervalDraftIsValid = true
+                model.updateTransientEditorInputValidity(
+                    field: .automaticGenerationInterval,
+                    isValid: true,
+                    invalidMessage: "Automatic generation interval must be between 1 and 3650 days."
+                )
                 var value = invoice.wrappedValue
                 value.autoGeneration.intervalDays = intervalDays
                 if value.autoGeneration.isEnabled {
@@ -851,11 +874,22 @@ struct InvoiceEditorView: View {
     }
 
     private func updateNumericValidity(field: EditorField, isValid: Bool) {
-        if isValid {
-            invalidNumericFields.remove(field)
-        } else {
-            invalidNumericFields.insert(field)
+        let message: String
+        switch field {
+        case .lineItemQuantity(_):
+            message = "Enter a valid line item quantity."
+        case .lineItemUnitPrice(_):
+            message = "Enter a valid line item unit price."
+        case .lineItemTaxRate(_):
+            message = "Enter a valid line item tax rate."
+        default:
+            return
         }
+        model.updateTransientEditorInputValidity(
+            field: field,
+            isValid: isValid,
+            invalidMessage: message
+        )
     }
 
     private func numericDraftIssues(invoice: Invoice) -> [EditorIssue] {
@@ -866,7 +900,8 @@ struct InvoiceEditorView: View {
                 (.lineItemUnitPrice(item.id), "Enter a valid line item unit price."),
                 (.lineItemTaxRate(item.id), "Enter a valid line item tax rate.")
             ]
-            for (field, message) in messages where invalidNumericFields.contains(field) {
+            for (field, message) in messages
+            where model.transientEditorInputIssue(for: field) != nil {
                 issues.append(EditorIssue(field: field, message: message))
             }
         }
@@ -881,7 +916,7 @@ struct InvoiceEditorView: View {
             .first(where: { $0.field == field }) {
             return issue.message
         }
-        if wasSubmitted, invalidNumericFields.contains(field) {
+        if wasSubmitted, model.transientEditorInputIssue(for: field) != nil {
             return numericDraftIssues(invoice: invoice).first(where: { $0.field == field })?.message
         }
         return nil
@@ -923,7 +958,9 @@ struct InvoiceEditorView: View {
             .lineItemTaxRate(id)
         ]
         touchedFields.subtract(Set(fields))
-        invalidNumericFields.subtract(Set(fields))
+        for field in fields {
+            model.clearTransientEditorInputIssue(for: field)
+        }
     }
 
     private func lineItemID(from field: EditorField?) -> UUID? {
@@ -957,9 +994,8 @@ struct InvoiceEditorView: View {
 
     private func resetEditorState() {
         autoGenerationIntervalDraft = nil
-        autoGenerationIntervalDraftIsValid = true
         touchedFields.removeAll()
-        invalidNumericFields.removeAll()
+        numericInputResetGeneration += 1
         focusedField = nil
     }
 
@@ -1043,6 +1079,7 @@ struct LineItemEditor: View {
     var taxRateIssue: String?
     var isTotalPaused: Bool
     var availableWidth: CGFloat
+    var numericInputResetGeneration: Int
     var focusedField: FocusState<EditorField?>.Binding
     var touched: (EditorField) -> Void
     var numericValidityChanged: (EditorField, Bool) -> Void
@@ -1080,7 +1117,10 @@ struct LineItemEditor: View {
             RuneyDecimalTextField(
                 value: $item.quantity,
                 width: 60,
-                resetID: item.id,
+                resetID: NumericEditorResetID(
+                    entityID: item.id,
+                    generation: numericInputResetGeneration
+                ),
                 onValidityChanged: {
                     numericValidityChanged(.lineItemQuantity(item.id), $0)
                 },
@@ -1099,7 +1139,10 @@ struct LineItemEditor: View {
             RuneyMoneyTextField(
                 minorUnits: $item.unitPriceMinorUnits,
                 width: 84,
-                resetID: item.id,
+                resetID: NumericEditorResetID(
+                    entityID: item.id,
+                    generation: numericInputResetGeneration
+                ),
                 onValidityChanged: {
                     numericValidityChanged(.lineItemUnitPrice(item.id), $0)
                 },
@@ -1118,7 +1161,10 @@ struct LineItemEditor: View {
             RuneyDecimalTextField(
                 value: $item.taxRatePercent,
                 width: 56,
-                resetID: item.id,
+                resetID: NumericEditorResetID(
+                    entityID: item.id,
+                    generation: numericInputResetGeneration
+                ),
                 onValidityChanged: {
                     numericValidityChanged(.lineItemTaxRate(item.id), $0)
                 },
