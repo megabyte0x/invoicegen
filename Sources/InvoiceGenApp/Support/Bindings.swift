@@ -302,11 +302,14 @@ private struct RuneyNumericDraftTextField: NSViewRepresentable {
             doCommandBy commandSelector: Selector
         ) -> Bool {
             if commandSelector == #selector(NSResponder.insertTab(_:)) {
-                control.window?.selectNextKeyView(nil)
+                // The first responder is the shared field editor, not this
+                // NSTextField. Advance from the control explicitly so Tab
+                // cannot select the same numeric field again.
+                control.window?.selectKeyView(following: control)
                 return true
             }
             if commandSelector == #selector(NSResponder.insertBacktab(_:)) {
-                control.window?.selectPreviousKeyView(nil)
+                control.window?.selectKeyView(preceding: control)
                 return true
             }
             return false
