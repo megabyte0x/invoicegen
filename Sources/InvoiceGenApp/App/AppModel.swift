@@ -42,6 +42,7 @@ final class AppModel: ObservableObject {
     @Published var clientDraft: DraftSession<Client>?
     @Published var projectDraft: DraftSession<Project>?
     @Published var settingsDraft: DraftSession<WorkspaceSettingsDraft>?
+    @Published var activeDraftRoute: DraftKind?
     @Published var pendingNavigation: NavigationIntent?
     @Published var dirtyDraftRequiringDecision: DraftKind?
     @Published var contextualReturnSection: AppSection?

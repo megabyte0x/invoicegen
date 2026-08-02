@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import InvoiceCore
 
@@ -30,6 +31,7 @@ extension AppModel {
             terms: "Net \(dueDays)."
         )
         invoiceDraft = DraftSession(origin: .new, baseline: invoice, value: invoice)
+        activeDraftRoute = .invoice
         selectedSection = .invoices
         selectedInvoiceID = nil
     }
@@ -37,6 +39,7 @@ extension AppModel {
     func beginEditingInvoice(id: UUID) {
         guard let invoice = book.invoices.first(where: { $0.id == id }) else { return }
         invoiceDraft = DraftSession(origin: .persisted, baseline: invoice, value: invoice)
+        activeDraftRoute = .invoice
         selectedSection = .invoices
         selectedInvoiceID = id
     }
@@ -58,12 +61,14 @@ extension AppModel {
         }
         session.markCommitted(committed)
         invoiceDraft = session
+        activeDraftRoute = .invoice
         selectedInvoiceID = committed.id
     }
 
     func cancelInvoiceDraft() {
         guard let session = invoiceDraft else { return }
         invoiceDraft = nil
+        clearActiveDraftRoute(.invoice)
         selectedSection = .invoices
         selectedInvoiceID = session.origin == .persisted ? session.baseline.id : nil
     }
@@ -71,6 +76,7 @@ extension AppModel {
     func beginNewClient() {
         let client = Client(name: "New Client")
         clientDraft = DraftSession(origin: .new, baseline: client, value: client)
+        activeDraftRoute = .client
         selectedSection = .clients
         selectedClientID = nil
     }
@@ -78,6 +84,7 @@ extension AppModel {
     func beginEditingClient(id: UUID) {
         guard let client = book.clients.first(where: { $0.id == id }) else { return }
         clientDraft = DraftSession(origin: .persisted, baseline: client, value: client)
+        activeDraftRoute = .client
         selectedSection = .clients
         selectedClientID = id
     }
@@ -85,7 +92,8 @@ extension AppModel {
     func commitClientDraft(now: Date = Date()) throws {
         guard var session = clientDraft else { return }
         var candidate = book
-        let savedClient = session.value
+        var savedClient = session.value
+        savedClient.updatedAt = now
 
         if let index = candidate.clients.firstIndex(where: { $0.id == savedClient.id }) {
             candidate.clients[index] = savedClient
@@ -99,12 +107,14 @@ extension AppModel {
         }
         session.markCommitted(committed)
         clientDraft = session
+        activeDraftRoute = .client
         selectedClientID = committed.id
     }
 
     func cancelClientDraft() {
         guard let session = clientDraft else { return }
         clientDraft = nil
+        clearActiveDraftRoute(.client)
         selectedSection = .clients
         selectedClientID = session.origin == .persisted ? session.baseline.id : nil
     }
@@ -116,6 +126,7 @@ extension AppModel {
             currencyCode: book.businessProfile.currencyCode
         )
         projectDraft = DraftSession(origin: .new, baseline: project, value: project)
+        activeDraftRoute = .project
         selectedSection = .projects
         selectedProjectID = nil
     }
@@ -123,6 +134,7 @@ extension AppModel {
     func beginEditingProject(id: UUID) {
         guard let project = book.projects.first(where: { $0.id == id }) else { return }
         projectDraft = DraftSession(origin: .persisted, baseline: project, value: project)
+        activeDraftRoute = .project
         selectedSection = .projects
         selectedProjectID = id
     }
@@ -130,7 +142,8 @@ extension AppModel {
     func commitProjectDraft(now: Date = Date()) throws {
         guard var session = projectDraft else { return }
         var candidate = book
-        let savedProject = session.value
+        var savedProject = session.value
+        savedProject.updatedAt = now
 
         if let index = candidate.projects.firstIndex(where: { $0.id == savedProject.id }) {
             candidate.projects[index] = savedProject
@@ -144,12 +157,14 @@ extension AppModel {
         }
         session.markCommitted(committed)
         projectDraft = session
+        activeDraftRoute = .project
         selectedProjectID = committed.id
     }
 
     func cancelProjectDraft() {
         guard let session = projectDraft else { return }
         projectDraft = nil
+        clearActiveDraftRoute(.project)
         selectedSection = .projects
         selectedProjectID = session.origin == .persisted ? session.baseline.id : nil
     }
@@ -160,6 +175,7 @@ extension AppModel {
             paymentAcceptanceDetails: book.paymentAcceptanceDetails
         )
         settingsDraft = DraftSession(origin: .persisted, baseline: value, value: value)
+        activeDraftRoute = .settings
     }
 
     func commitSettingsDraft(now: Date = Date()) throws {
@@ -176,10 +192,12 @@ extension AppModel {
         )
         session.markCommitted(committed)
         settingsDraft = session
+        activeDraftRoute = .settings
     }
 
     func cancelSettingsDraft() {
         settingsDraft = nil
+        clearActiveDraftRoute(.settings)
     }
 
     func commitActiveDraft(now: Date = Date()) throws {
@@ -238,6 +256,7 @@ extension AppModel {
         clientDraft = nil
         projectDraft = nil
         settingsDraft = nil
+        activeDraftRoute = nil
         pendingNavigation = nil
         dirtyDraftRequiringDecision = nil
         contextualReturnSection = nil
@@ -280,6 +299,10 @@ extension AppModel {
 
         do {
             try applyPersistedCandidate(candidate)
+            if invoiceDraft?.value.id == id {
+                invoiceDraft = nil
+                clearActiveDraftRoute(.invoice)
+            }
             selectedInvoiceID = book.invoices.first?.id
         } catch {
             errorMessage = error.localizedDescription
@@ -299,6 +322,10 @@ extension AppModel {
 
         do {
             try applyPersistedCandidate(candidate)
+            if clientDraft?.value.id == id {
+                clientDraft = nil
+                clearActiveDraftRoute(.client)
+            }
             selectedClientID = book.clients.first?.id
         } catch {
             errorMessage = error.localizedDescription
@@ -315,6 +342,10 @@ extension AppModel {
 
         do {
             try applyPersistedCandidate(candidate)
+            if projectDraft?.value.id == id {
+                projectDraft = nil
+                clearActiveDraftRoute(.project)
+            }
             selectedProjectID = book.projects.first?.id
         } catch {
             errorMessage = error.localizedDescription
@@ -330,12 +361,21 @@ extension AppModel {
 
         do {
             try applyPersistedCandidate(candidate)
+            if var session = settingsDraft {
+                session.baseline.paymentAcceptanceDetails.removeAll { $0.id == id }
+                session.value.paymentAcceptanceDetails.removeAll { $0.id == id }
+                settingsDraft = session
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     private var activeDraftKind: DraftKind? {
+        if let activeDraftRoute, draftExists(for: activeDraftRoute) {
+            return activeDraftRoute
+        }
+
         switch selectedSection {
         case .invoices where invoiceDraft != nil:
             return .invoice
@@ -353,6 +393,9 @@ extension AppModel {
     }
 
     private var activeDirtyDraftKind: DraftKind? {
+        if let activeDraftKind, isDraftDirty(activeDraftKind) {
+            return activeDraftKind
+        }
         if invoiceDraft?.isDirty == true { return .invoice }
         if clientDraft?.isDirty == true { return .client }
         if projectDraft?.isDirty == true { return .project }
@@ -400,7 +443,45 @@ extension AppModel {
             selectedSection = .projects
             selectedProjectID = id
         case .closeWindow:
-            break
+            NSApp.keyWindow?.performClose(nil)
+        }
+    }
+
+    private func draftExists(for kind: DraftKind) -> Bool {
+        switch kind {
+        case .invoice:
+            return invoiceDraft != nil
+        case .client:
+            return clientDraft != nil
+        case .project:
+            return projectDraft != nil
+        case .settings:
+            return settingsDraft != nil
+        }
+    }
+
+    private func isDraftDirty(_ kind: DraftKind) -> Bool {
+        switch kind {
+        case .invoice:
+            return invoiceDraft?.isDirty == true
+        case .client:
+            return clientDraft?.isDirty == true
+        case .project:
+            return projectDraft?.isDirty == true
+        case .settings:
+            return settingsDraft?.isDirty == true
+        }
+    }
+
+    private func clearActiveDraftRoute(_ kind: DraftKind) {
+        guard activeDraftRoute == kind else { return }
+
+        if kind == .settings,
+           contextualReturnSection == .invoices,
+           invoiceDraft != nil {
+            activeDraftRoute = .invoice
+        } else {
+            activeDraftRoute = nil
         }
     }
 
