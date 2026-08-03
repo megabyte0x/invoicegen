@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@11.5.1",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "node script/render_site_shell.mjs && vite --host 127.0.0.1",
     "build": "pnpm build:site",
     "build:site": "node script/build_site.mjs",
     "preview": "vite preview --host 127.0.0.1",

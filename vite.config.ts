@@ -75,7 +75,9 @@ function invoicegenHtmlPlaceholders(): Plugin {
   return {
     name: 'invoicegen-html-placeholders',
     transformIndexHtml(html) {
+      const homepageShell = readFileSync(resolve(root, '.site-shell/homepage.html'), 'utf8');
       return html
+        .replace('<!--INVOICEGEN_APP_SHELL-->', homepageShell)
         .replaceAll('__INVOICEGEN_VERSION__', version)
         .replaceAll('__INVOICEGEN_DATE_MODIFIED__', dateModified);
     },

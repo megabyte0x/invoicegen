@@ -1,6 +1,7 @@
 .build/
 .worktrees/
 .swiftpm/
+.site-shell/
 node_modules/
 .pnpm-store/
 target/

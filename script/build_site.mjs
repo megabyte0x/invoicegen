@@ -14,12 +14,22 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = resolve(root, "dist/site");
 const skill = resolve(root, "SKILL.md");
+const shellRenderer = resolve(root, "script/render_site_shell.mjs");
 const viteBin = resolve(root, "node_modules/vite/bin/vite.js");
 const dateModified = new Date().toISOString().slice(0, 10);
 const version = readReleaseVersion();
 
 if (!existsSync(viteBin)) {
   throw new Error("Vite is not installed. Run `pnpm install` before building the site.");
+}
+
+const shellRender = spawnSync(process.execPath, [shellRenderer], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (shellRender.status !== 0) {
+  process.exit(shellRender.status ?? 1);
 }
 
 const viteBuild = spawnSync(process.execPath, [viteBin, "build"], {
