@@ -34,6 +34,29 @@ enum DraftKind: String, Equatable {
     case settings
 }
 
+extension DraftKind {
+    var displayName: String {
+        switch self {
+        case .invoice: "invoice"
+        case .client: "client"
+        case .project: "project"
+        case .settings: "business and payment"
+        }
+    }
+}
+
+enum StoreReplacementRequest: Equatable {
+    case sampleData
+    case backup(URL)
+
+    var actionTitle: String {
+        switch self {
+        case .sampleData: "Seed Sample Data"
+        case .backup: "Restore Backup"
+        }
+    }
+}
+
 enum NavigationIntent: Equatable {
     case section(AppSection)
     case invoice(UUID)

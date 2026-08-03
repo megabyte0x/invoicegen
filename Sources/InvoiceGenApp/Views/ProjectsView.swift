@@ -66,11 +66,13 @@ struct ProjectsView: View {
             }
             activateSelectedProjectIfNeeded()
         }
-        .onChange(of: model.selectedProjectID) { _, _ in
-            if model.selectedProjectID != nil {
+        .onChange(of: model.selectedProjectID) { _, id in
+            if id != nil {
                 isPresentingDetail = true
+                activateSelectedProjectIfNeeded()
+            } else if model.projectDraft == nil {
+                isPresentingDetail = false
             }
-            activateSelectedProjectIfNeeded()
         }
         .onChange(of: model.projectDraft?.value.id) { _, id in
             if id != nil {

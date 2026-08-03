@@ -351,6 +351,10 @@ extension AppModel {
         transientEditorInputIssues.removeAll()
     }
 
+    var dirtyDraftKinds: [DraftKind] {
+        [DraftKind.invoice, .client, .project, .settings].filter { isDraftDirty($0) }
+    }
+
     func addInvoice() {
         beginNewInvoice()
     }

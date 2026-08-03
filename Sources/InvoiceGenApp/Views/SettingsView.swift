@@ -4,8 +4,6 @@ import AppKit
 
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var isConfirmingSeedSampleData = false
-    @State private var restoreURLPendingConfirmation: URL?
     @State private var paymentDetailIDPendingDeletion: UUID?
     @State private var touchedFields: Set<EditorField> = []
     @FocusState private var focusedField: EditorField?
@@ -20,6 +18,9 @@ struct SettingsView: View {
             }
         }
         .onAppear(perform: activateSettingsDraft)
+        .onChange(of: model.book) { _, _ in
+            activateSettingsDraftAfterBookReplacement()
+        }
         .onChange(of: focusedField) { oldValue, _ in
             if let oldValue {
                 touchedFields.insert(oldValue)
@@ -29,31 +30,15 @@ struct SettingsView: View {
             guard let field, isSettingsField(field) else { return }
             focusedField = field
         }
-        .alert("Replace local data with sample data?", isPresented: $isConfirmingSeedSampleData) {
-            Button("Seed Sample Data", role: .destructive) {
-                model.seedSampleData()
-                model.beginEditingSettings()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This replaces the current local invoice store with sample clients, projects, invoices, and payment details.")
-        }
-        .alert("Restore local data from backup?", isPresented: Binding(
-            get: { restoreURLPendingConfirmation != nil },
-            set: { if !$0 { restoreURLPendingConfirmation = nil } }
-        )) {
-            Button("Restore Backup", role: .destructive) {
-                if let url = restoreURLPendingConfirmation {
-                    model.restoreStore(from: url)
-                    model.beginEditingSettings()
-                }
-                restoreURLPendingConfirmation = nil
+        .alert("Replace local data?", isPresented: replacementConfirmationPresented) {
+            Button(model.pendingStoreReplacement?.actionTitle ?? "Replace Local Data", role: .destructive) {
+                model.confirmStoreReplacement()
             }
             Button("Cancel", role: .cancel) {
-                restoreURLPendingConfirmation = nil
+                model.cancelStoreReplacement()
             }
         } message: {
-            Text("This replaces the current local invoice store with the selected backup file.")
+            Text(replacementWarning)
         }
         .alert("Delete payment details?", isPresented: Binding(
             get: { paymentDetailIDPendingDeletion != nil },
@@ -355,7 +340,7 @@ struct SettingsView: View {
         .buttonStyle(RuneyButtonStyle())
 
         Button {
-            isConfirmingSeedSampleData = true
+            model.requestStoreReplacement(.sampleData)
         } label: {
             Label("Seed Sample Data", systemImage: "doc.text.fill.badge.plus")
         }
@@ -406,6 +391,33 @@ struct SettingsView: View {
         if model.settingsDraft == nil {
             model.beginEditingSettings()
         }
+    }
+
+    private func activateSettingsDraftAfterBookReplacement() {
+        guard model.settingsDraft == nil else { return }
+        paymentDetailIDPendingDeletion = nil
+        touchedFields.removeAll()
+        focusedField = nil
+        model.beginEditingSettings()
+    }
+
+    private var replacementConfirmationPresented: Binding<Bool> {
+        Binding(
+            get: { model.pendingStoreReplacement != nil },
+            set: { isPresented in
+                if !isPresented {
+                    model.cancelStoreReplacement()
+                }
+            }
+        )
+    }
+
+    private var replacementWarning: String {
+        let dirty = model.dirtyDraftKinds.map(\.displayName)
+        let suffix = dirty.isEmpty
+            ? ""
+            : " Unsaved \(ListFormatter.localizedString(byJoining: dirty)) changes will be discarded."
+        return "This replaces the complete local invoice store.\(suffix)"
     }
 
     private func saveSettings() {
@@ -488,7 +500,7 @@ struct SettingsView: View {
         panel.canChooseDirectories = false
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            restoreURLPendingConfirmation = url
+            model.requestStoreReplacement(.backup(url))
         }
     }
 

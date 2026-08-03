@@ -110,13 +110,15 @@ public final class LocalInvoiceStore {
         }
     }
 
-    public func restoreStore(from sourceURL: URL) throws {
+    @discardableResult
+    public func restoreStore(from sourceURL: URL) throws -> InvoiceBook {
         let data = try Data(contentsOf: sourceURL)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        var book = try decoder.decode(InvoiceBook.self, from: data)
-        book.schemaVersion = InvoiceBook.currentSchemaVersion
-        try save(book)
+        var restored = try decoder.decode(InvoiceBook.self, from: data)
+        restored.schemaVersion = InvoiceBook.currentSchemaVersion
+        try save(restored)
+        return restored
     }
 
     public func update<T>(_ transform: (inout InvoiceBook) throws -> T) throws -> T {

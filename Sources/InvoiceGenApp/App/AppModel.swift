@@ -49,6 +49,7 @@ final class AppModel: ObservableObject {
     @Published var pendingNavigation: NavigationIntent?
     @Published var dirtyDraftRequiringDecision: DraftKind?
     @Published var draftCommandTargetPendingCancellation: DraftCommandTarget?
+    @Published var pendingStoreReplacement: StoreReplacementRequest?
     @Published var contextualReturnSection: AppSection?
     @Published var editorIssues: [EditorIssue] = []
     @Published var focusedEditorField: EditorField?
@@ -125,16 +126,29 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func restoreStore(from sourceURL: URL) {
+    func requestStoreReplacement(_ request: StoreReplacementRequest) {
+        pendingStoreReplacement = request
+    }
+
+    func cancelStoreReplacement() {
+        pendingStoreReplacement = nil
+    }
+
+    func confirmStoreReplacement() {
+        guard let request = pendingStoreReplacement else { return }
         do {
-            try store.restoreStore(from: sourceURL)
-            book = try store.load()
-            loadedStoreSuccessfully = true
-            selectedInvoiceID = book.invoices.first?.id
-            selectedClientID = book.clients.first?.id
-            selectedProjectID = book.projects.first?.id
-            errorMessage = "Restored local store from \(sourceURL.path)"
-            scheduleAutomaticGenerationCheck()
+            let replacement: InvoiceBook
+            let message: String
+            switch request {
+            case .sampleData:
+                replacement = .sample()
+                try store.save(replacement)
+                message = "Replaced the local store with sample data."
+            case let .backup(url):
+                replacement = try store.restoreStore(from: url)
+                message = "Restored local store from \(url.path)"
+            }
+            applySuccessfulStoreReplacement(replacement, message: message)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -159,21 +173,6 @@ final class AppModel: ObservableObject {
             loadedStoreSuccessfully = true
             errorMessage = nil
             scheduleAutomaticGenerationCheck(now: now)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func seedSampleData() {
-        let candidate = InvoiceBook.sample()
-        do {
-            try store.save(candidate)
-            book = candidate
-            loadedStoreSuccessfully = true
-            errorMessage = nil
-            selectedSection = .dashboard
-            selectedInvoiceID = candidate.invoices.first?.id
-            scheduleAutomaticGenerationCheck()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -227,6 +226,31 @@ final class AppModel: ObservableObject {
         automaticGenerationCheckTask?.cancel()
         automaticGenerationCheckTask = nil
         automaticGenerationCheckScheduledFor = nil
+    }
+
+    private func applySuccessfulStoreReplacement(_ replacement: InvoiceBook, message: String) {
+        book = replacement
+        invoiceDraft = nil
+        clientDraft = nil
+        projectDraft = nil
+        settingsDraft = nil
+        selectedInvoiceID = nil
+        selectedClientID = nil
+        selectedProjectID = nil
+        activeDraftRoute = nil
+        pendingNavigation = nil
+        dirtyDraftRequiringDecision = nil
+        contextualReturnSection = nil
+        clearEditorIssues()
+        clearAllTransientEditorInputIssues()
+        searchText = ""
+        draftCommandTargetPendingCancellation = nil
+        pendingStoreReplacement = nil
+        clearScheduledAutomaticGenerationCheck()
+        selectedSection = .dashboard
+        loadedStoreSuccessfully = true
+        scheduleAutomaticGenerationCheck()
+        errorMessage = message
     }
 
     private func nextAutomaticGenerationDate() -> Date? {

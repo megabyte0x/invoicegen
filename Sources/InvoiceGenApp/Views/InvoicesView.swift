@@ -36,11 +36,13 @@ struct InvoicesView: View {
             }
             activateSelectedInvoiceIfNeeded()
         }
-        .onChange(of: model.selectedInvoiceID) { _, _ in
-            if model.selectedInvoiceID != nil {
+        .onChange(of: model.selectedInvoiceID) { _, id in
+            if id != nil {
                 isPresentingDetail = true
+                activateSelectedInvoiceIfNeeded()
+            } else if model.invoiceDraft == nil {
+                isPresentingDetail = false
             }
-            activateSelectedInvoiceIfNeeded()
         }
         .onChange(of: model.invoiceDraft?.value.id) { oldID, id in
             if let id, id != oldID {

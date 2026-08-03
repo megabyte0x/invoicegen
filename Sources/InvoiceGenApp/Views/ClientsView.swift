@@ -74,11 +74,13 @@ struct ClientsView: View {
             }
             activateSelectedClientIfNeeded()
         }
-        .onChange(of: model.selectedClientID) { _, _ in
-            if model.selectedClientID != nil {
+        .onChange(of: model.selectedClientID) { _, id in
+            if id != nil {
                 isPresentingDetail = true
+                activateSelectedClientIfNeeded()
+            } else if model.clientDraft == nil {
+                isPresentingDetail = false
             }
-            activateSelectedClientIfNeeded()
         }
         .onChange(of: model.clientDraft?.value.id) { _, id in
             if id != nil {
