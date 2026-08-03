@@ -283,14 +283,27 @@ struct SettingsView: View {
                     }
             }
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    storageActionButtons
+            VStack(alignment: .leading, spacing: 10) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        storageMaintenanceActionButtons
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        storageMaintenanceActionButtons
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    storageActionButtons
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        storageLocationActionButtons
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        storageLocationActionButtons
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
             .padding(.top, 4)
@@ -316,7 +329,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var storageActionButtons: some View {
+    private var storageMaintenanceActionButtons: some View {
         Button {
             model.reload()
             model.beginEditingSettings()
@@ -342,6 +355,16 @@ struct SettingsView: View {
         .buttonStyle(RuneyButtonStyle())
 
         Button {
+            isConfirmingSeedSampleData = true
+        } label: {
+            Label("Seed Sample Data", systemImage: "doc.text.fill.badge.plus")
+        }
+        .buttonStyle(RuneyButtonStyle(variant: .prominent))
+    }
+
+    @ViewBuilder
+    private var storageLocationActionButtons: some View {
+        Button {
             NSWorkspace.shared.activateFileViewerSelecting([model.store.url])
         } label: {
             Label("Open Store Folder", systemImage: "folder")
@@ -356,13 +379,6 @@ struct SettingsView: View {
             Label("Copy Store Path", systemImage: "doc.on.doc")
         }
         .buttonStyle(RuneyButtonStyle())
-
-        Button {
-            isConfirmingSeedSampleData = true
-        } label: {
-            Label("Seed Sample Data", systemImage: "doc.text.fill.badge.plus")
-        }
-        .buttonStyle(RuneyButtonStyle(variant: .prominent))
     }
 
     private func settingsBinding(fallback: WorkspaceSettingsDraft) -> Binding<WorkspaceSettingsDraft> {
