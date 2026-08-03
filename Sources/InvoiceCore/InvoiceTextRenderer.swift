@@ -36,8 +36,9 @@ public enum InvoiceTextRenderer {
             if !item.details.isEmpty {
                 lines.append("  \(item.details)")
             }
-            if !item.taxCode.isEmpty {
-                lines.append("  Code: \(item.taxCode)")
+            let taxCode = item.taxCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !taxCode.isEmpty {
+                lines.append("  Code: \(taxCode)")
             }
             lines.append("  Qty \(trimmedQuantity(item.quantity)) x \(price)  Tax \(trimmedQuantity(item.taxRatePercent))%  \(total)")
         }

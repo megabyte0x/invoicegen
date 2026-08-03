@@ -17,7 +17,7 @@ struct InvoiceDocumentPage: Identifiable, Equatable {
 enum InvoiceDocumentBlock: Equatable {
     case identity(InvoiceIdentityFragment)
     case billing(InvoiceBillingFragment)
-    case lineItemHeader
+    case lineItemHeader(showsTaxCodeColumn: Bool)
     case lineItem(InvoiceLineItemFragment)
     case titledText(InvoiceTitledTextFragment)
     case payment(InvoicePaymentFragment)
@@ -76,6 +76,7 @@ struct InvoiceLineItemFragment: Equatable {
     var itemID: UUID
     var descriptionLines: [InvoiceDocumentTextLine]
     var taxCodeLines: [InvoiceDocumentTextLine]
+    var showsTaxCodeColumn: Bool
     var quantity: String
     var unitPrice: String
     var tax: String
@@ -188,14 +189,16 @@ enum InvoiceDocumentMetrics {
     static let unitPriceWidth: CGFloat = 82
     static let taxWidth: CGFloat = 42
     static let totalWidth: CGFloat = 90
-    static let itemDescriptionWidth = bodyWidth
-        - (tableHorizontalPadding * 2)
-        - (tableColumnSpacing * 5)
-        - taxCodeWidth
-        - quantityWidth
-        - unitPriceWidth
-        - taxWidth
-        - totalWidth
+    static func itemDescriptionWidth(showsTaxCodeColumn: Bool) -> CGFloat {
+        bodyWidth
+            - (tableHorizontalPadding * 2)
+            - (tableColumnSpacing * (showsTaxCodeColumn ? 5 : 4))
+            - (showsTaxCodeColumn ? taxCodeWidth : 0)
+            - quantityWidth
+            - unitPriceWidth
+            - taxWidth
+            - totalWidth
+    }
 
     static let dividerHeight: CGFloat = 1
     static let fragmentSpacing: CGFloat = 8
@@ -258,15 +261,23 @@ enum InvoiceTextWrapper {
 enum InvoiceDocumentPaginator {
     static func paginate(invoice: Invoice, book: InvoiceBook) -> InvoiceDocument {
         var pages = [WorkingPage()]
+        let showsTaxCodeColumn = invoice.lineItems.contains { item in
+            !item.taxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
 
         appendIdentity(invoice: invoice, book: book, to: &pages)
         appendBilling(invoice: invoice, book: book, to: &pages)
 
         if invoice.lineItems.isEmpty {
-            appendFixed(.lineItemHeader, to: &pages)
+            appendFixed(.lineItemHeader(showsTaxCodeColumn: false), to: &pages)
         } else {
             for item in invoice.lineItems {
-                appendLineItem(item, currencyCode: invoice.currencyCode, to: &pages)
+                appendLineItem(
+                    item,
+                    currencyCode: invoice.currencyCode,
+                    showsTaxCodeColumn: showsTaxCodeColumn,
+                    to: &pages
+                )
             }
         }
 
@@ -424,17 +435,21 @@ enum InvoiceDocumentPaginator {
     private static func appendLineItem(
         _ item: InvoiceLineItem,
         currencyCode: String,
+        showsTaxCodeColumn: Bool,
         to pages: inout [WorkingPage]
     ) {
+        let descriptionWidth = InvoiceDocumentMetrics.itemDescriptionWidth(
+            showsTaxCodeColumn: showsTaxCodeColumn
+        )
         var lines = wrapped(
             item.title,
             style: .itemTitle,
-            width: InvoiceDocumentMetrics.itemDescriptionWidth
+            width: descriptionWidth
         )
         lines += wrapped(
             item.details,
             style: .itemDetail,
-            width: InvoiceDocumentMetrics.itemDescriptionWidth,
+            width: descriptionWidth,
             spacingBefore: lines.isEmpty ? 0 : 2
         )
         if lines.isEmpty {
@@ -452,7 +467,7 @@ enum InvoiceDocumentPaginator {
             currencyCode: currencyCode
         )
         let taxCodeLines = wrapped(
-            item.taxCode,
+            item.taxCode.trimmingCharacters(in: .whitespacesAndNewlines),
             style: .itemCode,
             width: InvoiceDocumentMetrics.taxCodeWidth
         )
@@ -465,6 +480,7 @@ enum InvoiceDocumentPaginator {
                 itemID: item.id,
                 descriptionLines: descriptionLines,
                 taxCodeLines: taxCodeLines,
+                showsTaxCodeColumn: showsTaxCodeColumn,
                 quantity: quantity,
                 unitPrice: unitPrice,
                 tax: tax,
@@ -498,7 +514,10 @@ enum InvoiceDocumentPaginator {
                 continue
             }
 
-            ensureLineItemHeader(to: &pages)
+            ensureLineItemHeader(
+                showsTaxCodeColumn: showsTaxCodeColumn,
+                to: &pages
+            )
 
             if finalBlock.measuredHeight <= availableHeight(in: pages) {
                 append(finalBlock, to: &pages)
@@ -695,7 +714,10 @@ enum InvoiceDocumentPaginator {
         append(block, to: &pages)
     }
 
-    private static func ensureLineItemHeader(to pages: inout [WorkingPage]) {
+    private static func ensureLineItemHeader(
+        showsTaxCodeColumn: Bool,
+        to pages: inout [WorkingPage]
+    ) {
         guard !currentPage(in: pages).hasLineItemHeader else { return }
 
         let minimumItemHeight = InvoiceDocumentMetrics.lineItemVerticalPadding
@@ -705,7 +727,10 @@ enum InvoiceDocumentPaginator {
             startNewPage(in: &pages)
         }
 
-        append(.lineItemHeader, to: &pages)
+        append(
+            .lineItemHeader(showsTaxCodeColumn: showsTaxCodeColumn),
+            to: &pages
+        )
         pages[pages.count - 1].hasLineItemHeader = true
     }
 

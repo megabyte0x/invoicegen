@@ -574,6 +574,27 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertTrue(rendered.contains("Code: HSN-998314"), rendered)
     }
 
+    func testInvoiceTextRendererOmitsWhitespaceOnlyLineItemTaxCode() {
+        let invoice = Invoice(
+            number: "INV-001",
+            dueDate: Date(timeIntervalSince1970: 0),
+            lineItems: [
+                InvoiceLineItem(
+                    title: "Implementation",
+                    taxCode: "  \n ",
+                    unitPriceMinorUnits: 10_000
+                )
+            ]
+        )
+
+        let rendered = InvoiceTextRenderer.render(
+            invoice: invoice,
+            book: InvoiceBook(invoices: [invoice])
+        )
+
+        XCTAssertFalse(rendered.contains("Code:"), rendered)
+    }
+
     func testInvoicePDFFileNameUsesInvoiceNumber() {
         let invoice = Invoice(
             number: "INV 2026/0001",

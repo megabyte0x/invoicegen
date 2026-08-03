@@ -38,8 +38,8 @@ struct InvoiceDocumentPageView: View {
             identity(fragment)
         case .billing(let fragment):
             billing(fragment)
-        case .lineItemHeader:
-            lineItemHeader
+        case .lineItemHeader(let showsTaxCodeColumn):
+            lineItemHeader(showsTaxCodeColumn: showsTaxCodeColumn)
         case .lineItem(let fragment):
             lineItem(fragment)
         case .titledText(let fragment):
@@ -121,13 +121,15 @@ struct InvoiceDocumentPageView: View {
         }
     }
 
-    private var lineItemHeader: some View {
+    private func lineItemHeader(showsTaxCodeColumn: Bool) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: InvoiceDocumentMetrics.tableColumnSpacing) {
                 Text("Description")
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("Code")
-                    .frame(width: InvoiceDocumentMetrics.taxCodeWidth, alignment: .leading)
+                if showsTaxCodeColumn {
+                    Text("Code")
+                        .frame(width: InvoiceDocumentMetrics.taxCodeWidth, alignment: .leading)
+                }
                 Text("Qty")
                     .frame(width: InvoiceDocumentMetrics.quantityWidth, alignment: .center)
                 Text("Unit Price")
@@ -163,8 +165,10 @@ struct InvoiceDocumentPageView: View {
                 InvoiceDocumentTextLines(lines: fragment.descriptionLines)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
 
-                InvoiceDocumentTextLines(lines: fragment.taxCodeLines)
-                    .frame(width: InvoiceDocumentMetrics.taxCodeWidth, alignment: .topLeading)
+                if fragment.showsTaxCodeColumn {
+                    InvoiceDocumentTextLines(lines: fragment.taxCodeLines)
+                        .frame(width: InvoiceDocumentMetrics.taxCodeWidth, alignment: .topLeading)
+                }
 
                 if fragment.showsAmounts {
                     amountText(fragment.quantity)

@@ -1546,8 +1546,9 @@ pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> Result<Stri
         if !item.details.is_empty() {
             lines.push(format!("  {}", item.details));
         }
-        if !item.tax_code.is_empty() {
-            lines.push(format!("  Code: {}", item.tax_code));
+        let tax_code = item.tax_code.trim();
+        if !tax_code.is_empty() {
+            lines.push(format!("  Code: {tax_code}"));
         }
         lines.push(format!(
             "  Qty {} x {}  Tax {}%  {}",
