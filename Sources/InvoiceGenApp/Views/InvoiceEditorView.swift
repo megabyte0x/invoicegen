@@ -1103,6 +1103,7 @@ struct LineItemEditor: View {
         VStack(alignment: .leading, spacing: 10) {
             AdaptiveFieldRow(availableWidth: availableWidth, spacing: 12) {
                 titleField
+                taxCodeField
                 quantityField
                 unitPriceField
                 taxRateField
@@ -1124,6 +1125,15 @@ struct LineItemEditor: View {
             if let titleIssue {
                 inlineIssue(titleIssue)
             }
+        }
+    }
+
+    private var taxCodeField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RuneyFormLabel(title: "Code")
+            TextField("e.g. HSN/SAC", text: $item.taxCode)
+                .accessibilityLabel("Line item tax code")
+                .runeyFieldInput()
         }
     }
 

@@ -547,6 +547,8 @@ fn cli_creates_entities_persists_swift_compatible_json_and_renders_invoice_text(
             "Design implementation",
             "--details",
             "Landing page and invoice workflow",
+            "--tax-code",
+            "SAC-998313",
             "--quantity",
             "2",
             "--unit-price",
@@ -565,6 +567,7 @@ fn cli_creates_entities_persists_swift_compatible_json_and_renders_invoice_text(
     assert!(rendered.contains("From: Test Studio"), "{rendered}");
     assert!(rendered.contains("Bill To: Ada Lovelace"), "{rendered}");
     assert!(rendered.contains("Project: Launch"), "{rendered}");
+    assert!(rendered.contains("Code: SAC-998313"), "{rendered}");
     assert!(
         rendered.contains("Qty 2 x USD 100.00  Tax 10%  USD 220.00"),
         "{rendered}"
@@ -573,6 +576,9 @@ fn cli_creates_entities_persists_swift_compatible_json_and_renders_invoice_text(
     assert!(rendered.contains("Tax:      USD 20.00"), "{rendered}");
     assert!(rendered.contains("Balance:  USD 220.00"), "{rendered}");
     assert!(rendered.contains("Payment Acceptance"), "{rendered}");
+
+    let stored = fs::read_to_string(&store).unwrap();
+    assert!(stored.contains(r#""taxCode": "SAC-998313""#), "{stored}");
     assert!(
         rendered.contains("Bank Details: Primary bank account"),
         "{rendered}"

@@ -1062,6 +1062,9 @@ fn apply_line_item_options(
     if let Some(details) = take_option(args, "--details") {
         item.details = details;
     }
+    if let Some(tax_code) = take_option(args, "--tax-code") {
+        item.tax_code = tax_code;
+    }
     if let Some(quantity) = take_option(args, "--quantity") {
         item.quantity = parse_f64(&quantity, "--quantity")?;
     }
@@ -1501,6 +1504,7 @@ fn line_item_args() -> Vec<Arg> {
     vec![
         option("title", "title", "TEXT"),
         option("details", "details", "TEXT"),
+        option("tax-code", "tax-code", "CODE"),
         option("quantity", "quantity", "N"),
         option("unit-price", "unit-price", "AMOUNT"),
         option("tax-rate", "tax-rate", "N"),

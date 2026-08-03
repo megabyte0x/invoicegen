@@ -72,6 +72,7 @@ struct InvoiceBillingFragment: Equatable {
 struct InvoiceLineItemFragment: Equatable {
     var itemID: UUID
     var descriptionLines: [InvoiceDocumentTextLine]
+    var taxCode: String
     var quantity: String
     var unitPrice: String
     var tax: String
@@ -175,14 +176,16 @@ enum InvoiceDocumentMetrics {
     static let billingRightWidth: CGFloat = 200
 
     static let tableHorizontalPadding: CGFloat = 8
-    static let tableColumnSpacing: CGFloat = 8
-    static let quantityWidth: CGFloat = 50
-    static let unitPriceWidth: CGFloat = 90
-    static let taxWidth: CGFloat = 50
-    static let totalWidth: CGFloat = 100
+    static let tableColumnSpacing: CGFloat = 6
+    static let taxCodeWidth: CGFloat = 60
+    static let quantityWidth: CGFloat = 42
+    static let unitPriceWidth: CGFloat = 82
+    static let taxWidth: CGFloat = 42
+    static let totalWidth: CGFloat = 90
     static let itemDescriptionWidth = bodyWidth
         - (tableHorizontalPadding * 2)
-        - (tableColumnSpacing * 4)
+        - (tableColumnSpacing * 5)
+        - taxCodeWidth
         - quantityWidth
         - unitPriceWidth
         - taxWidth
@@ -450,6 +453,7 @@ enum InvoiceDocumentPaginator {
             let finalFragment = InvoiceLineItemFragment(
                 itemID: item.id,
                 descriptionLines: remaining,
+                taxCode: item.taxCode,
                 quantity: quantity,
                 unitPrice: unitPrice,
                 tax: tax,
@@ -479,6 +483,7 @@ enum InvoiceDocumentPaginator {
             let emptyFragment = InvoiceLineItemFragment(
                 itemID: item.id,
                 descriptionLines: [],
+                taxCode: item.taxCode,
                 quantity: quantity,
                 unitPrice: unitPrice,
                 tax: tax,
@@ -502,6 +507,7 @@ enum InvoiceDocumentPaginator {
                     InvoiceLineItemFragment(
                         itemID: item.id,
                         descriptionLines: Array(remaining.prefix(count)),
+                        taxCode: item.taxCode,
                         quantity: quantity,
                         unitPrice: unitPrice,
                         tax: tax,

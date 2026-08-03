@@ -135,6 +135,7 @@ pub struct InvoiceLineItem {
     pub id: String,
     pub title: String,
     pub details: String,
+    pub tax_code: String,
     pub quantity: f64,
     pub unit_price_minor_units: i64,
     pub tax_rate_percent: f64,
@@ -434,6 +435,7 @@ impl InvoiceBook {
                             id: new_id(),
                             title: "Discovery workshop".to_string(),
                             details: "Stakeholder interviews and synthesis".to_string(),
+                            tax_code: String::new(),
                             quantity: 1.0,
                             unit_price_minor_units: 150_000,
                             tax_rate_percent: 0.0,
@@ -442,6 +444,7 @@ impl InvoiceBook {
                             id: new_id(),
                             title: "Design direction".to_string(),
                             details: "Visual territory and component starter kit".to_string(),
+                            tax_code: String::new(),
                             quantity: 1.0,
                             unit_price_minor_units: 280_000,
                             tax_rate_percent: 0.0,
@@ -471,6 +474,7 @@ impl InvoiceBook {
                         id: new_id(),
                         title: "Retainer".to_string(),
                         details: "June advisory retainer".to_string(),
+                        tax_code: String::new(),
                         quantity: 1.0,
                         unit_price_minor_units: 220_000,
                         tax_rate_percent: 0.0,
@@ -889,6 +893,7 @@ fn automatic_invoice_copy(
                 id: new_id(),
                 title: item.title.clone(),
                 details: item.details.clone(),
+                tax_code: item.tax_code.clone(),
                 quantity: item.quantity,
                 unit_price_minor_units: item.unit_price_minor_units,
                 tax_rate_percent: item.tax_rate_percent,
@@ -1059,6 +1064,7 @@ impl InvoiceLineItem {
             id: new_id(),
             title,
             details: String::new(),
+            tax_code: String::new(),
             quantity: 1.0,
             unit_price_minor_units,
             tax_rate_percent: 0.0,
@@ -1073,6 +1079,7 @@ impl InvoiceLineItem {
             id: required_string(object, "id")?,
             title: get_string(object, "title").unwrap_or_default(),
             details: get_string(object, "details").unwrap_or_default(),
+            tax_code: get_string(object, "taxCode").unwrap_or_default(),
             quantity: get_f64(object, "quantity").unwrap_or(1.0),
             unit_price_minor_units: get_i64(object, "unitPriceMinorUnits").unwrap_or(0),
             tax_rate_percent: get_f64(object, "taxRatePercent").unwrap_or(0.0),
@@ -1091,6 +1098,7 @@ impl InvoiceLineItem {
                 "taxRatePercent".to_string(),
                 json::number(format_float(self.tax_rate_percent)),
             ),
+            ("taxCode".to_string(), json::string(&self.tax_code)),
             ("title".to_string(), json::string(&self.title)),
             (
                 "unitPriceMinorUnits".to_string(),
@@ -1537,6 +1545,9 @@ pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> Result<Stri
         lines.push(item.title.clone());
         if !item.details.is_empty() {
             lines.push(format!("  {}", item.details));
+        }
+        if !item.tax_code.is_empty() {
+            lines.push(format!("  Code: {}", item.tax_code));
         }
         lines.push(format!(
             "  Qty {} x {}  Tax {}%  {}",
@@ -2016,6 +2027,7 @@ mod tests {
             id: "extreme".to_string(),
             title: "Extreme".to_string(),
             details: String::new(),
+            tax_code: String::new(),
             quantity: f64::MAX,
             unit_price_minor_units: i64::MAX,
             tax_rate_percent: 100.0,
@@ -2056,6 +2068,7 @@ mod tests {
             id: "large".to_string(),
             title: "Large".to_string(),
             details: String::new(),
+            tax_code: String::new(),
             quantity: MAXIMUM_INVOICE_QUANTITY,
             unit_price_minor_units: MAXIMUM_MONEY_MINOR_UNITS,
             tax_rate_percent: 100.0,

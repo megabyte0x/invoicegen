@@ -126,6 +126,8 @@ struct InvoiceDocumentPageView: View {
             HStack(spacing: InvoiceDocumentMetrics.tableColumnSpacing) {
                 Text("Description")
                     .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Code")
+                    .frame(width: InvoiceDocumentMetrics.taxCodeWidth, alignment: .leading)
                 Text("Qty")
                     .frame(width: InvoiceDocumentMetrics.quantityWidth, alignment: .center)
                 Text("Unit Price")
@@ -159,6 +161,8 @@ struct InvoiceDocumentPageView: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
 
                 if fragment.showsAmounts {
+                    taxCodeText(fragment.taxCode)
+                        .frame(width: InvoiceDocumentMetrics.taxCodeWidth, alignment: .leading)
                     amountText(fragment.quantity)
                         .frame(width: InvoiceDocumentMetrics.quantityWidth, alignment: .center)
                     amountText(fragment.unitPrice)
@@ -168,6 +172,8 @@ struct InvoiceDocumentPageView: View {
                     amountText(fragment.total, isStrong: true)
                         .frame(width: InvoiceDocumentMetrics.totalWidth, alignment: .trailing)
                 } else {
+                    Color.clear
+                        .frame(width: InvoiceDocumentMetrics.taxCodeWidth)
                     Color.clear
                         .frame(width: InvoiceDocumentMetrics.quantityWidth)
                     Color.clear
@@ -189,6 +195,18 @@ struct InvoiceDocumentPageView: View {
                 .overlay(Color(white: 0.88))
                 .frame(height: InvoiceDocumentMetrics.dividerHeight)
         }
+    }
+
+    private func taxCodeText(_ value: String) -> some View {
+        Text(value)
+            .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(Color.black)
+            .lineLimit(1)
+            .allowsTightening(true)
+            .minimumScaleFactor(0.6)
+            .truncationMode(.tail)
+            .accessibilityLabel(Text(verbatim: value))
+            .frame(height: InvoiceDocumentMetrics.amountLineHeight, alignment: .topLeading)
     }
 
     private func amountText(_ value: String, isStrong: Bool = false) -> some View {

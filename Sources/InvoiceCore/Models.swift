@@ -105,6 +105,7 @@ public struct InvoiceLineItem: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var title: String
     public var details: String
+    public var taxCode: String
     public var quantity: Double
     public var unitPriceMinorUnits: Int64
     public var taxRatePercent: Double
@@ -113,6 +114,7 @@ public struct InvoiceLineItem: Identifiable, Codable, Equatable, Sendable {
         id: UUID = UUID(),
         title: String,
         details: String = "",
+        taxCode: String = "",
         quantity: Double = 1,
         unitPriceMinorUnits: Int64,
         taxRatePercent: Double = 0
@@ -120,9 +122,42 @@ public struct InvoiceLineItem: Identifiable, Codable, Equatable, Sendable {
         self.id = id
         self.title = title
         self.details = details
+        self.taxCode = taxCode
         self.quantity = quantity
         self.unitPriceMinorUnits = unitPriceMinorUnits
         self.taxRatePercent = taxRatePercent
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case details
+        case taxCode
+        case quantity
+        case unitPriceMinorUnits
+        case taxRatePercent
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        details = try container.decode(String.self, forKey: .details)
+        taxCode = try container.decodeIfPresent(String.self, forKey: .taxCode) ?? ""
+        quantity = try container.decode(Double.self, forKey: .quantity)
+        unitPriceMinorUnits = try container.decode(Int64.self, forKey: .unitPriceMinorUnits)
+        taxRatePercent = try container.decode(Double.self, forKey: .taxRatePercent)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(details, forKey: .details)
+        try container.encode(taxCode, forKey: .taxCode)
+        try container.encode(quantity, forKey: .quantity)
+        try container.encode(unitPriceMinorUnits, forKey: .unitPriceMinorUnits)
+        try container.encode(taxRatePercent, forKey: .taxRatePercent)
     }
 
     public var calculatedSubtotalMinorUnits: Int64? {
@@ -578,6 +613,7 @@ public struct InvoiceBook: Codable, Equatable, Sendable {
                 InvoiceLineItem(
                     title: item.title,
                     details: item.details,
+                    taxCode: item.taxCode,
                     quantity: item.quantity,
                     unitPriceMinorUnits: item.unitPriceMinorUnits,
                     taxRatePercent: item.taxRatePercent

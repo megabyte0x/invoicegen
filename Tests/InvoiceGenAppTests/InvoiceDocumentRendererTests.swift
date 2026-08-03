@@ -1,4 +1,5 @@
 import AppKit
+import InvoiceCore
 @testable import InvoiceGenApp
 import PDFKit
 import XCTest
@@ -29,6 +30,34 @@ final class InvoiceDocumentRendererTests: XCTestCase {
         XCTAssertEqual(exportedDocument.page(at: 1)?.bounds(for: .mediaBox).size, InvoiceDocument.pageSize)
         XCTAssertTrue(exportedDocument.page(at: 0)?.string?.contains("FIRST PAGE CONTENT") == true)
         XCTAssertTrue(exportedDocument.page(at: 1)?.string?.contains("SECOND PAGE CONTENT") == true)
+    }
+
+    func testPDFRendersTaxCodeColumnAndLineItemValue() throws {
+        let invoice = Invoice(
+            number: "INV-TAX-CODE",
+            dueDate: Date(timeIntervalSince1970: 0),
+            lineItems: [
+                InvoiceLineItem(
+                    title: "Implementation",
+                    taxCode: "SAC-998313",
+                    unitPriceMinorUnits: 10_000
+                )
+            ]
+        )
+        let document = InvoiceDocumentPaginator.paginate(
+            invoice: invoice,
+            book: InvoiceBook(invoices: [invoice])
+        )
+
+        let renderedDocument = try XCTUnwrap(
+            PDFDocument(data: InvoiceDocumentRenderer.pdfData(document: document))
+        )
+        let renderedText = (0..<renderedDocument.pageCount)
+            .compactMap { renderedDocument.page(at: $0)?.string }
+            .joined(separator: "\n")
+
+        XCTAssertTrue(renderedText.contains("Code"), renderedText)
+        XCTAssertTrue(renderedText.contains("SAC-998313"), renderedText)
     }
 
     private func twoPageDocument() -> InvoiceDocument {

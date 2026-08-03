@@ -173,6 +173,34 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(settings.intervalDays, 2)
     }
 
+    func testLineItemTaxCodeCodableDefaultsLegacyItemsAndRoundTripsNewValues() throws {
+        let legacyJSON = """
+        {
+          "id": "00000000-0000-0000-0000-000000000501",
+          "title": "Consulting",
+          "details": "Implementation support",
+          "quantity": 1,
+          "unitPriceMinorUnits": 10000,
+          "taxRatePercent": 18
+        }
+        """
+
+        let legacyItem = try JSONDecoder().decode(
+            InvoiceLineItem.self,
+            from: Data(legacyJSON.utf8)
+        )
+        XCTAssertEqual(legacyItem.taxCode, "")
+
+        var codedItem = legacyItem
+        codedItem.taxCode = "SAC-998313"
+        let roundTrippedItem = try JSONDecoder().decode(
+            InvoiceLineItem.self,
+            from: JSONEncoder().encode(codedItem)
+        )
+
+        XCTAssertEqual(roundTrippedItem.taxCode, "SAC-998313")
+    }
+
     func testDueAutomaticGenerationCreatesDraftInvoiceCopyAndAdvancesSchedule() {
         let issueDate = date(year: 2026, month: 1, day: 1)
         let generationDate = date(year: 2026, month: 1, day: 8)
@@ -185,7 +213,12 @@ final class InvoiceCoreTests: XCTestCase {
             status: .sent,
             currencyCode: "USD",
             lineItems: [
-                InvoiceLineItem(title: "Retainer", quantity: 1, unitPriceMinorUnits: 250_000)
+                InvoiceLineItem(
+                    title: "Retainer",
+                    taxCode: "SAC-998313",
+                    quantity: 1,
+                    unitPriceMinorUnits: 250_000
+                )
             ],
             payments: [
                 Payment(amountMinorUnits: 250_000, paidAt: issueDate)
@@ -215,6 +248,7 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(generatedInvoice.clientId, sourceInvoice.clientId)
         XCTAssertEqual(generatedInvoice.projectId, sourceInvoice.projectId)
         XCTAssertEqual(generatedInvoice.lineItems.map(\.title), ["Retainer"])
+        XCTAssertEqual(generatedInvoice.lineItems.map(\.taxCode), ["SAC-998313"])
         XCTAssertEqual(generatedInvoice.payments, [])
         XCTAssertEqual(generatedInvoice.notes, "Monthly support")
         XCTAssertEqual(generatedInvoice.terms, "Net 14.")
@@ -517,6 +551,27 @@ final class InvoiceCoreTests: XCTestCase {
 
         XCTAssertTrue(rendered.contains("INVOICE INV-NO-STATUS"))
         XCTAssertFalse(rendered.contains("Status:"), rendered)
+    }
+
+    func testInvoiceTextRendererIncludesLineItemTaxCode() {
+        let invoice = Invoice(
+            number: "INV-TAX-CODE",
+            dueDate: Date(timeIntervalSince1970: 0),
+            lineItems: [
+                InvoiceLineItem(
+                    title: "Implementation",
+                    taxCode: "HSN-998314",
+                    unitPriceMinorUnits: 10_000
+                )
+            ]
+        )
+
+        let rendered = InvoiceTextRenderer.render(
+            invoice: invoice,
+            book: InvoiceBook(invoices: [invoice])
+        )
+
+        XCTAssertTrue(rendered.contains("Code: HSN-998314"), rendered)
     }
 
     func testInvoicePDFFileNameUsesInvoiceNumber() {
