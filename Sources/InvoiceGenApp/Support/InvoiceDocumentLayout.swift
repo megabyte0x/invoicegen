@@ -36,7 +36,10 @@ enum InvoiceDocumentBlock: Equatable {
             InvoiceDocumentMetrics.lineItemHeaderHeight
         case .lineItem(let fragment):
             max(
-                fragment.descriptionLines.measuredHeight,
+                max(
+                    fragment.descriptionLines.measuredHeight,
+                    fragment.taxCodeLines.measuredHeight
+                ),
                 fragment.showsAmounts ? InvoiceDocumentMetrics.amountLineHeight : 0
             ) + InvoiceDocumentMetrics.lineItemVerticalPadding + InvoiceDocumentMetrics.dividerHeight
         case .titledText(let fragment):
@@ -72,7 +75,7 @@ struct InvoiceBillingFragment: Equatable {
 struct InvoiceLineItemFragment: Equatable {
     var itemID: UUID
     var descriptionLines: [InvoiceDocumentTextLine]
-    var taxCode: String
+    var taxCodeLines: [InvoiceDocumentTextLine]
     var quantity: String
     var unitPrice: String
     var tax: String
@@ -122,6 +125,7 @@ enum InvoiceDocumentTextStyle: Equatable {
     case caption
     case itemTitle
     case itemDetail
+    case itemCode
 
     var nsFont: NSFont {
         switch self {
@@ -145,6 +149,8 @@ enum InvoiceDocumentTextStyle: Equatable {
             .systemFont(ofSize: 13, weight: .medium)
         case .itemDetail:
             .systemFont(ofSize: 11, weight: .regular)
+        case .itemCode:
+            .monospacedSystemFont(ofSize: 11, weight: .regular)
         }
     }
 
@@ -156,7 +162,7 @@ enum InvoiceDocumentTextStyle: Equatable {
             34
         case .invoiceNumber:
             17
-        case .label, .captionStrong, .caption, .itemDetail:
+        case .label, .captionStrong, .caption, .itemDetail, .itemCode:
             14
         case .bodyStrong, .body, .itemTitle:
             17
@@ -445,19 +451,40 @@ enum InvoiceDocumentPaginator {
             item.totalMinorUnits,
             currencyCode: currencyCode
         )
-        var index = 0
-        var didShowAmounts = false
-
-        while index < lines.count || !didShowAmounts {
-            let remaining = Array(lines[index...])
-            let finalFragment = InvoiceLineItemFragment(
+        let taxCodeLines = wrapped(
+            item.taxCode,
+            style: .itemCode,
+            width: InvoiceDocumentMetrics.taxCodeWidth
+        )
+        func fragment(
+            descriptionLines: [InvoiceDocumentTextLine],
+            taxCodeLines: [InvoiceDocumentTextLine],
+            showsAmounts: Bool
+        ) -> InvoiceLineItemFragment {
+            InvoiceLineItemFragment(
                 itemID: item.id,
-                descriptionLines: remaining,
-                taxCode: item.taxCode,
+                descriptionLines: descriptionLines,
+                taxCodeLines: taxCodeLines,
                 quantity: quantity,
                 unitPrice: unitPrice,
                 tax: tax,
                 total: total,
+                showsAmounts: showsAmounts
+            )
+        }
+
+        var descriptionIndex = 0
+        var taxCodeIndex = 0
+        var didShowAmounts = false
+
+        while descriptionIndex < lines.count
+                || taxCodeIndex < taxCodeLines.count
+                || !didShowAmounts {
+            let remainingDescriptionLines = Array(lines[descriptionIndex...])
+            let remainingTaxCodeLines = Array(taxCodeLines[taxCodeIndex...])
+            let finalFragment = fragment(
+                descriptionLines: remainingDescriptionLines,
+                taxCodeLines: remainingTaxCodeLines,
                 showsAmounts: true
             )
             let finalBlock = InvoiceDocumentBlock.lineItem(finalFragment)
@@ -475,49 +502,51 @@ enum InvoiceDocumentPaginator {
 
             if finalBlock.measuredHeight <= availableHeight(in: pages) {
                 append(finalBlock, to: &pages)
-                index = lines.count
+                descriptionIndex = lines.count
+                taxCodeIndex = taxCodeLines.count
                 didShowAmounts = true
                 continue
             }
 
-            let emptyFragment = InvoiceLineItemFragment(
-                itemID: item.id,
-                descriptionLines: [],
-                taxCode: item.taxCode,
-                quantity: quantity,
-                unitPrice: unitPrice,
-                tax: tax,
-                total: total,
-                showsAmounts: false
-            )
             let lineCapacity = availableHeight(in: pages)
-                - InvoiceDocumentBlock.lineItem(emptyFragment).measuredHeight
-            var count = prefixCount(fitting: remaining, height: lineCapacity)
-            if count == remaining.count {
-                count -= 1
+                - InvoiceDocumentMetrics.lineItemVerticalPadding
+                - InvoiceDocumentMetrics.dividerHeight
+            var descriptionCount = prefixCount(
+                fitting: remainingDescriptionLines,
+                height: lineCapacity
+            )
+            var taxCodeCount = prefixCount(
+                fitting: remainingTaxCodeLines,
+                height: lineCapacity
+            )
+            if descriptionCount == remainingDescriptionLines.count,
+               taxCodeCount == remainingTaxCodeLines.count {
+                if descriptionCount > 0,
+                   (taxCodeCount == 0
+                    || remainingDescriptionLines.measuredHeight >= remainingTaxCodeLines.measuredHeight) {
+                    descriptionCount -= 1
+                } else if taxCodeCount > 0 {
+                    taxCodeCount -= 1
+                }
             }
 
-            guard count > 0 else {
+            guard descriptionCount > 0 || taxCodeCount > 0 else {
                 startNewPage(in: &pages)
                 continue
             }
 
             append(
                 .lineItem(
-                    InvoiceLineItemFragment(
-                        itemID: item.id,
-                        descriptionLines: Array(remaining.prefix(count)),
-                        taxCode: item.taxCode,
-                        quantity: quantity,
-                        unitPrice: unitPrice,
-                        tax: tax,
-                        total: total,
+                    fragment(
+                        descriptionLines: Array(remainingDescriptionLines.prefix(descriptionCount)),
+                        taxCodeLines: Array(remainingTaxCodeLines.prefix(taxCodeCount)),
                         showsAmounts: false
                     )
                 ),
                 to: &pages
             )
-            index += count
+            descriptionIndex += descriptionCount
+            taxCodeIndex += taxCodeCount
         }
     }
 

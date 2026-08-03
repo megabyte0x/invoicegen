@@ -55,9 +55,44 @@ final class InvoiceDocumentRendererTests: XCTestCase {
         let renderedText = (0..<renderedDocument.pageCount)
             .compactMap { renderedDocument.page(at: $0)?.string }
             .joined(separator: "\n")
+        let renderedTextWithoutWhitespace = renderedText.filter { !$0.isWhitespace }
 
         XCTAssertTrue(renderedText.contains("Code"), renderedText)
-        XCTAssertTrue(renderedText.contains("SAC-998313"), renderedText)
+        XCTAssertTrue(renderedTextWithoutWhitespace.contains("SAC-998313"), renderedText)
+    }
+
+    func testPaginatorPreservesLongTaxCodeAcrossWrappedFragments() {
+        let taxCode = String(repeating: "SAC998313", count: 80)
+        let invoice = Invoice(
+            number: "INV-LONG-TAX-CODE",
+            dueDate: Date(timeIntervalSince1970: 0),
+            lineItems: [
+                InvoiceLineItem(
+                    title: "Implementation",
+                    taxCode: taxCode,
+                    unitPriceMinorUnits: 10_000
+                )
+            ]
+        )
+
+        let document = InvoiceDocumentPaginator.paginate(
+            invoice: invoice,
+            book: InvoiceBook(invoices: [invoice])
+        )
+        let fragments: [InvoiceLineItemFragment] = document.pages
+            .flatMap(\.blocks)
+            .compactMap { block in
+                guard case .lineItem(let fragment) = block else { return nil }
+                return fragment
+            }
+        let reconstructedCode = fragments
+            .flatMap(\.taxCodeLines)
+            .map(\.text)
+            .joined()
+
+        XCTAssertGreaterThan(fragments.count, 1)
+        XCTAssertEqual(reconstructedCode, taxCode)
+        XCTAssertEqual(fragments.filter(\.showsAmounts).count, 1)
     }
 
     private func twoPageDocument() -> InvoiceDocument {

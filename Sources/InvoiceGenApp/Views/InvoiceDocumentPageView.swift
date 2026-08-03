@@ -151,7 +151,10 @@ struct InvoiceDocumentPageView: View {
 
     private func lineItem(_ fragment: InvoiceLineItemFragment) -> some View {
         let contentHeight = max(
-            fragment.descriptionLines.measuredHeight,
+            max(
+                fragment.descriptionLines.measuredHeight,
+                fragment.taxCodeLines.measuredHeight
+            ),
             fragment.showsAmounts ? InvoiceDocumentMetrics.amountLineHeight : 0
         )
 
@@ -160,9 +163,10 @@ struct InvoiceDocumentPageView: View {
                 InvoiceDocumentTextLines(lines: fragment.descriptionLines)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
 
+                InvoiceDocumentTextLines(lines: fragment.taxCodeLines)
+                    .frame(width: InvoiceDocumentMetrics.taxCodeWidth, alignment: .topLeading)
+
                 if fragment.showsAmounts {
-                    taxCodeText(fragment.taxCode)
-                        .frame(width: InvoiceDocumentMetrics.taxCodeWidth, alignment: .leading)
                     amountText(fragment.quantity)
                         .frame(width: InvoiceDocumentMetrics.quantityWidth, alignment: .center)
                     amountText(fragment.unitPrice)
@@ -172,8 +176,6 @@ struct InvoiceDocumentPageView: View {
                     amountText(fragment.total, isStrong: true)
                         .frame(width: InvoiceDocumentMetrics.totalWidth, alignment: .trailing)
                 } else {
-                    Color.clear
-                        .frame(width: InvoiceDocumentMetrics.taxCodeWidth)
                     Color.clear
                         .frame(width: InvoiceDocumentMetrics.quantityWidth)
                     Color.clear
@@ -195,18 +197,6 @@ struct InvoiceDocumentPageView: View {
                 .overlay(Color(white: 0.88))
                 .frame(height: InvoiceDocumentMetrics.dividerHeight)
         }
-    }
-
-    private func taxCodeText(_ value: String) -> some View {
-        Text(value)
-            .font(.system(size: 12, design: .monospaced))
-            .foregroundStyle(Color.black)
-            .lineLimit(1)
-            .allowsTightening(true)
-            .minimumScaleFactor(0.6)
-            .truncationMode(.tail)
-            .accessibilityLabel(Text(verbatim: value))
-            .frame(height: InvoiceDocumentMetrics.amountLineHeight, alignment: .topLeading)
     }
 
     private func amountText(_ value: String, isStrong: Bool = false) -> some View {
@@ -393,6 +383,8 @@ private extension InvoiceDocumentTextStyle {
             .system(size: 13, weight: .medium)
         case .itemDetail:
             .system(size: 11)
+        case .itemCode:
+            .system(size: 11, design: .monospaced)
         }
     }
 
@@ -402,7 +394,7 @@ private extension InvoiceDocumentTextStyle {
             Color.black
         case .label:
             Color(white: 0.45)
-        case .invoiceNumber, .body, .caption, .itemDetail:
+        case .invoiceNumber, .body, .caption, .itemDetail, .itemCode:
             Color(white: 0.35)
         }
     }
