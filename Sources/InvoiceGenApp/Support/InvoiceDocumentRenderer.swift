@@ -37,7 +37,8 @@ enum InvoiceDocumentRenderer {
             )
             view.layoutSubtreeIfNeeded()
 
-            guard let pdfPage = PDFPage(data: view.dataWithPDF(inside: view.bounds)) else {
+            let pageData = view.dataWithPDF(inside: view.bounds)
+            guard let pdfPage = PDFDocument(data: pageData)?.page(at: 0) else {
                 throw InvoiceDocumentRenderError.pageEncodingFailed(index: index)
             }
             pdf.insert(pdfPage, at: index)
