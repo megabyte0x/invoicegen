@@ -38,7 +38,7 @@ private struct SettingsSceneRoot: View {
     @State private var sceneID = UUID()
 
     var body: some View {
-        SettingsView()
+        SettingsView(sceneID: sceneID)
             .environmentObject(model)
             .focusedSceneValue(
                 \.draftCommandTarget,

@@ -57,6 +57,11 @@ enum StoreReplacementRequest: Equatable {
     }
 }
 
+struct PendingStoreReplacement: Equatable {
+    let sceneID: UUID
+    let request: StoreReplacementRequest
+}
+
 enum NavigationIntent: Equatable {
     case section(AppSection)
     case invoice(UUID)

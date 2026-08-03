@@ -49,11 +49,12 @@ final class AppModel: ObservableObject {
     @Published var pendingNavigation: NavigationIntent?
     @Published var dirtyDraftRequiringDecision: DraftKind?
     @Published var draftCommandTargetPendingCancellation: DraftCommandTarget?
-    @Published var pendingStoreReplacement: StoreReplacementRequest?
+    @Published var pendingStoreReplacement: PendingStoreReplacement?
     @Published var contextualReturnSection: AppSection?
     @Published var editorIssues: [EditorIssue] = []
     @Published var focusedEditorField: EditorField?
     @Published var transientEditorInputIssues: [EditorField: String] = [:]
+    @Published private(set) var storeReplacementGeneration = 0
     @Published private(set) var automaticGenerationCheckScheduledFor: Date?
 
     let store: LocalInvoiceStore
@@ -126,20 +127,23 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func requestStoreReplacement(_ request: StoreReplacementRequest) {
-        pendingStoreReplacement = request
+    func requestStoreReplacement(_ request: StoreReplacementRequest, from sceneID: UUID) {
+        guard pendingStoreReplacement == nil else { return }
+        pendingStoreReplacement = PendingStoreReplacement(sceneID: sceneID, request: request)
     }
 
-    func cancelStoreReplacement() {
+    func cancelStoreReplacement(from sceneID: UUID) {
+        guard pendingStoreReplacement?.sceneID == sceneID else { return }
         pendingStoreReplacement = nil
     }
 
-    func confirmStoreReplacement() {
-        guard let request = pendingStoreReplacement else { return }
+    func confirmStoreReplacement(from sceneID: UUID) {
+        guard let pendingStoreReplacement,
+              pendingStoreReplacement.sceneID == sceneID else { return }
         do {
             let replacement: InvoiceBook
             let message: String
-            switch request {
+            switch pendingStoreReplacement.request {
             case .sampleData:
                 replacement = .sample()
                 try store.save(replacement)
@@ -251,6 +255,7 @@ final class AppModel: ObservableObject {
         loadedStoreSuccessfully = true
         scheduleAutomaticGenerationCheck()
         errorMessage = message
+        storeReplacementGeneration &+= 1
     }
 
     private func nextAutomaticGenerationDate() -> Date? {

@@ -115,7 +115,7 @@ struct ContentView: View {
         case .projects:
             ProjectsView()
         case .settings:
-            SettingsView()
+            SettingsView(sceneID: sceneID)
                 .onAppear {
                     activateSettingsDraft()
                 }

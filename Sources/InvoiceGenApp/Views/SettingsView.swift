@@ -4,6 +4,7 @@ import AppKit
 
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
+    let sceneID: UUID
     @State private var paymentDetailIDPendingDeletion: UUID?
     @State private var touchedFields: Set<EditorField> = []
     @FocusState private var focusedField: EditorField?
@@ -18,7 +19,7 @@ struct SettingsView: View {
             }
         }
         .onAppear(perform: activateSettingsDraft)
-        .onChange(of: model.book) { _, _ in
+        .onChange(of: model.storeReplacementGeneration) { _, _ in
             activateSettingsDraftAfterBookReplacement()
         }
         .onChange(of: focusedField) { oldValue, _ in
@@ -31,11 +32,11 @@ struct SettingsView: View {
             focusedField = field
         }
         .alert("Replace local data?", isPresented: replacementConfirmationPresented) {
-            Button(model.pendingStoreReplacement?.actionTitle ?? "Replace Local Data", role: .destructive) {
-                model.confirmStoreReplacement()
+            Button(scenePendingStoreReplacement?.request.actionTitle ?? "Replace Local Data", role: .destructive) {
+                model.confirmStoreReplacement(from: sceneID)
             }
             Button("Cancel", role: .cancel) {
-                model.cancelStoreReplacement()
+                model.cancelStoreReplacement(from: sceneID)
             }
         } message: {
             Text(replacementWarning)
@@ -340,7 +341,7 @@ struct SettingsView: View {
         .buttonStyle(RuneyButtonStyle())
 
         Button {
-            model.requestStoreReplacement(.sampleData)
+            model.requestStoreReplacement(.sampleData, from: sceneID)
         } label: {
             Label("Seed Sample Data", systemImage: "doc.text.fill.badge.plus")
         }
@@ -394,25 +395,29 @@ struct SettingsView: View {
     }
 
     private func activateSettingsDraftAfterBookReplacement() {
-        guard model.settingsDraft == nil else { return }
         paymentDetailIDPendingDeletion = nil
         touchedFields.removeAll()
         focusedField = nil
-        model.beginEditingSettings()
+        if model.settingsDraft == nil {
+            model.beginEditingSettings()
+        }
+    }
+
+    private var scenePendingStoreReplacement: PendingStoreReplacement? {
+        guard let pendingStoreReplacement = model.pendingStoreReplacement,
+              pendingStoreReplacement.sceneID == sceneID else { return nil }
+        return pendingStoreReplacement
     }
 
     private var replacementConfirmationPresented: Binding<Bool> {
         Binding(
-            get: { model.pendingStoreReplacement != nil },
-            set: { isPresented in
-                if !isPresented {
-                    model.cancelStoreReplacement()
-                }
-            }
+            get: { scenePendingStoreReplacement != nil },
+            set: { _ in }
         )
     }
 
     private var replacementWarning: String {
+        guard scenePendingStoreReplacement != nil else { return "" }
         let dirty = model.dirtyDraftKinds.map(\.displayName)
         let suffix = dirty.isEmpty
             ? ""
@@ -500,7 +505,7 @@ struct SettingsView: View {
         panel.canChooseDirectories = false
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            model.requestStoreReplacement(.backup(url))
+            model.requestStoreReplacement(.backup(url), from: sceneID)
         }
     }
 
