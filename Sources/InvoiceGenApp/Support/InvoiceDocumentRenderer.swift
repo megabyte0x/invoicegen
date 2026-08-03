@@ -5,7 +5,6 @@ import SwiftUI
 enum InvoiceDocumentRenderError: LocalizedError {
     case pageEncodingFailed(index: Int)
     case documentEncodingFailed
-    case documentLoadingFailed
 
     var errorDescription: String? {
         switch self {
@@ -13,8 +12,6 @@ enum InvoiceDocumentRenderError: LocalizedError {
             "Could not render invoice page \(index + 1)."
         case .documentEncodingFailed:
             "Could not encode the invoice PDF."
-        case .documentLoadingFailed:
-            "Could not load the rendered invoice PDF."
         }
     }
 }
@@ -35,10 +32,28 @@ enum InvoiceDocumentRenderer {
                 origin: .zero,
                 size: InvoiceDocument.pageSize
             )
-            view.layoutSubtreeIfNeeded()
 
-            let pageData = view.dataWithPDF(inside: view.bounds)
-            guard let pdfPage = PDFDocument(data: pageData)?.page(at: 0) else {
+            let pageData = NSMutableData()
+            let pagePrintInfo = NSPrintInfo()
+            pagePrintInfo.paperSize = InvoiceDocument.pageSize
+            pagePrintInfo.orientation = .portrait
+            pagePrintInfo.leftMargin = 0
+            pagePrintInfo.rightMargin = 0
+            pagePrintInfo.topMargin = 0
+            pagePrintInfo.bottomMargin = 0
+            let pageOperation = NSPrintOperation.pdfOperation(
+                with: view,
+                inside: view.bounds,
+                to: pageData,
+                printInfo: pagePrintInfo
+            )
+            pageOperation.showsPrintPanel = false
+            pageOperation.showsProgressPanel = false
+
+            guard pageOperation.run() else {
+                throw InvoiceDocumentRenderError.pageEncodingFailed(index: index)
+            }
+            guard let pdfPage = PDFDocument(data: pageData as Data)?.page(at: 0) else {
                 throw InvoiceDocumentRenderError.pageEncodingFailed(index: index)
             }
             pdf.insert(pdfPage, at: index)
@@ -50,30 +65,7 @@ enum InvoiceDocumentRenderer {
         return data
     }
 
-    static func print(document: InvoiceDocument, jobTitle: String) throws {
-        let data = try pdfData(document: document)
-        guard let pdf = PDFDocument(data: data) else {
-            throw InvoiceDocumentRenderError.documentLoadingFailed
-        }
-        pdf.documentAttributes = [PDFDocumentAttribute.titleAttribute: jobTitle]
-
-        let pdfView = PDFView(
-            frame: NSRect(origin: .zero, size: InvoiceDocument.pageSize)
-        )
-        pdfView.document = pdf
-        pdfView.autoScales = true
-        pdfView.displayMode = .singlePageContinuous
-
-        let printInfo = NSPrintInfo.shared.copy() as! NSPrintInfo
-        printInfo.paperSize = InvoiceDocument.pageSize
-        printInfo.orientation = .portrait
-        printInfo.horizontalPagination = .fit
-        printInfo.verticalPagination = .fit
-        printInfo.leftMargin = InvoiceDocument.pageInsets.leading
-        printInfo.rightMargin = InvoiceDocument.pageInsets.trailing
-        printInfo.topMargin = InvoiceDocument.pageInsets.top
-        printInfo.bottomMargin = InvoiceDocument.pageInsets.bottom
-
-        pdfView.print(with: printInfo, autoRotate: false)
+    static func writePDF(document: InvoiceDocument, to url: URL) throws {
+        try pdfData(document: document).write(to: url, options: .atomic)
     }
 }

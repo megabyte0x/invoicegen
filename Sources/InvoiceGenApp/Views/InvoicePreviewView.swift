@@ -1,6 +1,7 @@
 import AppKit
 import InvoiceCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct InvoicePreviewView: View {
     @EnvironmentObject private var model: AppModel
@@ -72,7 +73,7 @@ struct InvoicePreviewView: View {
                     mailButton
                         .frame(maxWidth: .infinity)
 
-                    printButton
+                    exportButton
                         .frame(maxWidth: .infinity)
                 }
 
@@ -97,7 +98,7 @@ struct InvoicePreviewView: View {
     private var previewActions: some View {
         HStack(spacing: 8) {
             mailButton
-            printButton
+            exportButton
             scalePicker
                 .frame(width: 210)
         }
@@ -115,14 +116,14 @@ struct InvoicePreviewView: View {
         .help(isPaused ? "Fix invalid line-item values before mailing this invoice." : "")
     }
 
-    private var printButton: some View {
-        Button(action: printInvoice) {
-            Label("Print or Export PDF...", systemImage: "printer")
+    private var exportButton: some View {
+        Button(action: exportInvoicePDF) {
+            Label("Export PDF...", systemImage: "square.and.arrow.down")
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
         }
         .disabled(isPaused)
-        .help(isPaused ? "Fix invalid line-item values before printing or exporting this invoice." : "")
+        .help(isPaused ? "Fix invalid line-item values before exporting this invoice." : "")
     }
 
     private var scalePicker: some View {
@@ -150,14 +151,34 @@ struct InvoicePreviewView: View {
         .background(Color.runeyPreviewBackground)
     }
 
-    private func printInvoice() {
-        do {
-            try InvoiceDocumentRenderer.print(
-                document: document,
-                jobTitle: InvoiceExportNaming.pdfFileStem(for: invoice)
-            )
-        } catch {
-            model.errorMessage = "Could not print invoice: \(error.localizedDescription)"
+    private func exportInvoicePDF() {
+        let exportDocument = document
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.nameFieldStringValue = InvoiceExportNaming.pdfFileName(for: invoice)
+        panel.directoryURL = FileManager.default.urls(
+            for: .downloadsDirectory,
+            in: .userDomainMask
+        ).first
+
+        let handleResponse: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let destinationURL = panel.url else { return }
+            do {
+                try InvoiceDocumentRenderer.writePDF(
+                    document: exportDocument,
+                    to: destinationURL
+                )
+            } catch {
+                model.errorMessage = "Could not export invoice: \(error.localizedDescription)"
+            }
+        }
+
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: handleResponse)
+        } else {
+            panel.begin(completionHandler: handleResponse)
         }
     }
 
