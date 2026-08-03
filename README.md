@@ -222,5 +222,5 @@ requires these GitHub Actions secrets so the uploaded DMG passes Gatekeeper:
 - `APP_STORE_CONNECT_API_PRIVATE_KEY`: private `.p8` key for that API key
 
 After those secrets are present, either push a new `v<version>` tag or run the
-GitHub Release workflow manually with a version like `0.2.0` to replace that
+GitHub Release workflow manually with a version like `0.2.1` to replace that
 release's DMG.
