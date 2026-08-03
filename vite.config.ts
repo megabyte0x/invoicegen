@@ -46,9 +46,12 @@ export default defineConfig({
 function cleanResourceRoutePlugin(): Plugin {
   const rewrite = (requestUrl: string | undefined): string | undefined => {
     if (!requestUrl) return requestUrl;
-    const url = new URL(requestUrl, 'http://invoicegen.local');
-    const route = cleanResourceRoutes[url.pathname as keyof typeof cleanResourceRoutes];
-    return route ? `${route}${url.search}` : requestUrl;
+    const queryIndex = requestUrl.indexOf('?');
+    const path = queryIndex === -1 ? requestUrl : requestUrl.slice(0, queryIndex);
+    const query = queryIndex === -1 ? '' : requestUrl.slice(queryIndex);
+    if (!Object.prototype.hasOwnProperty.call(cleanResourceRoutes, path)) return requestUrl;
+    const route = cleanResourceRoutes[path as keyof typeof cleanResourceRoutes];
+    return `${route}${query}`;
   };
 
   return {

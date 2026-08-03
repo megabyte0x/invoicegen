@@ -3,7 +3,12 @@
   const media = window.matchMedia('(prefers-color-scheme: dark)');
 
   function currentTheme() {
-    const stored = localStorage.getItem('theme');
+    let stored;
+    try {
+      stored = localStorage.getItem('theme');
+    } catch {
+      stored = null;
+    }
     return stored === 'dark' || stored === 'light'
       ? stored
       : media.matches ? 'dark' : 'light';
@@ -12,7 +17,13 @@
   function apply(theme, persist) {
     root.classList.toggle('dark', theme === 'dark');
     root.style.colorScheme = theme;
-    if (persist) localStorage.setItem('theme', theme);
+    if (persist) {
+      try {
+        localStorage.setItem('theme', theme);
+      } catch {
+        // The selected theme still applies when storage is unavailable.
+      }
+    }
     document.querySelectorAll('[data-theme-label]').forEach((label) => {
       label.textContent = theme === 'dark' ? 'Light theme' : 'Dark theme';
     });
