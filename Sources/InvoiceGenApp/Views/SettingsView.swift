@@ -7,6 +7,7 @@ struct SettingsView: View {
     let sceneID: UUID
     @State private var paymentDetailIDPendingDeletion: UUID?
     @State private var touchedFields: Set<EditorField> = []
+    @State private var suppressNextReplacementDismissalCancellation = false
     @FocusState private var focusedField: EditorField?
 
     var body: some View {
@@ -20,6 +21,7 @@ struct SettingsView: View {
         }
         .onAppear(perform: activateSettingsDraft)
         .onDisappear {
+            suppressNextReplacementDismissalCancellation = false
             model.cancelStoreReplacement(from: sceneID)
         }
         .onChange(of: model.storeReplacementGeneration) { _, _ in
@@ -36,6 +38,7 @@ struct SettingsView: View {
         }
         .alert("Replace local data?", isPresented: replacementConfirmationPresented) {
             Button(scenePendingStoreReplacement?.request.actionTitle ?? "Replace Local Data", role: .destructive) {
+                suppressNextReplacementDismissalCancellation = true
                 model.confirmStoreReplacement(from: sceneID)
             }
             Button("Cancel", role: .cancel) {
@@ -416,9 +419,12 @@ struct SettingsView: View {
         Binding(
             get: { scenePendingStoreReplacement != nil },
             set: { isPresented in
-                if !isPresented {
-                    model.cancelStoreReplacement(from: sceneID)
+                guard !isPresented else { return }
+                if suppressNextReplacementDismissalCancellation {
+                    suppressNextReplacementDismissalCancellation = false
+                    return
                 }
+                model.cancelStoreReplacement(from: sceneID)
             }
         )
     }
