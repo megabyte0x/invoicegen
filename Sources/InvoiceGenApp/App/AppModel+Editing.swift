@@ -243,8 +243,8 @@ extension AppModel {
         clearActiveDraftRoute(.settings)
     }
 
-    func commitActiveDraft(now: Date = Date()) throws {
-        switch activeDraftKind {
+    func commitDraft(_ kind: DraftKind, now: Date = Date()) throws {
+        switch kind {
         case .invoice:
             try commitInvoiceDraft(now: now)
         case .client:
@@ -253,13 +253,11 @@ extension AppModel {
             try commitProjectDraft(now: now)
         case .settings:
             try commitSettingsDraft(now: now)
-        case nil:
-            return
         }
     }
 
-    func cancelActiveDraft() {
-        switch activeDraftKind {
+    func cancelDraft(_ kind: DraftKind) {
+        switch kind {
         case .invoice:
             cancelInvoiceDraft()
         case .client:
@@ -268,8 +266,6 @@ extension AppModel {
             cancelProjectDraft()
         case .settings:
             cancelSettingsDraft()
-        case nil:
-            return
         }
     }
 
@@ -553,7 +549,7 @@ extension AppModel {
         }
     }
 
-    private func isDraftDirty(_ kind: DraftKind) -> Bool {
+    func isDraftDirty(_ kind: DraftKind) -> Bool {
         switch kind {
         case .invoice:
             return invoiceDraft?.isDirty == true || hasTransientEditorInputIssue(for: .invoice)

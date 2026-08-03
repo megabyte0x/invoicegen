@@ -48,11 +48,11 @@ final class AppModel: ObservableObject {
     @Published var activeDraftRoute: DraftKind?
     @Published var pendingNavigation: NavigationIntent?
     @Published var dirtyDraftRequiringDecision: DraftKind?
+    @Published var draftKindPendingCancellation: DraftKind?
     @Published var contextualReturnSection: AppSection?
     @Published var editorIssues: [EditorIssue] = []
     @Published var focusedEditorField: EditorField?
     @Published var transientEditorInputIssues: [EditorField: String] = [:]
-    @Published var isConfirmingActiveDraftCancellation = false
     @Published private(set) var automaticGenerationCheckScheduledFor: Date?
 
     let store: LocalInvoiceStore
@@ -84,21 +84,6 @@ final class AppModel: ObservableObject {
             !transientEditorInputIssues.isEmpty
     }
 
-    var activeDraftIsDirty: Bool {
-        switch activeDraftRoute {
-        case .invoice:
-            return invoiceDraft?.isDirty == true || hasTransientEditorInputIssue(for: .invoice)
-        case .client:
-            return clientDraft?.isDirty == true || hasTransientEditorInputIssue(for: .client)
-        case .project:
-            return projectDraft?.isDirty == true || hasTransientEditorInputIssue(for: .project)
-        case .settings:
-            return settingsDraft?.isDirty == true || hasTransientEditorInputIssue(for: .settings)
-        case nil:
-            return false
-        }
-    }
-
     func presentEditorIssues(_ issues: [EditorIssue]) {
         editorIssues = issues
         focusedEditorField = issues.first?.field
@@ -109,13 +94,13 @@ final class AppModel: ObservableObject {
         focusedEditorField = nil
     }
 
-    func requestActiveDraftCancellation() {
-        guard activeDraftIsDirty else {
-            cancelActiveDraft()
+    func requestDraftCancellation(_ kind: DraftKind) {
+        guard isDraftDirty(kind) else {
+            cancelDraft(kind)
             return
         }
 
-        isConfirmingActiveDraftCancellation = true
+        draftKindPendingCancellation = kind
     }
 
     func reload() {

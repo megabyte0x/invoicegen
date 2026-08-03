@@ -21,18 +21,9 @@ struct InvoiceGenApp: App {
                     model.beginNewInvoice()
                 }
                 .keyboardShortcut("n", modifiers: [.command])
-
-                Button("Save") {
-                    commitActiveDraft()
-                }
-                .keyboardShortcut("s", modifiers: [.command])
-                .disabled(!model.activeDraftIsDirty)
-
-                Button("Cancel Changes") {
-                    model.requestActiveDraftCancellation()
-                }
-                .keyboardShortcut(.cancelAction)
             }
+
+            DraftCommands(model: model)
         }
 
         Settings {
@@ -45,22 +36,9 @@ struct InvoiceGenApp: App {
         .defaultSize(width: 680, height: 560)
     }
 
-    private func commitActiveDraft() {
-        do {
-            try model.commitActiveDraft()
-            model.clearEditorIssues()
-        } catch let error as EditorCommitError {
-            model.presentEditorIssues(error.issues)
-        } catch {
-            model.errorMessage = error.localizedDescription
-        }
-    }
-
     private func activateSettingsDraft() {
         if model.settingsDraft == nil {
             model.beginEditingSettings()
-        } else {
-            model.activeDraftRoute = .settings
         }
     }
 }

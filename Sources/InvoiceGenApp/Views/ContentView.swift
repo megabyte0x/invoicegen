@@ -47,6 +47,8 @@ struct ContentView: View {
                 }
         }
         .background(WindowCloseGuard(model: model))
+        .focusedSceneValue(\.draftCommandTarget, commandTarget)
+        .modifier(FocusedDraftCancellationAlert(model: model))
         .alert("Local Invoice", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -54,14 +56,6 @@ struct ContentView: View {
             Button("OK", role: .cancel) { model.errorMessage = nil }
         } message: {
             Text(model.errorMessage ?? "")
-        }
-        .alert("Discard unsaved changes?", isPresented: $model.isConfirmingActiveDraftCancellation) {
-            Button("Discard Changes", role: .destructive) {
-                model.cancelActiveDraft()
-            }
-            Button("Keep Editing", role: .cancel) {}
-        } message: {
-            Text("Your changes have not been saved.")
         }
         .alert(navigationConfirmationTitle, isPresented: pendingNavigationPresented) {
             Button(isClosingWindow ? "Save and Close" : "Save and Continue") {
@@ -86,6 +80,21 @@ struct ContentView: View {
                 model.requestNavigation(to: .section(section))
             }
         )
+    }
+
+    private var commandTarget: DraftKind? {
+        switch model.selectedSection {
+        case .invoices where model.invoiceDraft != nil:
+            .invoice
+        case .clients where model.clientDraft != nil:
+            .client
+        case .projects where model.projectDraft != nil:
+            .project
+        case .settings where model.settingsDraft != nil:
+            .settings
+        default:
+            nil
+        }
     }
 
     @ViewBuilder
@@ -132,9 +141,13 @@ struct ContentView: View {
 
     private func saveAndContinueNavigation() {
         let intent = model.pendingNavigation
+        guard let draftKind = model.dirtyDraftRequiringDecision else {
+            model.cancelPendingNavigation()
+            return
+        }
 
         do {
-            try model.commitActiveDraft()
+            try model.commitDraft(draftKind)
             model.clearEditorIssues()
             model.cancelPendingNavigation()
             if let intent {
@@ -152,8 +165,6 @@ struct ContentView: View {
     private func activateSettingsDraft() {
         if model.settingsDraft == nil {
             model.beginEditingSettings()
-        } else {
-            model.activeDraftRoute = .settings
         }
     }
 }
