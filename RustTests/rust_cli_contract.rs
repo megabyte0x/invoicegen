@@ -72,6 +72,30 @@ fn id_from_created_line(output: &str, entity: &str) -> String {
         .to_string()
 }
 
+fn replace_line_item_quantity(store_text: &mut String, item_id: &str, replacement: &str) {
+    let item_marker = format!("\"id\": \"{item_id}\"");
+    let item_offset = store_text
+        .find(&item_marker)
+        .unwrap_or_else(|| panic!("missing line item {item_id} in store"));
+    let quantity_key_offset = store_text[item_offset..]
+        .find("\"quantity\":")
+        .map(|offset| item_offset + offset)
+        .unwrap_or_else(|| panic!("missing quantity for line item {item_id}"));
+    let colon_offset = store_text[quantity_key_offset..]
+        .find(':')
+        .map(|offset| quantity_key_offset + offset)
+        .unwrap();
+    let value_start = store_text[colon_offset + 1..]
+        .find(|character: char| !character.is_ascii_whitespace())
+        .map(|offset| colon_offset + 1 + offset)
+        .unwrap();
+    let value_end = store_text[value_start..]
+        .find(',')
+        .map(|offset| value_start + offset)
+        .unwrap();
+    store_text.replace_range(value_start..value_end, replacement);
+}
+
 #[test]
 fn cli_exposes_command_help_examples_and_shell_completions() {
     let global_help = assert_success(run_without_store(&["--help"]));
@@ -576,6 +600,107 @@ fn cli_creates_entities_persists_swift_compatible_json_and_renders_invoice_text(
     assert!(
         saved_json.contains("\"unitPriceMinorUnits\": 10000"),
         "{saved_json}"
+    );
+}
+
+#[test]
+fn invoice_render_rejects_selected_external_overflow_without_writing_pdf() {
+    let store = temp_store("render-overflow");
+    let valid_invoice_id = id_from_created_line(
+        &assert_success(run(
+            &store,
+            &[
+                "invoice",
+                "add",
+                "--number",
+                "INV-VALID",
+                "--no-default-item",
+            ],
+        )),
+        "invoice",
+    );
+    assert_success(run(
+        &store,
+        &[
+            "invoice",
+            "add-item",
+            &valid_invoice_id,
+            "--title",
+            "Valid item",
+            "--quantity",
+            "1",
+            "--unit-price",
+            "10.00",
+        ],
+    ));
+
+    let overflow_invoice_id = id_from_created_line(
+        &assert_success(run(
+            &store,
+            &[
+                "invoice",
+                "add",
+                "--number",
+                "INV-OVERFLOW",
+                "--no-default-item",
+            ],
+        )),
+        "invoice",
+    );
+    let overflow_item_id = id_from_created_line(
+        &assert_success(run(
+            &store,
+            &[
+                "invoice",
+                "add-item",
+                &overflow_invoice_id,
+                "--title",
+                "Externally edited item",
+                "--quantity",
+                "1",
+                "--unit-price",
+                "10.00",
+            ],
+        )),
+        "line item",
+    );
+
+    let mut externally_edited_store = fs::read_to_string(&store).unwrap();
+    replace_line_item_quantity(&mut externally_edited_store, &overflow_item_id, "1e308");
+    fs::write(&store, externally_edited_store).unwrap();
+
+    let valid_render = assert_success(run(&store, &["invoice", "render", &valid_invoice_id]));
+    assert!(valid_render.contains("INVOICE INV-VALID"), "{valid_render}");
+
+    let text_error = assert_failure(run(&store, &["invoice", "render", &overflow_invoice_id]));
+    assert!(
+        text_error.contains("Cannot render invoice INV-OVERFLOW"),
+        "{text_error}"
+    );
+    assert!(
+        text_error.contains("outside the supported amount range"),
+        "{text_error}"
+    );
+
+    let pdf_path = store.with_file_name("INV-OVERFLOW.pdf");
+    let pdf_path_text = pdf_path.to_string_lossy().into_owned();
+    let pdf_error = assert_failure(run(
+        &store,
+        &[
+            "invoice",
+            "render",
+            &overflow_invoice_id,
+            "--output",
+            &pdf_path_text,
+        ],
+    ));
+    assert!(
+        pdf_error.contains("Cannot render invoice INV-OVERFLOW"),
+        "{pdf_error}"
+    );
+    assert!(
+        !pdf_path.exists(),
+        "overflow render created {pdf_path_text}"
     );
 }
 

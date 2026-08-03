@@ -1,9 +1,8 @@
 use crate::domain::{
-    add_days_iso, format_money, invoice_pdf_file_name, normalize_date_input, now_iso,
-    checked_minor_unit_sum, parse_minor_units, render_invoice_pdf, render_invoice_text,
+    add_days_iso, checked_minor_unit_sum, format_money, invoice_pdf_file_name,
+    normalize_date_input, now_iso, parse_minor_units, render_invoice_pdf, render_invoice_text,
     BusinessProfile, Client, Invoice, InvoiceAutoGenerationSettings, InvoiceBook, InvoiceLineItem,
-    InvoiceStatus, Payment,
-    PaymentAcceptanceDetail, PaymentAcceptanceKind, Project,
+    InvoiceStatus, Payment, PaymentAcceptanceDetail, PaymentAcceptanceKind, Project,
 };
 use crate::json::{self, JsonValue};
 use crate::store::LocalInvoiceStore;
@@ -857,13 +856,13 @@ fn command_invoice(
             let index = find_invoice_index(&book, &id)?;
             if let Some(output_path) = output_path {
                 let output_path = invoice_render_output_path(output_path, &book.invoices[index]);
-                let pdf = render_invoice_pdf(&book.invoices[index], &book);
+                let pdf = render_invoice_pdf(&book.invoices[index], &book)?;
                 fs::write(&output_path, pdf).map_err(|error| {
                     format!("failed to write {}: {error}", output_path.display())
                 })?;
                 Ok(format!("Wrote {}\n", output_path.display()))
             } else {
-                let rendered = render_invoice_text(&book.invoices[index], &book);
+                let rendered = render_invoice_text(&book.invoices[index], &book)?;
                 Ok(format!("{rendered}\n"))
             }
         }

@@ -2,10 +2,62 @@ import Foundation
 import SwiftUI
 import InvoiceCore
 
+struct PendingNavigationAlertCoordinator: Equatable {
+    enum DismissalEffect: Equatable {
+        case preservePendingNavigation
+        case cancelPendingNavigation
+    }
+
+    private(set) var isPresented = false
+    private(set) var dismissalGeneration = 0
+    private var actionDismissalInFlight = false
+    private var dismissalAwaitingResolution = false
+
+    mutating func synchronize(hasPendingNavigation: Bool) {
+        guard !actionDismissalInFlight, !dismissalAwaitingResolution else { return }
+        if hasPendingNavigation {
+            isPresented = true
+        } else {
+            isPresented = false
+        }
+    }
+
+    mutating func beginActionDrivenDismissal() {
+        actionDismissalInFlight = true
+    }
+
+    mutating func presentationChanged(to isPresented: Bool) {
+        guard !isPresented else {
+            self.isPresented = true
+            return
+        }
+
+        self.isPresented = false
+        guard !dismissalAwaitingResolution else { return }
+        dismissalAwaitingResolution = true
+        dismissalGeneration &+= 1
+    }
+
+    mutating func resolveDismissal(hasPendingNavigation: Bool) -> DismissalEffect {
+        guard dismissalAwaitingResolution else { return .preservePendingNavigation }
+        dismissalAwaitingResolution = false
+
+        if actionDismissalInFlight {
+            actionDismissalInFlight = false
+            isPresented = hasPendingNavigation
+            return .preservePendingNavigation
+        }
+
+        isPresented = false
+        return hasPendingNavigation ? .cancelPendingNavigation : .preservePendingNavigation
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var sceneID = UUID()
+    @State private var pendingNavigationAlertCoordinator = PendingNavigationAlertCoordinator()
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -64,6 +116,7 @@ struct ContentView: View {
                 saveAndContinueNavigation()
             }
             Button(isClosingWindow ? "Discard and Close" : "Discard Changes", role: .destructive) {
+                pendingNavigationAlertCoordinator.beginActionDrivenDismissal()
                 model.discardDirtyDraftsAndContinue()
             }
             Button(isClosingWindow ? "Keep Editing" : "Stay Here", role: .cancel) {
@@ -71,6 +124,19 @@ struct ContentView: View {
             }
         } message: {
             Text("Your changes have not been saved.")
+        }
+        .onChange(of: model.pendingNavigation, initial: true) { _, pendingNavigation in
+            pendingNavigationAlertCoordinator.synchronize(
+                hasPendingNavigation: pendingNavigation != nil
+            )
+        }
+        .onChange(of: pendingNavigationAlertCoordinator.dismissalGeneration) { _, _ in
+            let effect = pendingNavigationAlertCoordinator.resolveDismissal(
+                hasPendingNavigation: model.pendingNavigation != nil
+            )
+            if effect == .cancelPendingNavigation {
+                model.cancelPendingNavigation()
+            }
         }
     }
 
@@ -105,11 +171,9 @@ struct ContentView: View {
 
     private var pendingNavigationPresented: Binding<Bool> {
         Binding(
-            get: { model.pendingNavigation != nil },
+            get: { pendingNavigationAlertCoordinator.isPresented },
             set: { isPresented in
-                if !isPresented {
-                    model.cancelPendingNavigation()
-                }
+                pendingNavigationAlertCoordinator.presentationChanged(to: isPresented)
             }
         )
     }
@@ -127,6 +191,7 @@ struct ContentView: View {
     }
 
     private func saveAndContinueNavigation() {
+        pendingNavigationAlertCoordinator.beginActionDrivenDismissal()
         let intent = model.pendingNavigation
         guard let draftKind = model.dirtyDraftRequiringDecision else {
             model.cancelPendingNavigation()

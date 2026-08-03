@@ -141,7 +141,7 @@ struct SettingsView: View {
 
                                 Spacer()
 
-                                paymentAcceptanceAddActions
+                                paymentAcceptanceAddActions(fullWidth: false)
                             }
 
                             VStack(alignment: .leading, spacing: 10) {
@@ -149,8 +149,7 @@ struct SettingsView: View {
                                     .font(.headline)
                                     .foregroundStyle(Color.runeyPrimary)
 
-                                paymentAcceptanceAddActions
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                paymentAcceptanceAddActions(fullWidth: true)
                             }
                         }
 
@@ -333,11 +332,12 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var paymentAcceptanceAddActions: some View {
+    private func paymentAcceptanceAddActions(fullWidth: Bool) -> some View {
         Button {
             model.addPaymentAcceptanceDetail(kind: .bankDetails)
         } label: {
             Label("Add Bank Details", systemImage: "building.columns")
+                .frame(maxWidth: fullWidth ? .infinity : nil, alignment: .leading)
         }
         .buttonStyle(RuneyButtonStyle())
 
@@ -345,6 +345,7 @@ struct SettingsView: View {
             model.addPaymentAcceptanceDetail(kind: .cryptocurrency)
         } label: {
             Label("Add Cryptocurrency", systemImage: "bitcoinsign.circle")
+                .frame(maxWidth: fullWidth ? .infinity : nil, alignment: .leading)
         }
         .buttonStyle(RuneyButtonStyle())
     }

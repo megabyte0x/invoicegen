@@ -109,6 +109,84 @@ final class DraftEditingTests: XCTestCase {
     }
 
     @MainActor
+    func testActionDismissalRepresentsSaveAndRequeueNavigationAlert() throws {
+        let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
+        model.beginNewInvoice(now: Date(timeIntervalSince1970: 0))
+        model.invoiceDraft?.value.notes = "Save this invoice"
+        model.beginEditingSettings()
+        model.settingsDraft?.value.businessProfile.name = "Unsaved settings"
+        model.activeDraftRoute = .invoice
+        model.requestNavigation(to: .section(.clients))
+
+        var coordinator = PendingNavigationAlertCoordinator()
+        coordinator.synchronize(hasPendingNavigation: model.pendingNavigation != nil)
+        coordinator.beginActionDrivenDismissal()
+
+        let intent = try XCTUnwrap(model.pendingNavigation)
+        try model.commitDraft(.invoice, now: Date(timeIntervalSince1970: 0))
+        model.cancelPendingNavigation()
+        model.requestNavigation(to: intent)
+
+        XCTAssertEqual(model.dirtyDraftRequiringDecision, .settings)
+        coordinator.presentationChanged(to: false)
+        XCTAssertFalse(coordinator.isPresented)
+        XCTAssertEqual(coordinator.dismissalGeneration, 1)
+
+        XCTAssertEqual(
+            coordinator.resolveDismissal(
+                hasPendingNavigation: model.pendingNavigation != nil
+            ),
+            .preservePendingNavigation
+        )
+
+        XCTAssertTrue(coordinator.isPresented)
+        XCTAssertEqual(model.pendingNavigation, .section(.clients))
+    }
+
+    @MainActor
+    func testActionDismissalRepresentsMultiDraftDiscardAlert() {
+        let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
+        model.beginNewInvoice(now: Date(timeIntervalSince1970: 0))
+        model.invoiceDraft?.value.notes = "Discard this invoice"
+        model.beginEditingSettings()
+        model.settingsDraft?.value.businessProfile.name = "Still unsaved"
+        model.activeDraftRoute = .invoice
+        model.requestNavigation(to: .section(.clients))
+
+        var coordinator = PendingNavigationAlertCoordinator()
+        coordinator.synchronize(hasPendingNavigation: model.pendingNavigation != nil)
+        coordinator.presentationChanged(to: false)
+        coordinator.beginActionDrivenDismissal()
+        model.discardDirtyDraftsAndContinue()
+
+        XCTAssertEqual(model.dirtyDraftRequiringDecision, .settings)
+        XCTAssertFalse(coordinator.isPresented)
+        XCTAssertEqual(coordinator.dismissalGeneration, 1)
+
+        XCTAssertEqual(
+            coordinator.resolveDismissal(
+                hasPendingNavigation: model.pendingNavigation != nil
+            ),
+            .preservePendingNavigation
+        )
+
+        XCTAssertTrue(coordinator.isPresented)
+        XCTAssertEqual(model.pendingNavigation, .section(.clients))
+    }
+
+    func testPassiveNavigationAlertDismissalCancelsPendingTransition() {
+        var coordinator = PendingNavigationAlertCoordinator()
+        coordinator.synchronize(hasPendingNavigation: true)
+        coordinator.presentationChanged(to: false)
+
+        XCTAssertEqual(
+            coordinator.resolveDismissal(hasPendingNavigation: true),
+            .cancelPendingNavigation
+        )
+        XCTAssertFalse(coordinator.isPresented)
+    }
+
+    @MainActor
     func testSettingsSessionLifecycleDoesNotReplaceMainDraftRoute() throws {
         let store = LocalInvoiceStore(url: temporaryStoreURL())
         let model = AppModel(store: store)

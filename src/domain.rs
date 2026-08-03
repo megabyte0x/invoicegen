@@ -259,7 +259,11 @@ impl Invoice {
     }
 
     pub fn calculated_paid_minor_units(&self) -> Option<i64> {
-        checked_sum(self.payments.iter().map(|payment| Some(payment.amount_minor_units)))
+        checked_sum(
+            self.payments
+                .iter()
+                .map(|payment| Some(payment.amount_minor_units)),
+        )
     }
 
     pub fn calculated_balance_due_minor_units(&self) -> Option<i64> {
@@ -1406,7 +1410,66 @@ fn checked_rounded_product(minor_units: i64, multiplier: f64) -> Option<i64> {
     Some(rounded as i64)
 }
 
-pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> String {
+struct InvoiceRenderAmounts {
+    line_totals: Vec<i64>,
+    subtotal: i64,
+    tax: i64,
+    paid: i64,
+    balance: i64,
+}
+
+fn checked_invoice_render_amounts(invoice: &Invoice) -> Result<InvoiceRenderAmounts, String> {
+    let invoice_number = invoice_display_number(invoice);
+    let line_totals = invoice
+        .line_items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            item.calculated_total_minor_units().ok_or_else(|| {
+                let label = if item.title.trim().is_empty() {
+                    format!("line item {}", index + 1)
+                } else {
+                    format!("line item {:?}", item.title.trim())
+                };
+                format!(
+                    "Cannot render invoice {invoice_number}: {label} is outside the supported amount range. Reduce its quantity, unit price, or tax rate."
+                )
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let aggregate_error = || {
+        format!(
+            "Cannot render invoice {invoice_number}: its aggregate subtotal, tax, payments, or balance is outside the supported amount range. Reduce the invoice amounts."
+        )
+    };
+    let subtotal = invoice
+        .calculated_subtotal_minor_units()
+        .ok_or_else(|| aggregate_error())?;
+    let tax = invoice
+        .calculated_tax_minor_units()
+        .ok_or_else(|| aggregate_error())?;
+    invoice
+        .calculated_total_minor_units()
+        .ok_or_else(|| aggregate_error())?;
+    let paid = invoice
+        .calculated_paid_minor_units()
+        .ok_or_else(|| aggregate_error())?;
+    let balance = invoice
+        .calculated_balance_due_minor_units()
+        .ok_or_else(aggregate_error)?;
+
+    Ok(InvoiceRenderAmounts {
+        line_totals,
+        subtotal,
+        tax,
+        paid,
+        balance,
+    })
+}
+
+pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> Result<String, String> {
+    let amounts = checked_invoice_render_amounts(invoice)?;
     let client = book.client_for(invoice);
     let project = book.project_for(invoice);
     let business = &book.business_profile;
@@ -1468,9 +1531,9 @@ pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> String {
 
     lines.push("Items".to_string());
     lines.push("-".repeat(72));
-    for item in &invoice.line_items {
+    for (item, total_minor_units) in invoice.line_items.iter().zip(&amounts.line_totals) {
         let price = format_money(item.unit_price_minor_units, &invoice.currency_code);
-        let total = format_money(item.total_minor_units(), &invoice.currency_code);
+        let total = format_money(*total_minor_units, &invoice.currency_code);
         lines.push(item.title.clone());
         if !item.details.is_empty() {
             lines.push(format!("  {}", item.details));
@@ -1487,19 +1550,19 @@ pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> String {
     lines.push("-".repeat(72));
     lines.push(format!(
         "Subtotal: {}",
-        format_money(invoice.subtotal_minor_units(), &invoice.currency_code)
+        format_money(amounts.subtotal, &invoice.currency_code)
     ));
     lines.push(format!(
         "Tax:      {}",
-        format_money(invoice.tax_minor_units(), &invoice.currency_code)
+        format_money(amounts.tax, &invoice.currency_code)
     ));
     lines.push(format!(
         "Paid:     {}",
-        format_money(invoice.paid_minor_units(), &invoice.currency_code)
+        format_money(amounts.paid, &invoice.currency_code)
     ));
     lines.push(format!(
         "Balance:  {}",
-        format_money(invoice.balance_due_minor_units(), &invoice.currency_code)
+        format_money(amounts.balance, &invoice.currency_code)
     ));
     lines.push(String::new());
 
@@ -1531,11 +1594,11 @@ pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> String {
         lines.push(String::new());
     }
 
-    lines.join("\n")
+    Ok(lines.join("\n"))
 }
 
-pub fn render_invoice_pdf(invoice: &Invoice, book: &InvoiceBook) -> Vec<u8> {
-    render_text_pdf(&render_invoice_text(invoice, book))
+pub fn render_invoice_pdf(invoice: &Invoice, book: &InvoiceBook) -> Result<Vec<u8>, String> {
+    Ok(render_text_pdf(&render_invoice_text(invoice, book)?))
 }
 
 pub fn invoice_pdf_file_name(invoice: &Invoice) -> String {
@@ -1999,9 +2062,7 @@ mod tests {
         };
         assert!(valid_large.calculated_total_minor_units().is_some());
         assert_eq!(
-            checked_minor_unit_sum(
-                (0..50).map(|_| valid_large.calculated_total_minor_units())
-            ),
+            checked_minor_unit_sum((0..50).map(|_| valid_large.calculated_total_minor_units())),
             None
         );
     }
