@@ -1,9 +1,23 @@
-import type { ReactElement } from 'react';
+import type { MouseEvent, ReactElement } from 'react';
 import { useState } from 'react';
 import { faqItems } from '../data/siteContent';
 
 export function FAQ(): ReactElement {
   const [openItemId, setOpenItemId] = useState<string | null>(null);
+
+  function toggleItem(event: MouseEvent<HTMLButtonElement>, itemId: string, isOpen: boolean): void {
+    const button = event.currentTarget;
+    const topBefore = button.getBoundingClientRect().top;
+
+    setOpenItemId(isOpen ? null : itemId);
+
+    requestAnimationFrame(() => {
+      if (!button.isConnected) return;
+
+      const delta = button.getBoundingClientRect().top - topBefore;
+      if (delta !== 0) window.scrollBy(0, delta);
+    });
+  }
 
   return (
     <section className="faq-section" id="faq" aria-labelledby="faq-title">
@@ -23,7 +37,7 @@ export function FAQ(): ReactElement {
                 type="button"
                 aria-expanded={isOpen}
                 aria-controls={answerId}
-                onClick={() => setOpenItemId(isOpen ? null : item.id)}
+                onClick={(event) => toggleItem(event, item.id, isOpen)}
               >
                 <span>{item.question}</span>
                 <span className="faq-icon" aria-hidden="true">
