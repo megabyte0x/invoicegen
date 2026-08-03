@@ -5,6 +5,7 @@ struct InvoicesView: View {
     @EnvironmentObject private var model: AppModel
     @State private var invoiceIDPendingDeletion: UUID?
     @State private var isPresentingDetail = false
+    @State private var requestedPresentation: InvoiceEditorPresentation = .edit
 
     private var filteredInvoices: [Invoice] {
         let query = model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -41,7 +42,10 @@ struct InvoicesView: View {
             }
             activateSelectedInvoiceIfNeeded()
         }
-        .onChange(of: model.invoiceDraft?.value.id) { _, id in
+        .onChange(of: model.invoiceDraft?.value.id) { oldID, id in
+            if let id, id != oldID {
+                requestedPresentation = .edit
+            }
             if id != nil {
                 isPresentingDetail = true
             } else if model.selectedInvoiceID == nil {
@@ -98,7 +102,7 @@ struct InvoicesView: View {
     @ViewBuilder
     private var invoiceDetail: some View {
         if model.invoiceDraft != nil {
-            InvoiceEditorView()
+            InvoiceEditorView(requestedPresentation: $requestedPresentation)
         } else {
             EmptyStateView(
                 title: "Select an invoice",

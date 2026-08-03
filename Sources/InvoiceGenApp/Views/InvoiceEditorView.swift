@@ -3,13 +3,13 @@ import InvoiceCore
 
 struct InvoiceEditorView: View {
     @EnvironmentObject private var model: AppModel
+    @Binding var requestedPresentation: InvoiceEditorPresentation
     @State private var isConfirmingMarkUnpaid = false
     @State private var isConfirmingDelete = false
     @State private var lineItemIDPendingDeletion: UUID?
     @State private var autoGenerationIntervalDraft: String?
     @State private var touchedFields: Set<EditorField> = []
     @State private var numericInputResetGeneration = 0
-    @State private var requestedPresentation: InvoiceEditorPresentation = .edit
     @FocusState private var focusedField: EditorField?
 
     var body: some View {
@@ -83,10 +83,9 @@ struct InvoiceEditorView: View {
 
         return GeometryReader { geometry in
             let presentation = WorkspaceLayoutPolicy.invoiceEditor(
-                width: geometry.size.width,
+                width: max(0, geometry.size.width),
                 requested: requestedPresentation
             )
-            let contentLayout = editorContentLayout(presentation: presentation)
 
             VStack(spacing: 0) {
                 if presentation != .sideBySide {
@@ -108,45 +107,32 @@ struct InvoiceEditorView: View {
                     Divider()
                 }
 
-                contentLayout {
-                    invoiceFormPane(invoice: invoice, session: session)
-                        .frame(
-                            minWidth: presentation == .sideBySide ? 520 : nil,
-                            idealWidth: presentation == .sideBySide ? 640 : nil,
-                            maxWidth: presentation == .sideBySide ? 860 : .infinity,
-                            maxHeight: .infinity
-                        )
-                        .opacity(presentation == .preview ? 0 : 1)
-                        .allowsHitTesting(presentation != .preview)
-                        .accessibilityHidden(presentation == .preview)
-
-                    Divider()
-                        .opacity(presentation == .sideBySide ? 1 : 0)
-                        .accessibilityHidden(true)
-
-                    invoicePreviewPane(invoice: invoice)
-                        .frame(
-                            minWidth: presentation == .sideBySide ? 380 : nil,
-                            idealWidth: presentation == .sideBySide ? 560 : nil,
-                            maxWidth: .infinity,
-                            maxHeight: .infinity
-                        )
-                        .opacity(presentation == .edit ? 0 : 1)
-                        .allowsHitTesting(presentation != .edit)
-                        .accessibilityHidden(presentation == .edit)
-                }
+                editorContent(
+                    presentation: presentation,
+                    invoice: invoice,
+                    session: session
+                )
             }
         }
         .navigationTitle(invoice.wrappedValue.number)
     }
 
-    private func editorContentLayout(
-        presentation: InvoiceEditorPresentation
-    ) -> AnyLayout {
-        if presentation == .sideBySide {
-            AnyLayout(HStackLayout(spacing: 0))
-        } else {
-            AnyLayout(ZStackLayout())
+    @ViewBuilder
+    private func editorContent(
+        presentation: InvoiceEditorPresentation,
+        invoice: Binding<Invoice>,
+        session: DraftSession<Invoice>
+    ) -> some View {
+        switch presentation {
+        case .edit:
+            invoiceFormPane(invoice: invoice, session: session)
+        case .preview:
+            invoicePreviewPane(invoice: invoice)
+        case .sideBySide:
+            HSplitView {
+                invoiceFormPane(invoice: invoice, session: session)
+                invoicePreviewPane(invoice: invoice)
+            }
         }
     }
 

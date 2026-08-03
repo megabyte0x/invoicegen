@@ -52,55 +52,53 @@ struct AdaptiveMasterDetailView<ListContent: View, DetailContent: View>: View {
 
     var body: some View {
         GeometryReader { proxy in
+            let safeWidth = max(0, proxy.size.width)
             let presentation = WorkspaceLayoutPolicy.masterDetail(
-                width: proxy.size.width,
+                width: safeWidth,
                 hasDetail: hasDetail
             )
 
-            if presentation == .split {
-                HSplitView {
-                    list
-                        .frame(
-                            minWidth: 240,
-                            idealWidth: 300,
-                            maxWidth: 340,
-                            maxHeight: .infinity
-                        )
+            content(for: presentation, width: safeWidth)
+        }
+    }
 
-                    detail
-                        .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
-                }
-            } else {
-                ZStack {
-                    list
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .opacity(presentation == .list ? 1 : 0)
-                        .allowsHitTesting(presentation == .list)
-                        .accessibilityHidden(presentation != .list)
-
-                    VStack(spacing: 0) {
-                        HStack {
-                            Button(action: back) {
-                                Label("Back", systemImage: "chevron.left")
-                            }
-                            .buttonStyle(.borderless)
-
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-
-                        Divider()
-
-                        detail
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                    .opacity(presentation == .detail ? 1 : 0)
-                    .allowsHitTesting(presentation == .detail)
-                    .accessibilityHidden(presentation != .detail)
-                }
+    @ViewBuilder
+    private func content(
+        for presentation: MasterDetailPresentation,
+        width: CGFloat
+    ) -> some View {
+        switch presentation {
+        case .split:
+            HSplitView {
+                list.frame(
+                    minWidth: 240,
+                    idealWidth: min(320, width * 0.28),
+                    maxWidth: min(360, width * 0.34)
+                )
+                detail.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        case .list:
+            list.frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .detail:
+            VStack(spacing: 0) {
+                compactBackBar
+                Divider()
+                detail.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+    }
+
+    private var compactBackBar: some View {
+        HStack {
+            Button(action: back) {
+                Label("Back", systemImage: "chevron.left")
+            }
+            .buttonStyle(.borderless)
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 }
 
@@ -109,7 +107,6 @@ struct AdaptiveFieldRow<Content: View>: View {
     var spacing: CGFloat
 
     private let content: Content
-    @State private var selectedAxis: AdaptiveFieldAxis
 
     init(
         availableWidth: CGFloat,
@@ -119,62 +116,25 @@ struct AdaptiveFieldRow<Content: View>: View {
         self.availableWidth = availableWidth
         self.spacing = spacing
         self.content = content()
-        self._selectedAxis = State(
-            initialValue: availableWidth < WorkspaceLayoutPolicy.compactFormWidth
-                ? .vertical
-                : .horizontal
-        )
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ViewThatFits(in: .horizontal) {
-                AdaptiveFieldAxisProbe(axis: .horizontal, select: select)
-                    .frame(
-                        minWidth: availableWidth < WorkspaceLayoutPolicy.compactFormWidth
-                            ? availableWidth + 1
-                            : 0
-                    )
+        let safeWidth = max(0, availableWidth)
+        let axis: Axis = safeWidth < WorkspaceLayoutPolicy.compactFormWidth
+            ? .vertical
+            : .horizontal
 
-                AdaptiveFieldAxisProbe(axis: .vertical, select: select)
+        Group {
+            if axis == .vertical {
+                VStack(alignment: .leading, spacing: spacing) {
+                    content
+                }
+            } else {
+                HStack(alignment: .top, spacing: spacing) {
+                    content
+                }
             }
-            .frame(height: 0)
-            .clipped()
-            .accessibilityHidden(true)
-
-            layout {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    private var layout: AnyLayout {
-        if selectedAxis == .vertical {
-            AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
-        } else {
-            AnyLayout(HStackLayout(alignment: .top, spacing: spacing))
-        }
-    }
-
-    private func select(_ axis: AdaptiveFieldAxis) {
-        selectedAxis = axis
-    }
-}
-
-private enum AdaptiveFieldAxis {
-    case horizontal
-    case vertical
-}
-
-private struct AdaptiveFieldAxisProbe: View {
-    var axis: AdaptiveFieldAxis
-    var select: (AdaptiveFieldAxis) -> Void
-
-    var body: some View {
-        Color.clear
-            .onAppear {
-                select(axis)
-            }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
