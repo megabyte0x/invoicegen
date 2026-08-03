@@ -34,6 +34,7 @@ fn run_without_store(args: &[&str]) -> Output {
         .expect("failed to run invoicegen-rs")
 }
 
+#[cfg(target_os = "macos")]
 fn run_with_home(home: &Path, args: &[&str]) -> Output {
     Command::new(bin())
         .env("HOME", home)
@@ -405,6 +406,7 @@ fn default_store_paths_are_platform_appropriate_for_packaged_cli() {
 }
 
 #[test]
+#[cfg(target_os = "macos")]
 fn cli_migrates_legacy_macos_store_to_documents_without_deleting_source() {
     let home = temp_store("macos-legacy-home")
         .parent()
