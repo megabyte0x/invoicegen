@@ -64,6 +64,65 @@ final class DraftEditingTests: XCTestCase {
     }
 
     @MainActor
+    func testSameKindNewInvoiceWaitsForDirtyDraftDecision() throws {
+        let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
+        model.beginNewInvoice(now: Date(timeIntervalSince1970: 0))
+        model.invoiceDraft?.value.notes = "Do not replace"
+        let originalID = try XCTUnwrap(model.invoiceDraft?.value.id)
+
+        model.requestNavigation(to: .newInvoice)
+
+        XCTAssertEqual(model.invoiceDraft?.value.id, originalID)
+        XCTAssertEqual(model.pendingNavigation, .newInvoice)
+        XCTAssertEqual(model.dirtyDraftRequiringDecision, .invoice)
+
+        model.discardDirtyDraftsAndContinue()
+
+        XCTAssertNotEqual(model.invoiceDraft?.value.id, originalID)
+        XCTAssertNil(model.pendingNavigation)
+    }
+
+    @MainActor
+    func testDiscardPromptsAgainForAnotherDirtyDraft() {
+        let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
+        model.beginNewInvoice(now: Date(timeIntervalSince1970: 0))
+        model.invoiceDraft?.value.notes = "Dirty invoice"
+        model.beginEditingSettings()
+        model.settingsDraft?.value.businessProfile.name = "Dirty settings"
+
+        model.requestNavigation(to: .section(.clients))
+        XCTAssertEqual(model.dirtyDraftRequiringDecision, .invoice)
+
+        model.discardDirtyDraftsAndContinue()
+
+        XCTAssertNil(model.invoiceDraft)
+        XCTAssertNotNil(model.settingsDraft)
+        XCTAssertEqual(model.pendingNavigation, .section(.clients))
+        XCTAssertEqual(model.dirtyDraftRequiringDecision, .settings)
+        XCTAssertEqual(model.selectedSection, .invoices)
+
+        model.discardDirtyDraftsAndContinue()
+
+        XCTAssertNil(model.settingsDraft)
+        XCTAssertNil(model.pendingNavigation)
+        XCTAssertEqual(model.selectedSection, .clients)
+    }
+
+    @MainActor
+    func testSettingsSessionLifecycleDoesNotReplaceMainDraftRoute() throws {
+        let store = LocalInvoiceStore(url: temporaryStoreURL())
+        let model = AppModel(store: store)
+        model.beginNewInvoice(now: Date(timeIntervalSince1970: 0))
+        model.activeDraftRoute = .invoice
+
+        model.beginEditingSettings()
+        XCTAssertEqual(model.activeDraftRoute, .invoice)
+
+        try model.commitSettingsDraft()
+        XCTAssertEqual(model.activeDraftRoute, .invoice)
+    }
+
+    @MainActor
     func testContextualClientNavigationPreservesInvoiceDraft() throws {
         let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
         model.beginNewInvoice(now: Date(timeIntervalSince1970: 0))

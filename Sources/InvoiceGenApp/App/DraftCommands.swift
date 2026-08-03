@@ -2,8 +2,14 @@ import Foundation
 import SwiftUI
 
 struct DraftCommandTarget: Equatable {
-    let sceneID: UUID
+    let id: UUID
     let kind: DraftKind
+    let save: () -> Void
+    let cancel: () -> Void
+
+    static func == (lhs: DraftCommandTarget, rhs: DraftCommandTarget) -> Bool {
+        lhs.id == rhs.id && lhs.kind == rhs.kind
+    }
 }
 
 private struct DraftCommandTargetKey: FocusedValueKey {
@@ -39,15 +45,7 @@ struct DraftCommands: Commands {
 
     private func saveFocusedDraft() {
         guard let target else { return }
-
-        do {
-            try model.commitDraft(target.kind)
-            model.clearEditorIssues()
-        } catch let error as EditorCommitError {
-            model.presentEditorIssues(error.issues)
-        } catch {
-            model.errorMessage = error.localizedDescription
-        }
+        target.save()
     }
 }
 
@@ -60,7 +58,7 @@ struct FocusedDraftCancellationAlert: ViewModifier {
             Button("Discard Changes", role: .destructive) {
                 guard let focusedTarget,
                       model.draftCommandTargetPendingCancellation == focusedTarget else { return }
-                model.cancelDraft(focusedTarget.kind)
+                focusedTarget.cancel()
                 model.draftCommandTargetPendingCancellation = nil
             }
             Button("Keep Editing", role: .cancel) {}
@@ -80,6 +78,38 @@ struct FocusedDraftCancellationAlert: ViewModifier {
                       let focusedTarget,
                       model.draftCommandTargetPendingCancellation == focusedTarget else { return }
                 model.draftCommandTargetPendingCancellation = nil
+            }
+        )
+    }
+}
+
+struct StoreReplacementFeedbackAlert: ViewModifier {
+    @ObservedObject var model: AppModel
+    let sceneID: UUID
+
+    func body(content: Content) -> some View {
+        content.alert("Local Data Storage", isPresented: isPresented) {
+            Button("OK", role: .cancel) {
+                model.dismissStoreReplacementFeedback(from: sceneID)
+            }
+        } message: {
+            Text(sceneFeedback?.message ?? "")
+        }
+    }
+
+    private var sceneFeedback: StoreReplacementFeedback? {
+        guard let feedback = model.storeReplacementFeedback,
+              feedback.sceneID == sceneID else { return nil }
+        return feedback
+    }
+
+    private var isPresented: Binding<Bool> {
+        Binding(
+            get: { sceneFeedback != nil },
+            set: { presented in
+                if !presented {
+                    model.dismissStoreReplacementFeedback(from: sceneID)
+                }
             }
         )
     }

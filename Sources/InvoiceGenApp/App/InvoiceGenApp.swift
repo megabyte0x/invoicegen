@@ -18,7 +18,7 @@ struct InvoiceGenApp: App {
 
             CommandGroup(after: .newItem) {
                 Button("New Invoice") {
-                    model.beginNewInvoice()
+                    model.requestNavigation(to: .newInvoice)
                 }
                 .keyboardShortcut("n", modifiers: [.command])
             }
@@ -38,13 +38,10 @@ private struct SettingsSceneRoot: View {
     @State private var sceneID = UUID()
 
     var body: some View {
-        SettingsView(sceneID: sceneID)
+        SettingsView(sceneID: sceneID, presentation: .dedicated)
             .environmentObject(model)
-            .focusedSceneValue(
-                \.draftCommandTarget,
-                DraftCommandTarget(sceneID: sceneID, kind: .settings)
-            )
             .modifier(FocusedDraftCancellationAlert(model: model))
+            .modifier(StoreReplacementFeedbackAlert(model: model, sceneID: sceneID))
     }
 }
 

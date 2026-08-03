@@ -140,4 +140,11 @@ final class IntegerTextFieldFormatterTests: XCTestCase {
         XCTAssertNil(IntegerTextFieldFormatter.value(from: "-"))
         XCTAssertEqual(IntegerTextFieldFormatter.value(from: "30"), 30)
     }
+
+    func testIntegerInputRejectsSeparatorsInsteadOfChangingMagnitude() {
+        XCTAssertNil(IntegerTextFieldFormatter.value(from: "1,2"))
+        XCTAssertNil(IntegerTextFieldFormatter.value(from: "1.2"))
+        XCTAssertNil(IntegerTextFieldFormatter.value(from: "1 2"))
+        XCTAssertNil(IntegerTextFieldFormatter.value(from: "1\u{00A0}2"))
+    }
 }

@@ -46,11 +46,13 @@ extension DraftKind {
 }
 
 enum StoreReplacementRequest: Equatable {
+    case reloadFromDisk
     case sampleData
     case backup(URL)
 
     var actionTitle: String {
         switch self {
+        case .reloadFromDisk: "Reload From Disk"
         case .sampleData: "Seed Sample Data"
         case .backup: "Restore Backup"
         }
@@ -62,10 +64,20 @@ struct PendingStoreReplacement: Equatable {
     let request: StoreReplacementRequest
 }
 
+struct StoreReplacementFeedback: Equatable, Identifiable {
+    let id = UUID()
+    let sceneID: UUID
+    let message: String
+    let isError: Bool
+}
+
 enum NavigationIntent: Equatable {
     case section(AppSection)
     case invoice(UUID)
     case client(UUID)
     case project(UUID)
+    case newInvoice
+    case newClient
+    case newProject
     case closeWindow
 }

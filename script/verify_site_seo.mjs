@@ -237,6 +237,14 @@ function verifyStaticSeoPage(baseDir, page, label) {
     fail(`${label}/${page.source} raw text must be at least 900 characters, got ${rawTextLength}`);
   }
 
+  for (const tag of ["table", "thead", "tbody", "tr"]) {
+    const openingCount = countMatches(html, new RegExp(`<${tag}\\b`, "gi"));
+    const closingCount = countMatches(html, new RegExp(`</${tag}>`, "gi"));
+    if (openingCount !== closingCount) {
+      fail(`${label}/${page.source} must balance <${tag}> tags, got ${openingCount} opening and ${closingCount} closing`);
+    }
+  }
+
   for (const pattern of stalePatterns) {
     assertNotMatches(html, pattern, `${label}/${page.source}`);
   }

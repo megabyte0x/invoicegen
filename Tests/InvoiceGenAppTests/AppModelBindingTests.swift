@@ -49,6 +49,46 @@ final class AppModelBindingTests: XCTestCase {
         XCTAssertEqual(persisted, "not valid json")
     }
 
+    func testStoreReplacementFeedbackStaysWithInitiatingScene() {
+        let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
+        let initiatingScene = UUID()
+
+        model.requestStoreReplacement(.sampleData, from: initiatingScene)
+        model.confirmStoreReplacement(from: initiatingScene)
+
+        XCTAssertNil(model.pendingStoreReplacement)
+        XCTAssertEqual(model.storeReplacementFeedback?.sceneID, initiatingScene)
+        XCTAssertFalse(model.storeReplacementFeedback?.isError ?? true)
+
+        model.dismissStoreReplacementFeedback(from: UUID())
+        XCTAssertNotNil(model.storeReplacementFeedback)
+
+        model.dismissStoreReplacementFeedback(from: initiatingScene)
+        XCTAssertNil(model.storeReplacementFeedback)
+    }
+
+    func testReloadReplacementDefersBookMutationUntilConfirmation() throws {
+        let url = temporaryStoreURL()
+        let store = LocalInvoiceStore(url: url)
+        try store.save(InvoiceBook(businessProfile: BusinessProfile(name: "On Disk")))
+        let model = AppModel(store: store)
+        model.book.businessProfile.name = "In Memory"
+        model.beginNewInvoice(now: Date(timeIntervalSince1970: 0))
+        let draftID = model.invoiceDraft?.value.id
+        let sceneID = UUID()
+
+        model.requestStoreReplacement(.reloadFromDisk, from: sceneID)
+
+        XCTAssertEqual(model.book.businessProfile.name, "In Memory")
+        XCTAssertEqual(model.invoiceDraft?.value.id, draftID)
+
+        model.confirmStoreReplacement(from: sceneID)
+
+        XCTAssertEqual(model.book.businessProfile.name, "On Disk")
+        XCTAssertNil(model.invoiceDraft)
+        XCTAssertNil(model.pendingStoreReplacement)
+    }
+
     func testDeletingClientUnassignsRelatedProjectsAndInvoices() {
         let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
         let timestamp = Date()

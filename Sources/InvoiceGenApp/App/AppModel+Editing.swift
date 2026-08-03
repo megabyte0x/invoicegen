@@ -211,7 +211,6 @@ extension AppModel {
             paymentAcceptanceDetails: book.paymentAcceptanceDetails
         )
         settingsDraft = DraftSession(origin: .persisted, baseline: value, value: value)
-        activeDraftRoute = .settings
     }
 
     func commitSettingsDraft(now: Date = Date()) throws {
@@ -238,7 +237,6 @@ extension AppModel {
         session.markCommitted(committed)
         settingsDraft = session
         clearTransientEditorInputIssues(for: .settings)
-        activeDraftRoute = .settings
     }
 
     func cancelSettingsDraft() {
@@ -294,16 +292,20 @@ extension AppModel {
     }
 
     func discardDirtyDraftsAndContinue() {
-        guard let intent = pendingNavigation else { return }
-        invoiceDraft = nil
-        clientDraft = nil
-        projectDraft = nil
-        settingsDraft = nil
-        activeDraftRoute = nil
-        pendingNavigation = nil
+        guard let intent = pendingNavigation,
+              let discardedKind = dirtyDraftRequiringDecision else { return }
+
+        cancelDraft(discardedKind)
+        clearTransientEditorInputIssues(for: discardedKind)
         dirtyDraftRequiringDecision = nil
+
+        if let nextDirtyDraft = activeDirtyDraftKind {
+            dirtyDraftRequiringDecision = nextDirtyDraft
+            return
+        }
+
+        pendingNavigation = nil
         contextualReturnSection = nil
-        clearAllTransientEditorInputIssues()
         continueNavigation(to: intent)
     }
 
@@ -360,15 +362,15 @@ extension AppModel {
     }
 
     func addInvoice() {
-        beginNewInvoice()
+        requestNavigation(to: .newInvoice)
     }
 
     func addClient() {
-        beginNewClient()
+        requestNavigation(to: .newClient)
     }
 
     func addProject() {
-        beginNewProject()
+        requestNavigation(to: .newProject)
     }
 
     func addPaymentAcceptanceDetail(kind: PaymentAcceptanceKind) {
@@ -539,6 +541,12 @@ extension AppModel {
         case let .project(id):
             selectedSection = .projects
             selectedProjectID = id
+        case .newInvoice:
+            beginNewInvoice()
+        case .newClient:
+            beginNewClient()
+        case .newProject:
+            beginNewProject()
         case .closeWindow:
             NSApp.keyWindow?.performClose(nil)
         }

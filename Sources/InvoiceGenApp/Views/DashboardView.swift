@@ -9,12 +9,16 @@ struct DashboardView: View {
         model.book.invoices.sorted { $0.issueDate > $1.issueDate }
     }
 
-    private var outstandingMinorUnits: Int64 {
-        model.book.invoices.reduce(0) { $0 + $1.balanceDueMinorUnits }
+    private var outstandingMinorUnits: Int64? {
+        let values = model.book.invoices.map(\.calculatedBalanceDueMinorUnits)
+        guard !values.contains(where: { $0 == nil }) else { return nil }
+        return MinorUnitArithmetic.sum(values.compactMap { $0 })
     }
 
-    private var paidMinorUnits: Int64 {
-        model.book.invoices.reduce(0) { $0 + $1.paidMinorUnits }
+    private var paidMinorUnits: Int64? {
+        let values = model.book.invoices.map(\.calculatedPaidMinorUnits)
+        guard !values.contains(where: { $0 == nil }) else { return nil }
+        return MinorUnitArithmetic.sum(values.compactMap { $0 })
     }
 
     var body: some View {
@@ -147,8 +151,9 @@ struct DashboardView: View {
         .background(TahoeHeaderBackground())
     }
 
-    private func money(_ value: Int64) -> String {
-        Money.format(minorUnits: value, currencyCode: model.book.businessProfile.currencyCode)
+    private func money(_ value: Int64?) -> String {
+        guard let value else { return "Amount unavailable" }
+        return Money.format(minorUnits: value, currencyCode: model.book.businessProfile.currencyCode)
     }
 }
 

@@ -104,7 +104,7 @@ struct InvoicesView: View {
         .safeAreaInset(edge: .bottom) {
             Button(action: {
                 isPresentingDetail = true
-                model.addInvoice()
+                model.requestNavigation(to: .newInvoice)
             }) {
                 Label("New Invoice", systemImage: "plus")
                     .frame(maxWidth: .infinity)
@@ -215,11 +215,10 @@ struct InvoiceSummaryRowContent {
     init(invoice: Invoice, clientName: String) {
         self.invoiceNumber = invoice.number
         self.statusLabel = invoice.status.label
-        self.amountText = Money.format(
-            minorUnits: invoice.balanceDueMinorUnits,
-            currencyCode: invoice.currencyCode
-        )
-        .replacingOccurrences(of: invoice.currencyCode + " ", with: "")
+        self.amountText = invoice.calculatedBalanceDueMinorUnits.map {
+            Money.format(minorUnits: $0, currencyCode: invoice.currencyCode)
+                .replacingOccurrences(of: invoice.currencyCode + " ", with: "")
+        } ?? "Amount unavailable"
         self.clientName = clientName
         self.dueDateText = DateFormatting.short.string(from: invoice.dueDate)
         self.minimumHeight = 58

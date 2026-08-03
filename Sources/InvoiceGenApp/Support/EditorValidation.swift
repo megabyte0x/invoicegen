@@ -82,22 +82,35 @@ enum EditorValidator {
                     message: "Line item title is required."
                 ))
             }
-            if item.quantity <= 0 || !item.quantity.isFinite {
+            if item.quantity <= 0 || !item.quantity.isFinite || item.quantity > InvoiceAmountPolicy.maximumQuantity {
                 issues.append(EditorIssue(
                     field: .lineItemQuantity(item.id),
-                    message: "Line item quantity must be greater than zero."
+                    message: "Line item quantity must be greater than zero and no more than 1,000,000."
                 ))
             }
-            if item.unitPriceMinorUnits < 0 {
+            if item.unitPriceMinorUnits < 0 || item.unitPriceMinorUnits > InvoiceAmountPolicy.maximumMoneyMinorUnits {
                 issues.append(EditorIssue(
                     field: .lineItemUnitPrice(item.id),
-                    message: "Line item unit price cannot be negative."
+                    message: "Line item unit price must be between 0.00 and 1,000,000,000.00."
                 ))
             }
             if item.taxRatePercent < 0 || item.taxRatePercent > 100 || !item.taxRatePercent.isFinite {
                 issues.append(EditorIssue(
                     field: .lineItemTaxRate(item.id),
                     message: "Line item tax rate must be between 0 and 100."
+                ))
+            }
+            if item.quantity > 0,
+               item.quantity <= InvoiceAmountPolicy.maximumQuantity,
+               item.unitPriceMinorUnits >= 0,
+               item.unitPriceMinorUnits <= InvoiceAmountPolicy.maximumMoneyMinorUnits,
+               item.taxRatePercent >= 0,
+               item.taxRatePercent <= 100,
+               item.taxRatePercent.isFinite,
+               item.calculatedTotalMinorUnits == nil {
+                issues.append(EditorIssue(
+                    field: .lineItemQuantity(item.id),
+                    message: "Quantity and unit price produce a line amount that is too large to calculate."
                 ))
             }
         }
@@ -111,14 +124,23 @@ enum EditorValidator {
 
         let hasInvalidLineAmount = invoice.lineItems.contains { item in
             item.quantity <= 0 ||
+                item.quantity > InvoiceAmountPolicy.maximumQuantity ||
                 !item.quantity.isFinite ||
                 item.unitPriceMinorUnits < 0 ||
+                item.unitPriceMinorUnits > InvoiceAmountPolicy.maximumMoneyMinorUnits ||
                 item.taxRatePercent < 0 ||
                 item.taxRatePercent > 100 ||
-                !item.taxRatePercent.isFinite
+                !item.taxRatePercent.isFinite ||
+                item.calculatedTotalMinorUnits == nil
         }
 
-        if !hasInvalidLineAmount, invoice.paidMinorUnits > invoice.totalMinorUnits {
+        if !hasInvalidLineAmount,
+           (invoice.calculatedTotalMinorUnits == nil || invoice.calculatedPaidMinorUnits == nil) {
+            issues.append(EditorIssue(
+                field: .invoiceNumber,
+                message: "Invoice totals are too large to calculate. Reduce one or more line-item amounts."
+            ))
+        } else if !hasInvalidLineAmount, invoice.paidMinorUnits > invoice.totalMinorUnits {
             issues.append(EditorIssue(
                 field: .invoiceNumber,
                 message: "Recorded payments cannot exceed the invoice total."
@@ -141,8 +163,11 @@ enum EditorValidator {
         if project.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             issues.append(EditorIssue(field: .projectName, message: "Project name is required."))
         }
-        if project.hourlyRateMinorUnits < 0 {
-            issues.append(EditorIssue(field: .projectHourlyRate, message: "Project hourly rate cannot be negative."))
+        if project.hourlyRateMinorUnits < 0 || project.hourlyRateMinorUnits > InvoiceAmountPolicy.maximumMoneyMinorUnits {
+            issues.append(EditorIssue(
+                field: .projectHourlyRate,
+                message: "Project hourly rate must be between 0.00 and 1,000,000,000.00."
+            ))
         }
 
         return issues

@@ -37,6 +37,53 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(item.totalMinorUnits, 3_085)
     }
 
+    func testExtremeLineItemArithmeticReturnsUnavailableWithoutOverflow() {
+        let item = InvoiceLineItem(
+            title: "Extreme",
+            quantity: Double.greatestFiniteMagnitude,
+            unitPriceMinorUnits: Int64.max,
+            taxRatePercent: 100
+        )
+
+        XCTAssertNil(item.calculatedSubtotalMinorUnits)
+        XCTAssertNil(item.calculatedTaxMinorUnits)
+        XCTAssertNil(item.calculatedTotalMinorUnits)
+        XCTAssertEqual(item.totalMinorUnits, 0)
+
+        let book = InvoiceBook(invoices: [Invoice(
+            number: "INV-EXTREME",
+            dueDate: Date(),
+            lineItems: [item]
+        )])
+        XCTAssertThrowsError(try book.validateForSave())
+    }
+
+    func testAggregateInvoiceArithmeticDetectsCheckedAdditionOverflow() {
+        let items = (0..<50).map { index in
+            InvoiceLineItem(
+                title: "Large \(index)",
+                quantity: InvoiceAmountPolicy.maximumQuantity,
+                unitPriceMinorUnits: InvoiceAmountPolicy.maximumMoneyMinorUnits,
+                taxRatePercent: 100
+            )
+        }
+        let invoice = Invoice(number: "INV-AGGREGATE", dueDate: Date(), lineItems: items)
+
+        XCTAssertNotNil(items.first?.calculatedTotalMinorUnits)
+        XCTAssertNil(invoice.calculatedTotalMinorUnits)
+        XCTAssertNil(invoice.calculatedBalanceDueMinorUnits)
+        XCTAssertThrowsError(try InvoiceBook(invoices: [invoice]).validateForSave())
+    }
+
+    func testMoneyHandlesInt64BoundariesWithoutOverflow() throws {
+        XCTAssertEqual(
+            Money.format(minorUnits: .min, currencyCode: "USD"),
+            "USD -92233720368547758.08"
+        )
+        XCTAssertEqual(try Money.parseMinorUnits("-92233720368547758.08"), .min)
+        XCTAssertThrowsError(try Money.parseMinorUnits("92233720368547758.08"))
+    }
+
     func testPaidInvoiceCanBeMarkedUnpaid() {
         let now = Date(timeIntervalSince1970: 0)
         var invoice = Invoice(
@@ -287,6 +334,31 @@ final class InvoiceCoreTests: XCTestCase {
 
         let restored = try store.load()
         XCTAssertEqual(restored.businessProfile.name, "Original Co")
+    }
+
+    func testRestoreRefreshesCanonicalInvoiceStatusBeforeReturning() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let storeURL = directory.appendingPathComponent("store.json")
+        let backupURL = directory.appendingPathComponent("backup.json")
+        let store = LocalInvoiceStore(url: storeURL)
+        let invoice = Invoice(
+            number: "INV-RESTORE-STATUS",
+            issueDate: Date(timeIntervalSince1970: 0),
+            dueDate: Date(timeIntervalSince1970: 86_400),
+            status: .sent,
+            lineItems: [InvoiceLineItem(title: "Work", unitPriceMinorUnits: 10_000)],
+            payments: [Payment(amountMinorUnits: 10_000)]
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try encoder.encode(InvoiceBook(invoices: [invoice])).write(to: backupURL)
+
+        let restored = try store.restoreStore(from: backupURL)
+
+        XCTAssertEqual(restored.invoices.first?.status, .paid)
+        XCTAssertEqual(try store.load().invoices.first?.status, .paid)
     }
 
     func testAppStoreOverrides() {

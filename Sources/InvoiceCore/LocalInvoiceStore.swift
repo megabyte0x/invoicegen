@@ -117,6 +117,7 @@ public final class LocalInvoiceStore {
         decoder.dateDecodingStrategy = .iso8601
         var restored = try decoder.decode(InvoiceBook.self, from: data)
         restored.schemaVersion = InvoiceBook.currentSchemaVersion
+        restored.refreshInvoiceStatuses()
         try save(restored)
         return restored
     }

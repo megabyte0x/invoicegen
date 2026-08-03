@@ -313,6 +313,15 @@ fn money_contract_matches_swift_core() {
     assert_eq!(invoicegen_rs::parse_minor_units("-12.3").unwrap(), -1_230);
     assert_eq!(invoicegen_rs::format_money(123_450, "USD"), "USD 1234.50");
     assert_eq!(invoicegen_rs::format_money(-1_230, "EUR"), "EUR -12.30");
+    assert_eq!(
+        invoicegen_rs::format_money(i64::MIN, "USD"),
+        "USD -92233720368547758.08"
+    );
+    assert_eq!(
+        invoicegen_rs::parse_minor_units("-92233720368547758.08").unwrap(),
+        i64::MIN
+    );
+    assert!(invoicegen_rs::parse_minor_units("92233720368547758.08").is_err());
     assert!(invoicegen_rs::parse_minor_units("12.345").is_err());
     assert!(invoicegen_rs::parse_minor_units("").is_err());
 }

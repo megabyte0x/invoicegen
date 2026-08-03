@@ -12,7 +12,6 @@ struct EditorActionBar: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Button("Cancel", action: cancel)
-                .keyboardShortcut(.cancelAction)
             Button("Save", action: save)
                 .keyboardShortcut(.defaultAction)
                 .disabled(!isDirty)

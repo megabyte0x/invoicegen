@@ -39,7 +39,7 @@ struct ProjectsView: View {
             .safeAreaInset(edge: .bottom) {
                 Button {
                     isPresentingDetail = true
-                    model.beginNewProject()
+                    model.requestNavigation(to: .newProject)
                 } label: {
                     Label("New Project", systemImage: "plus")
                         .frame(maxWidth: .infinity)
@@ -112,6 +112,7 @@ struct ProjectEditorView: View {
     @State private var isConfirmingDelete = false
     @State private var touchedFields: Set<EditorField> = []
     @State private var numericInputResetGeneration = 0
+    @State private var commandTargetID = UUID()
     @FocusState private var focusedField: EditorField?
 
     var body: some View {
@@ -126,6 +127,15 @@ struct ProjectEditorView: View {
                 )
             }
         }
+        .focusedSceneValue(
+            \.draftCommandTarget,
+            DraftCommandTarget(
+                id: commandTargetID,
+                kind: .project,
+                save: saveProject,
+                cancel: cancelProject
+            )
+        )
         .onChange(of: focusedField) { oldValue, _ in
             if let oldValue {
                 touchedFields.insert(oldValue)
@@ -219,6 +229,7 @@ struct ProjectEditorView: View {
                     Text(client.name).tag(Optional(client.id))
                 }
             }
+            .accessibilityLabel("Client assignment")
             .frame(height: 30)
         }
     }
@@ -228,6 +239,9 @@ struct ProjectEditorView: View {
             RuneyFormLabel(title: "Hourly Billing Rate")
             RuneyMoneyTextField(
                 minorUnits: project.hourlyRateMinorUnits,
+                accessibilityLabel: "Hourly billing rate",
+                validRange: 0...InvoiceAmountPolicy.maximumMoneyMinorUnits,
+                outOfRangeMessage: "Hourly rate must be between 0.00 and 1,000,000,000.00.",
                 resetID: NumericEditorResetID(
                     entityID: project.wrappedValue.id,
                     generation: numericInputResetGeneration
@@ -286,6 +300,8 @@ struct ProjectEditorView: View {
         do {
             try model.commitProjectDraft()
             model.clearEditorIssues()
+            touchedFields.removeAll()
+            numericInputResetGeneration &+= 1
         } catch let error as EditorCommitError {
             model.presentEditorIssues(error.issues)
             focusedField = error.issues.first?.field
@@ -337,13 +353,15 @@ struct ProjectEditorView: View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: label)
             if isMultiline {
-                RuneyMultilineEditor(text: text)
+                RuneyMultilineEditor(text: text, accessibilityLabel: label)
             } else if let field {
                 TextField("", text: text)
+                    .accessibilityLabel(label)
                     .runeyFieldInput()
                     .focused($focusedField, equals: field)
             } else {
                 TextField("", text: text)
+                    .accessibilityLabel(label)
                     .runeyFieldInput()
             }
             if let issue {

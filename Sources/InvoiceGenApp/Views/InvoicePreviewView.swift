@@ -163,24 +163,31 @@ struct InvoicePreviewView: View {
 
     private func mailInvoiceWithMailApp() {
         let draft = InvoiceMailDraft(invoice: invoice, book: book)
+        var attachmentURL: URL?
 
         do {
-            let attachmentURL = try writeTemporaryInvoicePDF()
+            attachmentURL = try writeTemporaryInvoicePDF()
+            guard let attachmentURL else { return }
             try InvoiceMailAppleScript.compose(draft: draft, attachmentURL: attachmentURL)
             scheduleTemporaryAttachmentCleanup(for: attachmentURL)
 
             mailNotice = draft.isMissingRecipient ? "No client email. Mail opened without a recipient." : nil
             isConfirmingMarkSent = true
         } catch {
+            if let attachmentURL {
+                removeTemporaryAttachment(at: attachmentURL)
+            }
             model.errorMessage = "Could not prepare invoice email: \(error.localizedDescription)"
         }
     }
 
     private func mailInvoiceWithBrowser() {
         let draft = InvoiceMailDraft(invoice: invoice, book: book)
+        var attachmentURL: URL?
 
         do {
-            let attachmentURL = try writeTemporaryInvoicePDF()
+            attachmentURL = try writeTemporaryInvoicePDF()
+            guard let attachmentURL else { return }
 
             guard let mailtoURL = InvoiceMailtoURL.url(for: draft) else {
                 throw NSError(
@@ -192,7 +199,18 @@ struct InvoicePreviewView: View {
                 )
             }
 
-            NSWorkspace.shared.activateFileViewerSelecting([attachmentURL])
+            guard NSWorkspace.shared.selectFile(
+                attachmentURL.path,
+                inFileViewerRootedAtPath: attachmentURL.deletingLastPathComponent().path
+            ) else {
+                throw NSError(
+                    domain: "InvoiceGen.Mailto",
+                    code: -2,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Could not reveal the temporary invoice PDF."
+                    ]
+                )
+            }
 
             guard NSWorkspace.shared.open(mailtoURL) else {
                 throw NSError(
@@ -208,6 +226,9 @@ struct InvoicePreviewView: View {
             mailNotice = browserMailNotice(isMissingRecipient: draft.isMissingRecipient)
             isConfirmingMarkSent = true
         } catch {
+            if let attachmentURL {
+                removeTemporaryAttachment(at: attachmentURL)
+            }
             model.errorMessage = "Could not prepare browser email: \(error.localizedDescription)"
         }
     }
@@ -216,11 +237,15 @@ struct InvoicePreviewView: View {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("InvoiceGen-Mail-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-
-        let fileURL = directoryURL.appendingPathComponent(InvoiceExportNaming.pdfFileName(for: invoice))
-        try InvoiceDocumentRenderer.pdfData(document: document)
-            .write(to: fileURL, options: .atomic)
-        return fileURL
+        do {
+            let fileURL = directoryURL.appendingPathComponent(InvoiceExportNaming.pdfFileName(for: invoice))
+            try InvoiceDocumentRenderer.pdfData(document: document)
+                .write(to: fileURL, options: .atomic)
+            return fileURL
+        } catch {
+            try? FileManager.default.removeItem(at: directoryURL)
+            throw error
+        }
     }
 
     private func scheduleTemporaryAttachmentCleanup(
@@ -229,8 +254,16 @@ struct InvoicePreviewView: View {
     ) {
         let directoryURL = attachmentURL.deletingLastPathComponent()
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            try? FileManager.default.removeItem(at: directoryURL)
+            Self.removeTemporaryDirectory(at: directoryURL)
         }
+    }
+
+    private func removeTemporaryAttachment(at attachmentURL: URL) {
+        Self.removeTemporaryDirectory(at: attachmentURL.deletingLastPathComponent())
+    }
+
+    private static func removeTemporaryDirectory(at directoryURL: URL) {
+        try? FileManager.default.removeItem(at: directoryURL)
     }
 
     private func browserMailNotice(isMissingRecipient: Bool) -> String {

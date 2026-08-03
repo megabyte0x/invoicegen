@@ -6,6 +6,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const CURRENT_SCHEMA_VERSION: i64 = 2;
+pub const MAXIMUM_INVOICE_QUANTITY: f64 = 1_000_000.0;
+pub const MAXIMUM_MONEY_MINOR_UNITS: i64 = 100_000_000_000;
 
 static ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -139,16 +141,32 @@ pub struct InvoiceLineItem {
 }
 
 impl InvoiceLineItem {
+    pub fn calculated_subtotal_minor_units(&self) -> Option<i64> {
+        checked_rounded_product(self.unit_price_minor_units, self.quantity)
+    }
+
+    pub fn calculated_tax_minor_units(&self) -> Option<i64> {
+        checked_rounded_product(
+            self.calculated_subtotal_minor_units()?,
+            self.tax_rate_percent / 100.0,
+        )
+    }
+
+    pub fn calculated_total_minor_units(&self) -> Option<i64> {
+        self.calculated_subtotal_minor_units()?
+            .checked_add(self.calculated_tax_minor_units()?)
+    }
+
     pub fn subtotal_minor_units(&self) -> i64 {
-        (self.quantity * self.unit_price_minor_units as f64).round() as i64
+        self.calculated_subtotal_minor_units().unwrap_or(0)
     }
 
     pub fn tax_minor_units(&self) -> i64 {
-        (self.subtotal_minor_units() as f64 * self.tax_rate_percent / 100.0).round() as i64
+        self.calculated_tax_minor_units().unwrap_or(0)
     }
 
     pub fn total_minor_units(&self) -> i64 {
-        self.subtotal_minor_units() + self.tax_minor_units()
+        self.calculated_total_minor_units().unwrap_or(0)
     }
 }
 
@@ -219,40 +237,72 @@ pub struct Invoice {
 }
 
 impl Invoice {
+    pub fn calculated_subtotal_minor_units(&self) -> Option<i64> {
+        checked_sum(
+            self.line_items
+                .iter()
+                .map(InvoiceLineItem::calculated_subtotal_minor_units),
+        )
+    }
+
+    pub fn calculated_tax_minor_units(&self) -> Option<i64> {
+        checked_sum(
+            self.line_items
+                .iter()
+                .map(InvoiceLineItem::calculated_tax_minor_units),
+        )
+    }
+
+    pub fn calculated_total_minor_units(&self) -> Option<i64> {
+        self.calculated_subtotal_minor_units()?
+            .checked_add(self.calculated_tax_minor_units()?)
+    }
+
+    pub fn calculated_paid_minor_units(&self) -> Option<i64> {
+        checked_sum(self.payments.iter().map(|payment| Some(payment.amount_minor_units)))
+    }
+
+    pub fn calculated_balance_due_minor_units(&self) -> Option<i64> {
+        Some(
+            0.max(
+                self.calculated_total_minor_units()?
+                    .checked_sub(self.calculated_paid_minor_units()?)?,
+            ),
+        )
+    }
+
     pub fn subtotal_minor_units(&self) -> i64 {
-        self.line_items
-            .iter()
-            .map(InvoiceLineItem::subtotal_minor_units)
-            .sum()
+        self.calculated_subtotal_minor_units().unwrap_or(0)
     }
 
     pub fn tax_minor_units(&self) -> i64 {
-        self.line_items
-            .iter()
-            .map(InvoiceLineItem::tax_minor_units)
-            .sum()
+        self.calculated_tax_minor_units().unwrap_or(0)
     }
 
     pub fn total_minor_units(&self) -> i64 {
-        self.subtotal_minor_units() + self.tax_minor_units()
+        self.calculated_total_minor_units().unwrap_or(0)
     }
 
     pub fn paid_minor_units(&self) -> i64 {
-        self.payments
-            .iter()
-            .map(|payment| payment.amount_minor_units)
-            .sum()
+        self.calculated_paid_minor_units().unwrap_or(0)
     }
 
     pub fn balance_due_minor_units(&self) -> i64 {
-        0.max(self.total_minor_units() - self.paid_minor_units())
+        self.calculated_balance_due_minor_units().unwrap_or(0)
     }
 
     pub fn refresh_status(&mut self, now: &str) {
         if self.status == InvoiceStatus::Void {
             return;
         }
-        if self.total_minor_units() > 0 && self.paid_minor_units() >= self.total_minor_units() {
+        let (Some(total), Some(paid)) = (
+            self.calculated_total_minor_units(),
+            self.calculated_paid_minor_units(),
+        ) else {
+            self.updated_at = now.to_string();
+            return;
+        };
+        if total > 0 && paid >= total {
             self.status = InvoiceStatus::Paid;
         } else if matches!(
             self.status,
@@ -567,9 +617,11 @@ impl InvoiceBook {
                     project.name
                 ));
             }
-            if project.hourly_rate_minor_units < 0 {
+            if project.hourly_rate_minor_units < 0
+                || project.hourly_rate_minor_units > MAXIMUM_MONEY_MINOR_UNITS
+            {
                 issues.push(format!(
-                    "Project hourly rate cannot be negative for project {}",
+                    "Project hourly rate must be between 0.00 and 1,000,000,000.00 for project {}",
                     project.name
                 ));
             }
@@ -642,7 +694,27 @@ impl InvoiceBook {
                     ));
                 }
             }
-            if invoice.paid_minor_units() > invoice.total_minor_units() {
+            let invoice_amounts_are_calculable = invoice.calculated_total_minor_units().is_some()
+                && invoice.calculated_paid_minor_units().is_some();
+            let has_invalid_line_amount = invoice.line_items.iter().any(|item| {
+                item.quantity <= 0.0
+                    || item.quantity > MAXIMUM_INVOICE_QUANTITY
+                    || !item.quantity.is_finite()
+                    || item.unit_price_minor_units < 0
+                    || item.unit_price_minor_units > MAXIMUM_MONEY_MINOR_UNITS
+                    || item.tax_rate_percent < 0.0
+                    || item.tax_rate_percent > 100.0
+                    || !item.tax_rate_percent.is_finite()
+                    || item.calculated_total_minor_units().is_none()
+            });
+            if !has_invalid_line_amount && !invoice_amounts_are_calculable {
+                issues.push(format!(
+                    "Invoice totals are too large to calculate for invoice {}",
+                    invoice_display_number(invoice)
+                ));
+            } else if !has_invalid_line_amount
+                && invoice.paid_minor_units() > invoice.total_minor_units()
+            {
                 issues.push(format!(
                     "Payments cannot exceed invoice total for invoice {}",
                     invoice_display_number(invoice)
@@ -668,14 +740,19 @@ impl InvoiceBook {
                         invoice_display_number(invoice)
                     ));
                 }
-                if item.quantity <= 0.0 || !item.quantity.is_finite() {
+                if item.quantity <= 0.0
+                    || item.quantity > MAXIMUM_INVOICE_QUANTITY
+                    || !item.quantity.is_finite()
+                {
                     issues.push(format!(
-                        "Line item quantity must be greater than zero for {item_label}"
+                        "Line item quantity must be greater than zero and no more than 1,000,000 for {item_label}"
                     ));
                 }
-                if item.unit_price_minor_units < 0 {
+                if item.unit_price_minor_units < 0
+                    || item.unit_price_minor_units > MAXIMUM_MONEY_MINOR_UNITS
+                {
                     issues.push(format!(
-                        "Line item unit price cannot be negative for {item_label}"
+                        "Line item unit price must be between 0.00 and 1,000,000,000.00 for {item_label}"
                     ));
                 }
                 if item.tax_rate_percent < 0.0
@@ -684,6 +761,19 @@ impl InvoiceBook {
                 {
                     issues.push(format!(
                         "Line item tax rate must be between 0 and 100 for {item_label}"
+                    ));
+                }
+                if item.quantity > 0.0
+                    && item.quantity <= MAXIMUM_INVOICE_QUANTITY
+                    && item.unit_price_minor_units >= 0
+                    && item.unit_price_minor_units <= MAXIMUM_MONEY_MINOR_UNITS
+                    && item.tax_rate_percent >= 0.0
+                    && item.tax_rate_percent <= 100.0
+                    && item.tax_rate_percent.is_finite()
+                    && item.calculated_total_minor_units().is_none()
+                {
+                    issues.push(format!(
+                        "Line item amount is too large to calculate for {item_label}"
                     ));
                 }
             }
@@ -1260,7 +1350,7 @@ pub fn parse_minor_units(raw_value: &str) -> Result<i64, String> {
         return Err(format!("Invalid amount: {raw_value}"));
     }
     let major = parts[0]
-        .parse::<i64>()
+        .parse::<i128>()
         .map_err(|_| format!("Invalid amount: {raw_value}"))?;
     if major < 0 {
         return Err(format!("Invalid amount: {raw_value}"));
@@ -1274,20 +1364,46 @@ pub fn parse_minor_units(raw_value: &str) -> Result<i64, String> {
         while padded.len() < 2 {
             padded.push('0');
         }
-        padded.parse::<i64>().unwrap_or(0)
+        padded.parse::<i128>().unwrap_or(0)
     } else {
         0
     };
-    let result = major * 100 + cents;
-    Ok(if is_negative { -result } else { result })
+    let magnitude = major
+        .checked_mul(100)
+        .and_then(|value| value.checked_add(cents))
+        .ok_or_else(|| format!("Invalid amount: {raw_value}"))?;
+    let result = if is_negative { -magnitude } else { magnitude };
+    i64::try_from(result).map_err(|_| format!("Invalid amount: {raw_value}"))
 }
 
 pub fn format_money(minor_units: i64, currency_code: &str) -> String {
     let sign = if minor_units < 0 { "-" } else { "" };
-    let absolute = minor_units.abs();
+    let absolute = minor_units.unsigned_abs();
     let major = absolute / 100;
     let cents = absolute % 100;
     format!("{currency_code} {sign}{major}.{cents:02}")
+}
+
+pub fn checked_minor_unit_sum(values: impl IntoIterator<Item = Option<i64>>) -> Option<i64> {
+    checked_sum(values)
+}
+
+fn checked_sum(values: impl IntoIterator<Item = Option<i64>>) -> Option<i64> {
+    let mut total = 0_i64;
+    for value in values {
+        total = total.checked_add(value?)?;
+    }
+    Some(total)
+}
+
+fn checked_rounded_product(minor_units: i64, multiplier: f64) -> Option<i64> {
+    let rounded = (minor_units as f64 * multiplier).round();
+    const I64_MAX_PLUS_ONE: f64 = 9_223_372_036_854_775_808.0;
+    const I64_MIN: f64 = -9_223_372_036_854_775_808.0;
+    if !rounded.is_finite() || !(I64_MIN..I64_MAX_PLUS_ONE).contains(&rounded) {
+        return None;
+    }
+    Some(rounded as i64)
 }
 
 pub fn render_invoice_text(invoice: &Invoice, book: &InvoiceBook) -> String {
@@ -1825,4 +1941,68 @@ fn civil_from_days(days: i64) -> (i32, u32, u32) {
     let month = mp + if mp < 10 { 3 } else { -9 };
     let year = year + if month <= 2 { 1 } else { 0 };
     (year as i32, month as u32, day as u32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn checked_invoice_arithmetic_rejects_extreme_and_aggregate_overflow() {
+        let extreme = InvoiceLineItem {
+            id: "extreme".to_string(),
+            title: "Extreme".to_string(),
+            details: String::new(),
+            quantity: f64::MAX,
+            unit_price_minor_units: i64::MAX,
+            tax_rate_percent: 100.0,
+        };
+        assert_eq!(extreme.calculated_total_minor_units(), None);
+        assert_eq!(extreme.total_minor_units(), 0);
+
+        let invalid_invoice = Invoice {
+            id: "invalid-invoice".to_string(),
+            number: "INV-INVALID".to_string(),
+            issue_date: "2026-08-03".to_string(),
+            due_date: "2026-08-03".to_string(),
+            status: InvoiceStatus::Draft,
+            currency_code: "USD".to_string(),
+            client_id: None,
+            project_id: None,
+            notes: String::new(),
+            terms: String::new(),
+            accepted_payment_detail_ids: Vec::new(),
+            line_items: vec![extreme],
+            payments: vec![Payment {
+                id: "payment".to_string(),
+                amount_minor_units: 1,
+                paid_at: "2026-08-03".to_string(),
+                reference: String::new(),
+                notes: String::new(),
+            }],
+            auto_generation: InvoiceAutoGenerationSettings::disabled(),
+            created_at: "2026-08-03T00:00:00Z".to_string(),
+            updated_at: "2026-08-03T00:00:00Z".to_string(),
+        };
+        let mut invalid_book = InvoiceBook::empty();
+        invalid_book.invoices = vec![invalid_invoice];
+        let validation_error = invalid_book.validate_for_save().unwrap_err();
+        assert!(!validation_error.contains("Payments cannot exceed invoice total"));
+
+        let valid_large = InvoiceLineItem {
+            id: "large".to_string(),
+            title: "Large".to_string(),
+            details: String::new(),
+            quantity: MAXIMUM_INVOICE_QUANTITY,
+            unit_price_minor_units: MAXIMUM_MONEY_MINOR_UNITS,
+            tax_rate_percent: 100.0,
+        };
+        assert!(valid_large.calculated_total_minor_units().is_some());
+        assert_eq!(
+            checked_minor_unit_sum(
+                (0..50).map(|_| valid_large.calculated_total_minor_units())
+            ),
+            None
+        );
+    }
 }

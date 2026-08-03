@@ -93,8 +93,10 @@ enum IntegerTextFieldFormatter {
     static func value(from rawValue: String) -> Int? {
         let trimmed = rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: ",", with: "")
         guard !trimmed.isEmpty else { return nil }
+        guard trimmed.range(of: #"^-?[0-9]+$"#, options: .regularExpression) != nil else {
+            return nil
+        }
         return Int(trimmed)
     }
 }
@@ -102,6 +104,9 @@ enum IntegerTextFieldFormatter {
 struct RuneyMoneyTextField: View {
     @Binding var minorUnits: Int64
     var width: CGFloat? = nil
+    var accessibilityLabel: String
+    var validRange: ClosedRange<Int64>? = nil
+    var outOfRangeMessage = "Enter an amount within the supported range."
     var resetID: AnyHashable? = nil
     var locale: Locale = .autoupdatingCurrent
     var onValidityChanged: (Bool) -> Void = { _ in }
@@ -115,6 +120,7 @@ struct RuneyMoneyTextField: View {
                 text: textBinding,
                 isEditing: $isEditing,
                 modelValueIsZero: minorUnits == 0,
+                accessibilityLabel: accessibilityLabel,
                 onCommit: onCommitDraft
             )
             .frame(width: width, height: 30)
@@ -158,8 +164,14 @@ struct RuneyMoneyTextField: View {
     }
 
     private var draftState: NumericDraftState<Int64> {
-        guard let draft else { return .valid(minorUnits) }
-        return LocaleNumericParser.moneyMinorUnits(from: draft, locale: locale)
+        let state = draft.map { LocaleNumericParser.moneyMinorUnits(from: $0, locale: locale) }
+            ?? .valid(minorUnits)
+        if case let .valid(value) = state,
+           let validRange,
+           !validRange.contains(value) {
+            return .invalid(outOfRangeMessage)
+        }
+        return state
     }
 
     private func reportValidity() {
@@ -174,6 +186,9 @@ struct RuneyMoneyTextField: View {
 struct RuneyDecimalTextField: View {
     @Binding var value: Double
     var width: CGFloat? = nil
+    var accessibilityLabel: String
+    var validRange: ClosedRange<Double>? = nil
+    var outOfRangeMessage = "Enter a number within the supported range."
     var resetID: AnyHashable? = nil
     var locale: Locale = .autoupdatingCurrent
     var onValidityChanged: (Bool) -> Void = { _ in }
@@ -187,6 +202,7 @@ struct RuneyDecimalTextField: View {
                 text: textBinding,
                 isEditing: $isEditing,
                 modelValueIsZero: value == 0,
+                accessibilityLabel: accessibilityLabel,
                 onCommit: onCommitDraft
             )
             .frame(width: width, height: 30)
@@ -230,8 +246,14 @@ struct RuneyDecimalTextField: View {
     }
 
     private var draftState: NumericDraftState<Double> {
-        guard let draft else { return .valid(value) }
-        return LocaleNumericParser.decimal(from: draft, locale: locale)
+        let state = draft.map { LocaleNumericParser.decimal(from: $0, locale: locale) }
+            ?? .valid(value)
+        if case let .valid(value) = state,
+           let validRange,
+           !validRange.contains(value) {
+            return .invalid(outOfRangeMessage)
+        }
+        return state
     }
 
     private func reportValidity() {
@@ -247,6 +269,7 @@ private struct RuneyNumericDraftTextField: NSViewRepresentable {
     @Binding var text: String
     @Binding var isEditing: Bool
     var modelValueIsZero: Bool
+    var accessibilityLabel: String
     var onCommit: () -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -258,11 +281,13 @@ private struct RuneyNumericDraftTextField: NSViewRepresentable {
         textField.bezelStyle = .roundedBezel
         textField.delegate = context.coordinator
         textField.stringValue = text
+        textField.setAccessibilityLabel(accessibilityLabel)
         return textField
     }
 
     func updateNSView(_ textField: NSTextField, context: Context) {
         context.coordinator.parent = self
+        textField.setAccessibilityLabel(accessibilityLabel)
         if !context.coordinator.isEditing, textField.stringValue != text {
             textField.stringValue = text
         }
@@ -329,11 +354,13 @@ struct RuneyIntegerTextField: View {
     var validRange: ClosedRange<Int>
     var width: CGFloat? = nil
     var resetID: AnyHashable? = nil
+    var accessibilityLabel: String
     var onValidityChange: (Bool) -> Void
     @FocusState private var isFocused: Bool
 
     var body: some View {
         TextField("", text: textBinding)
+            .accessibilityLabel(accessibilityLabel)
             .runeyFieldInput(width: width)
             .focused($isFocused)
             .onSubmit {

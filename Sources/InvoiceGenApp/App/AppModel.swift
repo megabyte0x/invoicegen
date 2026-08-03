@@ -50,6 +50,7 @@ final class AppModel: ObservableObject {
     @Published var dirtyDraftRequiringDecision: DraftKind?
     @Published var draftCommandTargetPendingCancellation: DraftCommandTarget?
     @Published var pendingStoreReplacement: PendingStoreReplacement?
+    @Published var storeReplacementFeedback: StoreReplacementFeedback?
     @Published var contextualReturnSection: AppSection?
     @Published var editorIssues: [EditorIssue] = []
     @Published var focusedEditorField: EditorField?
@@ -98,7 +99,7 @@ final class AppModel: ObservableObject {
 
     func requestDraftCancellation(_ target: DraftCommandTarget) {
         guard isDraftDirty(target.kind) else {
-            cancelDraft(target.kind)
+            target.cancel()
             return
         }
 
@@ -137,13 +138,23 @@ final class AppModel: ObservableObject {
         pendingStoreReplacement = nil
     }
 
+    func dismissStoreReplacementFeedback(from sceneID: UUID) {
+        guard storeReplacementFeedback?.sceneID == sceneID else { return }
+        storeReplacementFeedback = nil
+    }
+
     func confirmStoreReplacement(from sceneID: UUID) {
-        guard let pendingStoreReplacement,
-              pendingStoreReplacement.sceneID == sceneID else { return }
+        guard let pending = pendingStoreReplacement,
+              pending.sceneID == sceneID else { return }
+        pendingStoreReplacement = nil
+
         do {
             let replacement: InvoiceBook
             let message: String
-            switch pendingStoreReplacement.request {
+            switch pending.request {
+            case .reloadFromDisk:
+                replacement = try store.load()
+                message = "Reloaded the local store from disk."
             case .sampleData:
                 replacement = .sample()
                 try store.save(replacement)
@@ -152,9 +163,18 @@ final class AppModel: ObservableObject {
                 replacement = try store.restoreStore(from: url)
                 message = "Restored local store from \(url.path)"
             }
-            applySuccessfulStoreReplacement(replacement, message: message)
+            applySuccessfulStoreReplacement(replacement)
+            storeReplacementFeedback = StoreReplacementFeedback(
+                sceneID: sceneID,
+                message: message,
+                isError: false
+            )
         } catch {
-            errorMessage = error.localizedDescription
+            storeReplacementFeedback = StoreReplacementFeedback(
+                sceneID: sceneID,
+                message: error.localizedDescription,
+                isError: true
+            )
         }
     }
 
@@ -232,7 +252,7 @@ final class AppModel: ObservableObject {
         automaticGenerationCheckScheduledFor = nil
     }
 
-    private func applySuccessfulStoreReplacement(_ replacement: InvoiceBook, message: String) {
+    private func applySuccessfulStoreReplacement(_ replacement: InvoiceBook) {
         book = replacement
         invoiceDraft = nil
         clientDraft = nil
@@ -254,7 +274,7 @@ final class AppModel: ObservableObject {
         selectedSection = .dashboard
         loadedStoreSuccessfully = true
         scheduleAutomaticGenerationCheck()
-        errorMessage = message
+        errorMessage = nil
         storeReplacementGeneration &+= 1
     }
 

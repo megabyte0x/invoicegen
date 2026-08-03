@@ -40,7 +40,7 @@ struct ClientsView: View {
             .safeAreaInset(edge: .bottom) {
                 Button {
                     isPresentingDetail = true
-                    model.beginNewClient()
+                    model.requestNavigation(to: .newClient)
                 } label: {
                     Label("New Client", systemImage: "plus")
                         .frame(maxWidth: .infinity)
@@ -135,6 +135,7 @@ struct ClientEditorView: View {
     @EnvironmentObject private var model: AppModel
     @State private var isConfirmingDelete = false
     @State private var touchedFields: Set<EditorField> = []
+    @State private var commandTargetID = UUID()
     @FocusState private var focusedField: EditorField?
 
     var body: some View {
@@ -149,6 +150,15 @@ struct ClientEditorView: View {
                 )
             }
         }
+        .focusedSceneValue(
+            \.draftCommandTarget,
+            DraftCommandTarget(
+                id: commandTargetID,
+                kind: .client,
+                save: saveClient,
+                cancel: cancelClient
+            )
+        )
         .onChange(of: focusedField) { oldValue, _ in
             if let oldValue {
                 touchedFields.insert(oldValue)
@@ -223,7 +233,11 @@ struct ClientEditorView: View {
                             .font(.headline)
                             .foregroundStyle(Color.runeyPrimary)
 
-                        RuneyMultilineEditor(text: client.notes, minHeight: 120)
+                        RuneyMultilineEditor(
+                            text: client.notes,
+                            minHeight: 120,
+                            accessibilityLabel: "Internal notes"
+                        )
                     }
                     .runeyCard()
 
@@ -326,13 +340,15 @@ struct ClientEditorView: View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: label)
             if isMultiline {
-                RuneyMultilineEditor(text: text)
+                RuneyMultilineEditor(text: text, accessibilityLabel: label)
             } else if let field {
                 TextField("", text: text)
+                    .accessibilityLabel(label)
                     .runeyFieldInput()
                     .focused($focusedField, equals: field)
             } else {
                 TextField("", text: text)
+                    .accessibilityLabel(label)
                     .runeyFieldInput()
             }
             if let issue {

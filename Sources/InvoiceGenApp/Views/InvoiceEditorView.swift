@@ -10,6 +10,7 @@ struct InvoiceEditorView: View {
     @State private var autoGenerationIntervalDraft: String?
     @State private var touchedFields: Set<EditorField> = []
     @State private var numericInputResetGeneration = 0
+    @State private var commandTargetID = UUID()
     @FocusState private var focusedField: EditorField?
 
     var body: some View {
@@ -24,6 +25,15 @@ struct InvoiceEditorView: View {
                 )
             }
         }
+        .focusedSceneValue(
+            \.draftCommandTarget,
+            DraftCommandTarget(
+                id: commandTargetID,
+                kind: .invoice,
+                save: saveInvoice,
+                cancel: cancelInvoice
+            )
+        )
         .alert("Mark invoice as unpaid?", isPresented: $isConfirmingMarkUnpaid) {
             Button("Mark as Unpaid", role: .destructive) {
                 updateInvoice { $0.markUnpaid() }
@@ -255,6 +265,7 @@ struct InvoiceEditorView: View {
                     Text(status.label).tag(status)
                 }
             }
+            .accessibilityLabel("Status")
             .frame(height: 30)
         }
     }
@@ -268,6 +279,7 @@ struct InvoiceEditorView: View {
                     Text(client.name).tag(Optional(client.id))
                 }
             }
+            .accessibilityLabel("Client")
             .frame(height: 30)
 
             ViewThatFits(in: .horizontal) {
@@ -307,6 +319,7 @@ struct InvoiceEditorView: View {
                     Text(project.name).tag(Optional(project.id))
                 }
             }
+            .accessibilityLabel("Project")
             .frame(height: 30)
         }
     }
@@ -315,6 +328,7 @@ struct InvoiceEditorView: View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: "Issue Date")
             DatePicker("", selection: invoice.issueDate, displayedComponents: .date)
+                .accessibilityLabel("Issue Date")
                 .labelsHidden()
                 .frame(height: 30)
         }
@@ -324,6 +338,7 @@ struct InvoiceEditorView: View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: "Due Date")
             DatePicker("", selection: invoice.dueDate, displayedComponents: .date)
+                .accessibilityLabel("Due Date")
                 .labelsHidden()
                 .frame(height: 30)
             if let issue = issueMessage(
@@ -360,6 +375,7 @@ struct InvoiceEditorView: View {
                             RuneyFormLabel(title: "Interval")
                             HStack(spacing: 8) {
                                 TextField("", text: autoGenerationIntervalTextBinding(invoice: invoice))
+                                    .accessibilityLabel("Automatic generation interval in days")
                                     .font(.system(.body, design: .monospaced))
                                     .multilineTextAlignment(.trailing)
                                     .runeyFieldInput(width: 72)
@@ -471,7 +487,9 @@ struct InvoiceEditorView: View {
                             Label("Delete Item", systemImage: "trash")
                         }
                         .buttonStyle(RuneyButtonStyle(variant: .destructive))
-                        .focusable(false)
+                        .accessibilityLabel(
+                            "Delete line item \(item.wrappedValue.title.isEmpty ? "Untitled" : item.wrappedValue.title)"
+                        )
                     }
 
                     Divider()
@@ -499,12 +517,20 @@ struct InvoiceEditorView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 RuneyFormLabel(title: "Memo / Client Notes")
-                RuneyMultilineEditor(text: invoice.notes, minHeight: 78)
+                RuneyMultilineEditor(
+                    text: invoice.notes,
+                    minHeight: 78,
+                    accessibilityLabel: "Memo and client notes"
+                )
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 RuneyFormLabel(title: "Terms & Conditions")
-                RuneyMultilineEditor(text: invoice.terms, minHeight: 58)
+                RuneyMultilineEditor(
+                    text: invoice.terms,
+                    minHeight: 58,
+                    accessibilityLabel: "Terms and conditions"
+                )
             }
         }
         .runeyCard()
@@ -690,9 +716,10 @@ struct InvoiceEditorView: View {
         guard let invoice = model.invoiceDraft?.value else {
             return hasInvalidNumericDraft
         }
-        return hasInvalidNumericDraft || invoice.lineItems.contains {
-            lineItemHasInvalidAmount($0)
-        }
+        return hasInvalidNumericDraft
+            || invoice.lineItems.contains { lineItemHasInvalidAmount($0) }
+            || invoice.calculatedTotalMinorUnits == nil
+            || invoice.calculatedPaidMinorUnits == nil
     }
 
     private var hasInvalidUncommittedInput: Bool {
@@ -741,7 +768,7 @@ struct InvoiceEditorView: View {
         do {
             try model.commitInvoiceDraft()
             model.clearEditorIssues()
-            touchedFields.removeAll()
+            resetEditorState()
         } catch let error as EditorCommitError {
             model.presentEditorIssues(error.issues)
             touchedFields.formUnion(error.issues.map(\.field))
@@ -779,9 +806,8 @@ struct InvoiceEditorView: View {
         model.requestNavigation(to: .section(.settings), preserveCurrentDraft: true)
         if model.settingsDraft == nil {
             model.beginEditingSettings()
-        } else {
-            model.activeDraftRoute = .settings
         }
+        model.activeDraftRoute = .settings
     }
 
     private func autoGenerationEnabledBinding(invoice: Binding<Invoice>) -> Binding<Bool> {
@@ -869,11 +895,11 @@ struct InvoiceEditorView: View {
         let message: String
         switch field {
         case .lineItemQuantity(_):
-            message = "Enter a valid line item quantity."
+            message = "Quantity must be greater than zero and no more than 1,000,000."
         case .lineItemUnitPrice(_):
-            message = "Enter a valid line item unit price."
+            message = "Unit price must be between 0.00 and 1,000,000,000.00."
         case .lineItemTaxRate(_):
-            message = "Enter a valid line item tax rate."
+            message = "Tax rate must be between 0 and 100."
         default:
             return
         }
@@ -888,9 +914,9 @@ struct InvoiceEditorView: View {
         var issues: [EditorIssue] = []
         for item in invoice.lineItems {
             let messages: [(EditorField, String)] = [
-                (.lineItemQuantity(item.id), "Enter a valid line item quantity."),
-                (.lineItemUnitPrice(item.id), "Enter a valid line item unit price."),
-                (.lineItemTaxRate(item.id), "Enter a valid line item tax rate.")
+                (.lineItemQuantity(item.id), "Quantity must be greater than zero and no more than 1,000,000."),
+                (.lineItemUnitPrice(item.id), "Unit price must be between 0.00 and 1,000,000,000.00."),
+                (.lineItemTaxRate(item.id), "Tax rate must be between 0 and 100.")
             ]
             for (field, message) in messages
             where model.transientEditorInputIssue(for: field) != nil {
@@ -934,12 +960,7 @@ struct InvoiceEditorView: View {
     }
 
     private func lineItemHasInvalidAmount(_ item: InvoiceLineItem) -> Bool {
-        item.quantity <= 0
-            || !item.quantity.isFinite
-            || item.unitPriceMinorUnits < 0
-            || item.taxRatePercent < 0
-            || item.taxRatePercent > 100
-            || !item.taxRatePercent.isFinite
+        !InvoiceAmountPolicy.lineAmountsAreCalculable(item)
     }
 
     private func removeFieldState(forLineItemID id: UUID) {
@@ -1001,10 +1022,12 @@ struct InvoiceEditorView: View {
             RuneyFormLabel(title: label)
             if let field {
                 TextField("", text: text)
+                    .accessibilityLabel(label)
                     .runeyFieldInput()
                     .focused($focusedField, equals: field)
             } else {
                 TextField("", text: text)
+                    .accessibilityLabel(label)
                     .runeyFieldInput()
             }
             if let issue {
@@ -1095,6 +1118,7 @@ struct LineItemEditor: View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: "Title")
             TextField("", text: $item.title)
+                .accessibilityLabel("Line item title")
                 .runeyFieldInput()
                 .focused(focusedField, equals: .lineItemTitle(item.id))
             if let titleIssue {
@@ -1109,6 +1133,9 @@ struct LineItemEditor: View {
             RuneyDecimalTextField(
                 value: $item.quantity,
                 width: 60,
+                accessibilityLabel: "Line item quantity",
+                validRange: 0.00000001...InvoiceAmountPolicy.maximumQuantity,
+                outOfRangeMessage: "Quantity must be greater than zero and no more than 1,000,000.",
                 resetID: NumericEditorResetID(
                     entityID: item.id,
                     generation: numericInputResetGeneration
@@ -1131,6 +1158,9 @@ struct LineItemEditor: View {
             RuneyMoneyTextField(
                 minorUnits: $item.unitPriceMinorUnits,
                 width: 84,
+                accessibilityLabel: "Line item unit price",
+                validRange: 0...InvoiceAmountPolicy.maximumMoneyMinorUnits,
+                outOfRangeMessage: "Unit price must be between 0.00 and 1,000,000,000.00.",
                 resetID: NumericEditorResetID(
                     entityID: item.id,
                     generation: numericInputResetGeneration
@@ -1153,6 +1183,9 @@ struct LineItemEditor: View {
             RuneyDecimalTextField(
                 value: $item.taxRatePercent,
                 width: 56,
+                accessibilityLabel: "Line item tax rate percent",
+                validRange: 0...100,
+                outOfRangeMessage: "Tax rate must be between 0 and 100.",
                 resetID: NumericEditorResetID(
                     entityID: item.id,
                     generation: numericInputResetGeneration
@@ -1191,7 +1224,11 @@ struct LineItemEditor: View {
     private var detailsField: some View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: "Item Details")
-            RuneyMultilineEditor(text: $item.details, minHeight: 52)
+            RuneyMultilineEditor(
+                text: $item.details,
+                minHeight: 52,
+                accessibilityLabel: "Line item details"
+            )
         }
     }
 

@@ -40,7 +40,7 @@ struct ContentView: View {
 
                     ToolbarItemGroup(placement: .primaryAction) {
                         Button {
-                            model.beginNewInvoice()
+                            model.requestNavigation(to: .newInvoice)
                         } label: {
                             Label("New Invoice", systemImage: "plus")
                         }
@@ -49,8 +49,8 @@ struct ContentView: View {
                 }
         }
         .background(WindowCloseGuard(model: model))
-        .focusedSceneValue(\.draftCommandTarget, commandTarget)
         .modifier(FocusedDraftCancellationAlert(model: model))
+        .modifier(StoreReplacementFeedbackAlert(model: model, sceneID: sceneID))
         .alert("Local Invoice", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -84,25 +84,6 @@ struct ContentView: View {
         )
     }
 
-    private var commandTarget: DraftCommandTarget? {
-        let kind: DraftKind?
-
-        switch model.selectedSection {
-        case .invoices where model.invoiceDraft != nil:
-            kind = .invoice
-        case .clients where model.clientDraft != nil:
-            kind = .client
-        case .projects where model.projectDraft != nil:
-            kind = .project
-        case .settings where model.settingsDraft != nil:
-            kind = .settings
-        default:
-            kind = nil
-        }
-
-        return kind.map { DraftCommandTarget(sceneID: sceneID, kind: $0) }
-    }
-
     @ViewBuilder
     private var detail: some View {
         switch model.selectedSection {
@@ -115,7 +96,7 @@ struct ContentView: View {
         case .projects:
             ProjectsView()
         case .settings:
-            SettingsView(sceneID: sceneID)
+            SettingsView(sceneID: sceneID, presentation: .workspace)
                 .onAppear {
                     activateSettingsDraft()
                 }
@@ -172,5 +153,6 @@ struct ContentView: View {
         if model.settingsDraft == nil {
             model.beginEditingSettings()
         }
+        model.activeDraftRoute = .settings
     }
 }

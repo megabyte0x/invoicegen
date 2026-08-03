@@ -245,9 +245,11 @@ struct LocalBadge: View {
 struct RuneyMultilineEditor: View {
     @Binding var text: String
     var minHeight: CGFloat = 72
+    var accessibilityLabel: String
 
     var body: some View {
         TextEditor(text: $text)
+            .accessibilityLabel(accessibilityLabel)
             .font(.body)
             .scrollContentBackground(.hidden)
             .frame(minHeight: minHeight)

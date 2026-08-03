@@ -2,14 +2,20 @@ import SwiftUI
 import InvoiceCore
 import AppKit
 
+enum SettingsPresentation {
+    case workspace
+    case dedicated
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
     let sceneID: UUID
+    let presentation: SettingsPresentation
     @State private var paymentDetailIDPendingDeletion: UUID?
     @State private var paymentTermsDraft: String?
     @State private var inputResetGeneration = 0
     @State private var touchedFields: Set<EditorField> = []
-    @State private var suppressNextReplacementDismissalCancellation = false
+    @State private var commandTargetID = UUID()
     @FocusState private var focusedField: EditorField?
 
     var body: some View {
@@ -21,9 +27,17 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .focusedSceneValue(
+            \.draftCommandTarget,
+            DraftCommandTarget(
+                id: commandTargetID,
+                kind: .settings,
+                save: saveSettings,
+                cancel: cancelSettings
+            )
+        )
         .onAppear(perform: activateSettingsDraft)
         .onDisappear {
-            suppressNextReplacementDismissalCancellation = false
             model.cancelStoreReplacement(from: sceneID)
         }
         .onChange(of: model.storeReplacementGeneration) { _, _ in
@@ -40,7 +54,6 @@ struct SettingsView: View {
         }
         .alert("Replace local data?", isPresented: replacementConfirmationPresented) {
             Button(scenePendingStoreReplacement?.request.actionTitle ?? "Replace Local Data", role: .destructive) {
-                suppressNextReplacementDismissalCancellation = true
                 model.confirmStoreReplacement(from: sceneID)
             }
             Button("Cancel", role: .cancel) {
@@ -237,6 +250,7 @@ struct SettingsView: View {
                     validRange: 0...120,
                     width: 56,
                     resetID: inputResetGeneration,
+                    accessibilityLabel: "Payment terms in days",
                     onValidityChange: { isValid in
                         model.updateTransientEditorInputValidity(
                             field: .paymentTermsDays,
@@ -295,23 +309,21 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 10) {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) {
-                        storageMaintenanceActionButtons
+                        storageMaintenanceActionButtons(fullWidth: false)
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        storageMaintenanceActionButtons
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        storageMaintenanceActionButtons(fullWidth: true)
                     }
                 }
 
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) {
-                        storageLocationActionButtons
+                        storageLocationActionButtons(fullWidth: false)
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        storageLocationActionButtons
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        storageLocationActionButtons(fullWidth: true)
                     }
                 }
             }
@@ -338,28 +350,25 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var storageMaintenanceActionButtons: some View {
+    private func storageMaintenanceActionButtons(fullWidth: Bool) -> some View {
         Button {
-            model.reload()
-            model.beginEditingSettings()
+            model.requestStoreReplacement(.reloadFromDisk, from: sceneID)
         } label: {
             Label("Reload From Disk", systemImage: "arrow.clockwise")
+                .frame(maxWidth: fullWidth ? .infinity : nil, alignment: .leading)
         }
         .buttonStyle(RuneyButtonStyle())
-        .disabled(model.settingsDraft?.isDirty == true)
-        .help(
-            model.settingsDraft?.isDirty == true
-                ? "Save or Cancel business and payment changes before reloading."
-                : "Reload the local store from disk."
-        )
+        .help("Reload the local store from disk after confirmation.")
 
         Button(action: exportStoreBackup) {
             Label("Export Backup", systemImage: "square.and.arrow.up")
+                .frame(maxWidth: fullWidth ? .infinity : nil, alignment: .leading)
         }
         .buttonStyle(RuneyButtonStyle())
 
         Button(action: chooseStoreBackupToRestore) {
             Label("Restore Backup", systemImage: "arrow.down.doc")
+                .frame(maxWidth: fullWidth ? .infinity : nil, alignment: .leading)
         }
         .buttonStyle(RuneyButtonStyle())
 
@@ -367,16 +376,18 @@ struct SettingsView: View {
             model.requestStoreReplacement(.sampleData, from: sceneID)
         } label: {
             Label("Seed Sample Data", systemImage: "doc.text.fill.badge.plus")
+                .frame(maxWidth: fullWidth ? .infinity : nil, alignment: .leading)
         }
         .buttonStyle(RuneyButtonStyle(variant: .prominent))
     }
 
     @ViewBuilder
-    private var storageLocationActionButtons: some View {
+    private func storageLocationActionButtons(fullWidth: Bool) -> some View {
         Button {
             NSWorkspace.shared.activateFileViewerSelecting([model.store.url])
         } label: {
             Label("Open Store Folder", systemImage: "folder")
+                .frame(maxWidth: fullWidth ? .infinity : nil, alignment: .leading)
         }
         .buttonStyle(RuneyButtonStyle())
 
@@ -386,6 +397,7 @@ struct SettingsView: View {
             model.errorMessage = "Copied local store path."
         } label: {
             Label("Copy Store Path", systemImage: "doc.on.doc")
+                .frame(maxWidth: fullWidth ? .infinity : nil, alignment: .leading)
         }
         .buttonStyle(RuneyButtonStyle())
     }
@@ -402,7 +414,8 @@ struct SettingsView: View {
     }
 
     private var contextualInvoiceNumber: String? {
-        guard model.contextualReturnSection == .invoices,
+        guard presentation == .workspace,
+              model.contextualReturnSection == .invoices,
               let invoice = model.invoiceDraft?.value else { return nil }
         return invoice.number.isEmpty ? "Invoice" : invoice.number
     }
@@ -438,10 +451,6 @@ struct SettingsView: View {
             get: { scenePendingStoreReplacement != nil },
             set: { isPresented in
                 guard !isPresented else { return }
-                if suppressNextReplacementDismissalCancellation {
-                    suppressNextReplacementDismissalCancellation = false
-                    return
-                }
                 model.cancelStoreReplacement(from: sceneID)
             }
         )
@@ -563,13 +572,15 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: label)
             if isMultiline {
-                RuneyMultilineEditor(text: text)
+                RuneyMultilineEditor(text: text, accessibilityLabel: label)
             } else if let field {
                 TextField("", text: text)
+                    .accessibilityLabel(label)
                     .runeyFieldInput()
                     .focused($focusedField, equals: field)
             } else {
                 TextField("", text: text)
+                    .accessibilityLabel(label)
                     .runeyFieldInput()
             }
             if let issue {
@@ -612,6 +623,9 @@ struct PaymentAcceptanceDetailEditor: View {
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(RuneyButtonStyle(variant: .destructiveIcon))
+                .accessibilityLabel(
+                    "Delete payment details \(detail.label.isEmpty ? detail.kind.label : detail.label)"
+                )
             }
 
             VStack(alignment: .leading, spacing: 14) {
@@ -641,6 +655,7 @@ struct PaymentAcceptanceDetailEditor: View {
                     Text(kind.label).tag(kind)
                 }
             }
+            .accessibilityLabel("Payment detail type")
             .frame(height: 30)
         }
     }
@@ -649,6 +664,7 @@ struct PaymentAcceptanceDetailEditor: View {
         VStack(alignment: .leading, spacing: 6) {
             RuneyFormLabel(title: "Label")
             TextField("", text: $detail.label)
+                .accessibilityLabel("Payment detail label")
                 .runeyFieldInput()
                 .focused(focusedField, equals: .paymentDetailLabel(detail.id))
             if let issue {
@@ -670,7 +686,11 @@ struct PaymentDetailLinesEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             RuneyFormLabel(title: "Detail Lines")
-            RuneyMultilineEditor(text: $details, minHeight: 72)
+            RuneyMultilineEditor(
+                text: $details,
+                minHeight: 72,
+                accessibilityLabel: "Payment detail lines"
+            )
         }
     }
 }
