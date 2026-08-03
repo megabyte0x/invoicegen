@@ -133,7 +133,7 @@ function verifyIndexHtml(path, label) {
   assertIncludes(html, '/assets/invoicegen-preview-1280.webp 1280w', label);
   assertIncludes(html, '/assets/invoicegen-preview-640.png 640w', label);
   assertIncludes(html, 'sizes="(max-width: 720px) calc(100vw - 36px), 1180px"', label);
-  assertIncludes(html, 'alt="InvoiceGen macOS app window showing invoice lists, client revenue charts, and native sidebar tabs"', label);
+  assertIncludes(html, 'alt="InvoiceGen macOS workspace showing an invoice editor beside a multi-page invoice preview"', label);
   assertDefinitionLength(html, label);
 
   const h1Count = countMatches(html, /<h1\b/gi);
