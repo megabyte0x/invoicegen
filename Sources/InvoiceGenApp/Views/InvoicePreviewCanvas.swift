@@ -1,5 +1,4 @@
 import SwiftUI
-import InvoiceCore
 
 enum PreviewScaleMode: String, CaseIterable, Identifiable {
     case fitWidth
@@ -18,36 +17,51 @@ enum PreviewScaleMode: String, CaseIterable, Identifiable {
 }
 
 enum PreviewScalePolicy {
-    static let pageWidth: CGFloat = 612
+    static let pageWidth = InvoiceDocument.pageSize.width
     static let horizontalMargin: CGFloat = 48
 
     static func fitScale(availableWidth: CGFloat) -> CGFloat {
-        min(1.0, max(0.35, (availableWidth - horizontalMargin) / pageWidth))
+        let clampedWidth = max(0, availableWidth)
+        let usableWidth = max(0, clampedWidth - horizontalMargin)
+        return min(1, usableWidth / pageWidth)
     }
 }
 
 struct InvoicePreviewCanvas: View {
-    @Binding var invoice: Invoice
-    var book: InvoiceBook
+    var document: InvoiceDocument
     @Binding var scaleMode: PreviewScaleMode
-
-    @State private var sheetSize = CGSize(width: PreviewScalePolicy.pageWidth, height: 792)
 
     var body: some View {
         GeometryReader { geometry in
-            let scale = scale(for: geometry.size.width)
-            let scaledSheetSize = CGSize(
-                width: sheetSize.width * scale,
-                height: sheetSize.height * scale
+            let viewportSize = CGSize(
+                width: max(0, geometry.size.width),
+                height: max(0, geometry.size.height)
+            )
+            let scale = scale(for: viewportSize.width)
+            let pageCount = document.pages.count
+            let interPageHeight = CGFloat(max(0, pageCount - 1)) * 20
+            let unscaledSize = CGSize(
+                width: InvoiceDocument.pageSize.width,
+                height: CGFloat(pageCount) * InvoiceDocument.pageSize.height + interPageHeight
+            )
+            let scaledSize = CGSize(
+                width: max(0, unscaledSize.width * scale),
+                height: max(0, unscaledSize.height * scale)
             )
 
             ScrollView([.horizontal, .vertical]) {
-                scaledSheet(scale: scale)
+                scaledPageStack(scale: scale, unscaledSize: unscaledSize, scaledSize: scaledSize)
                     .padding(.horizontal, PreviewScalePolicy.horizontalMargin / 2)
                     .padding(.vertical, 16)
                     .frame(
-                        minWidth: max(geometry.size.width, scaledSheetSize.width + PreviewScalePolicy.horizontalMargin),
-                        minHeight: max(geometry.size.height, scaledSheetSize.height + 32),
+                        minWidth: max(
+                            0,
+                            max(
+                                viewportSize.width,
+                                scaledSize.width + PreviewScalePolicy.horizontalMargin
+                            )
+                        ),
+                        minHeight: max(0, max(viewportSize.height, scaledSize.height + 32)),
                         alignment: .topLeading
                     )
             }
@@ -59,47 +73,42 @@ struct InvoicePreviewCanvas: View {
     private func scale(for availableWidth: CGFloat) -> CGFloat {
         switch scaleMode {
         case .fitWidth:
-            PreviewScalePolicy.fitScale(availableWidth: availableWidth)
+            PreviewScalePolicy.fitScale(availableWidth: max(0, availableWidth))
         case .actualSize:
-            1.0
+            1
         }
     }
 
-    private func scaledSheet(scale: CGFloat) -> some View {
-        InvoiceSheetView(invoice: invoice, book: book)
-            .frame(width: PreviewScalePolicy.pageWidth, alignment: .topLeading)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
-            }
-            .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
-            .background {
-                GeometryReader { proxy in
-                    Color.clear.preference(
-                        key: InvoicePreviewSheetSizeKey.self,
-                        value: proxy.size
+    private func scaledPageStack(
+        scale: CGFloat,
+        unscaledSize: CGSize,
+        scaledSize: CGSize
+    ) -> some View {
+        VStack(spacing: 20) {
+            ForEach(document.pages) { page in
+                InvoiceDocumentPageView(page: page)
+                    .frame(
+                        width: InvoiceDocument.pageSize.width,
+                        height: InvoiceDocument.pageSize.height
                     )
-                }
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
+                    }
+                    .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
             }
-            .scaleEffect(scale, anchor: .topLeading)
-            .frame(
-                width: sheetSize.width * scale,
-                height: sheetSize.height * scale,
-                alignment: .topLeading
-            )
-            .onPreferenceChange(InvoicePreviewSheetSizeKey.self) { size in
-                guard size.width > 0, size.height > 0, size != sheetSize else { return }
-                sheetSize = size
-            }
-    }
-}
-
-private struct InvoicePreviewSheetSizeKey: PreferenceKey {
-    static var defaultValue = CGSize.zero
-
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        value = nextValue()
+        }
+        .frame(
+            width: max(0, unscaledSize.width),
+            height: max(0, unscaledSize.height),
+            alignment: .topLeading
+        )
+        .scaleEffect(scale, anchor: .topLeading)
+        .frame(
+            width: max(0, scaledSize.width),
+            height: max(0, scaledSize.height),
+            alignment: .topLeading
+        )
     }
 }
