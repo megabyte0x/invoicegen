@@ -4,32 +4,57 @@ import InvoiceCore
 struct InvoicesView: View {
     @EnvironmentObject private var model: AppModel
     @State private var invoiceIDPendingDeletion: UUID?
+    @State private var isPresentingDetail = false
+    @State private var requestedPresentation: InvoiceEditorPresentation = .edit
+
+    private var searchQuery: String {
+        model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     private var filteredInvoices: [Invoice] {
-        let query = model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return model.book.invoices
             .filter { invoice in
-                guard !query.isEmpty else { return true }
+                guard !searchQuery.isEmpty else { return true }
                 let clientName = model.book.client(for: invoice)?.name ?? ""
-                return invoice.number.localizedCaseInsensitiveContains(query)
-                    || clientName.localizedCaseInsensitiveContains(query)
-                    || invoice.status.rawValue.localizedCaseInsensitiveContains(query)
+                return invoice.number.localizedCaseInsensitiveContains(searchQuery)
+                    || clientName.localizedCaseInsensitiveContains(searchQuery)
+                    || invoice.status.rawValue.localizedCaseInsensitiveContains(searchQuery)
             }
             .sorted { $0.issueDate > $1.issueDate }
     }
 
     var body: some View {
-        HSplitView {
+        AdaptiveMasterDetailView(
+            hasDetail: isPresentingDetail,
+            back: { isPresentingDetail = false }
+        ) {
             invoiceList
-                .frame(minWidth: 240, idealWidth: 300, maxWidth: 340, maxHeight: .infinity)
-
+        } detail: {
             invoiceDetail
-                .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Invoices")
         .onAppear {
-            if model.selectedInvoiceID == nil {
-                model.selectedInvoiceID = filteredInvoices.first?.id
+            if model.selectedInvoiceID != nil || model.invoiceDraft != nil {
+                isPresentingDetail = true
+            }
+            activateSelectedInvoiceIfNeeded()
+        }
+        .onChange(of: model.selectedInvoiceID) { _, id in
+            if id != nil {
+                isPresentingDetail = true
+                activateSelectedInvoiceIfNeeded()
+            } else if model.invoiceDraft == nil {
+                isPresentingDetail = false
+            }
+        }
+        .onChange(of: model.invoiceDraft?.value.id) { oldID, id in
+            if let id, id != oldID {
+                requestedPresentation = .edit
+            }
+            if id != nil {
+                isPresentingDetail = true
+            } else if model.selectedInvoiceID == nil {
+                isPresentingDetail = false
             }
         }
         .alert("Delete invoice?", isPresented: Binding(
@@ -52,7 +77,7 @@ struct InvoicesView: View {
     }
 
     private var invoiceList: some View {
-        List(selection: $model.selectedInvoiceID) {
+        List(selection: invoiceSelection) {
             ForEach(filteredInvoices) { invoice in
                 InvoiceSummaryRow(invoice: invoice, client: model.book.client(for: invoice))
                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 10))
@@ -65,9 +90,21 @@ struct InvoicesView: View {
             }
         }
         .listStyle(.sidebar)
+        .overlay {
+            if !searchQuery.isEmpty, filteredInvoices.isEmpty {
+                ContentUnavailableView {
+                    Label("No matching invoices", systemImage: "magnifyingglass")
+                } description: {
+                    Text("No invoice number, client, or status matches “\(searchQuery)”.")
+                } actions: {
+                    Button("Clear Search") { model.searchText = "" }
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             Button(action: {
-                model.addInvoice()
+                isPresentingDetail = true
+                model.requestNavigation(to: .newInvoice)
             }) {
                 Label("New Invoice", systemImage: "plus")
                     .frame(maxWidth: .infinity)
@@ -80,9 +117,8 @@ struct InvoicesView: View {
 
     @ViewBuilder
     private var invoiceDetail: some View {
-        if let id = model.selectedInvoiceID,
-           let binding = model.invoiceBinding(id: id) {
-            InvoiceEditorView(invoice: binding)
+        if model.invoiceDraft != nil {
+            InvoiceEditorView(requestedPresentation: $requestedPresentation)
         } else {
             EmptyStateView(
                 title: "Select an invoice",
@@ -90,6 +126,29 @@ struct InvoicesView: View {
                 systemImage: "doc.text.magnifyingglass"
             )
         }
+    }
+
+    private var invoiceSelection: Binding<UUID?> {
+        Binding(
+            get: { isPresentingDetail ? model.selectedInvoiceID : nil },
+            set: { id in
+                guard let id else { return }
+                isPresentingDetail = true
+                guard model.invoiceDraft?.value.id != id else { return }
+                model.requestNavigation(to: .invoice(id))
+            }
+        )
+    }
+
+    private func activateSelectedInvoiceIfNeeded() {
+        if model.invoiceDraft != nil {
+            model.activeDraftRoute = .invoice
+        }
+        let id = model.selectedInvoiceID ?? filteredInvoices.first?.id
+        guard let id else { return }
+        guard model.invoiceDraft?.value.id != id else { return }
+        guard model.invoiceDraft?.isDirty != true else { return }
+        model.beginEditingInvoice(id: id)
     }
 }
 
@@ -156,11 +215,10 @@ struct InvoiceSummaryRowContent {
     init(invoice: Invoice, clientName: String) {
         self.invoiceNumber = invoice.number
         self.statusLabel = invoice.status.label
-        self.amountText = Money.format(
-            minorUnits: invoice.balanceDueMinorUnits,
-            currencyCode: invoice.currencyCode
-        )
-        .replacingOccurrences(of: invoice.currencyCode + " ", with: "")
+        self.amountText = invoice.calculatedBalanceDueMinorUnits.map {
+            Money.format(minorUnits: $0, currencyCode: invoice.currencyCode)
+                .replacingOccurrences(of: invoice.currencyCode + " ", with: "")
+        } ?? "Amount unavailable"
         self.clientName = clientName
         self.dueDateText = DateFormatting.short.string(from: invoice.dueDate)
         self.minimumHeight = 58

@@ -1,5 +1,6 @@
+import { Analytics } from '@vercel/analytics/react';
 import React from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles.css';
 
@@ -9,8 +10,14 @@ if (!rootElement) {
   throw new Error('InvoiceGen app root was not found');
 }
 
-createRoot(rootElement).render(
+hydrateRoot(
+  rootElement,
   <React.StrictMode>
     <App />
   </React.StrictMode>,
 );
+
+const analyticsElement = document.getElementById('analytics-root');
+if (analyticsElement) {
+  createRoot(analyticsElement).render(<Analytics />);
+}

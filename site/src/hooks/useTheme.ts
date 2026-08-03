@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 type Theme = 'dark' | 'light';
 
 function readInitialTheme(): Theme {
+  if (typeof document === 'undefined') return 'light';
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }
 

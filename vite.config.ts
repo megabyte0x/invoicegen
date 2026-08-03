@@ -8,10 +8,23 @@ const root = dirname(fileURLToPath(import.meta.url));
 const version = readReleaseVersion();
 const dateModified = new Date().toISOString().slice(0, 10);
 
+const cleanResourceRoutes = {
+  '/alternatives/invoice-ninja': '/alternatives/invoice-ninja.html',
+  '/alternatives/manta': '/alternatives/manta.html',
+  '/changelog': '/changelog.html',
+  '/cli': '/cli.html',
+  '/docs/backup-restore': '/docs/backup-restore.html',
+  '/docs/local-first-invoicing': '/docs/local-first-invoicing.html',
+  '/launch-kit': '/launch-kit.html',
+  '/offline-invoice-generator-mac': '/offline-invoice-generator-mac.html',
+  '/open-source-invoice-generator': '/open-source-invoice-generator.html',
+  '/privacy': '/privacy.html',
+} as const;
+
 export default defineConfig({
   root: 'site',
   publicDir: 'public',
-  plugins: [react(), invoicegenHtmlPlaceholders()],
+  plugins: [cleanResourceRoutePlugin(), react(), invoicegenHtmlPlaceholders()],
   define: {
     __INVOICEGEN_VERSION__: JSON.stringify(version),
     __INVOICEGEN_DATE_MODIFIED__: JSON.stringify(dateModified),
@@ -30,11 +43,41 @@ export default defineConfig({
   },
 });
 
+function cleanResourceRoutePlugin(): Plugin {
+  const rewrite = (requestUrl: string | undefined): string | undefined => {
+    if (!requestUrl) return requestUrl;
+    const queryIndex = requestUrl.indexOf('?');
+    const path = queryIndex === -1 ? requestUrl : requestUrl.slice(0, queryIndex);
+    const query = queryIndex === -1 ? '' : requestUrl.slice(queryIndex);
+    if (!Object.prototype.hasOwnProperty.call(cleanResourceRoutes, path)) return requestUrl;
+    const route = cleanResourceRoutes[path as keyof typeof cleanResourceRoutes];
+    return `${route}${query}`;
+  };
+
+  return {
+    name: 'invoicegen-clean-resource-routes',
+    configureServer(server) {
+      server.middlewares.use((request, _response, next) => {
+        request.url = rewrite(request.url);
+        next();
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((request, _response, next) => {
+        request.url = rewrite(request.url);
+        next();
+      });
+    },
+  };
+}
+
 function invoicegenHtmlPlaceholders(): Plugin {
   return {
     name: 'invoicegen-html-placeholders',
     transformIndexHtml(html) {
+      const homepageShell = readFileSync(resolve(root, '.site-shell/homepage.html'), 'utf8');
       return html
+        .replace('<!--INVOICEGEN_APP_SHELL-->', homepageShell)
         .replaceAll('__INVOICEGEN_VERSION__', version)
         .replaceAll('__INVOICEGEN_DATE_MODIFIED__', dateModified);
     },

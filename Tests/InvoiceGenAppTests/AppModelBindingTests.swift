@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class AppModelBindingTests: XCTestCase {
-    func testEntityBindingsRemainSafeIfEntityIsDeletedBeforeSwiftUIRefreshes() throws {
+    func testEntityDraftsAreClearedWhenTheirPersistedEntitiesAreDeleted() {
         let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
         let invoice = Invoice(number: "INV-DELETE", dueDate: Date())
         let client = Client(name: "Delete Me")
@@ -17,17 +17,21 @@ final class AppModelBindingTests: XCTestCase {
         model.selectedClientID = client.id
         model.selectedProjectID = project.id
 
-        let invoiceBinding = try XCTUnwrap(model.invoiceBinding(id: invoice.id))
-        let clientBinding = try XCTUnwrap(model.clientBinding(id: client.id))
-        let projectBinding = try XCTUnwrap(model.projectBinding(id: project.id))
+        model.beginEditingInvoice(id: invoice.id)
+        model.beginEditingClient(id: client.id)
+        model.beginEditingProject(id: project.id)
+
+        XCTAssertNotNil(model.invoiceDraft)
+        XCTAssertNotNil(model.clientDraft)
+        XCTAssertNotNil(model.projectDraft)
 
         model.deleteSelectedInvoice()
         model.deleteSelectedClient()
         model.deleteSelectedProject()
 
-        XCTAssertEqual(invoiceBinding.wrappedValue.id, invoice.id)
-        XCTAssertEqual(clientBinding.wrappedValue.id, client.id)
-        XCTAssertEqual(projectBinding.wrappedValue.id, project.id)
+        XCTAssertNil(model.invoiceDraft)
+        XCTAssertNil(model.clientDraft)
+        XCTAssertNil(model.projectDraft)
     }
 
     func testNormalSaveDoesNotOverwriteStoreAfterLoadFailure() throws {
@@ -45,11 +49,58 @@ final class AppModelBindingTests: XCTestCase {
         XCTAssertEqual(persisted, "not valid json")
     }
 
+    func testStoreReplacementFeedbackStaysWithInitiatingScene() {
+        let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
+        let initiatingScene = UUID()
+
+        model.requestStoreReplacement(.sampleData, from: initiatingScene)
+        model.confirmStoreReplacement(from: initiatingScene)
+
+        XCTAssertNil(model.pendingStoreReplacement)
+        XCTAssertEqual(model.storeReplacementFeedback?.sceneID, initiatingScene)
+        XCTAssertFalse(model.storeReplacementFeedback?.isError ?? true)
+
+        model.dismissStoreReplacementFeedback(from: UUID())
+        XCTAssertNotNil(model.storeReplacementFeedback)
+
+        model.dismissStoreReplacementFeedback(from: initiatingScene)
+        XCTAssertNil(model.storeReplacementFeedback)
+    }
+
+    func testReloadReplacementDefersBookMutationUntilConfirmation() throws {
+        let url = temporaryStoreURL()
+        let store = LocalInvoiceStore(url: url)
+        try store.save(InvoiceBook(businessProfile: BusinessProfile(name: "On Disk")))
+        let model = AppModel(store: store)
+        model.book.businessProfile.name = "In Memory"
+        model.beginNewInvoice(now: Date(timeIntervalSince1970: 0))
+        let draftID = model.invoiceDraft?.value.id
+        let sceneID = UUID()
+
+        model.requestStoreReplacement(.reloadFromDisk, from: sceneID)
+
+        XCTAssertEqual(model.book.businessProfile.name, "In Memory")
+        XCTAssertEqual(model.invoiceDraft?.value.id, draftID)
+
+        model.confirmStoreReplacement(from: sceneID)
+
+        XCTAssertEqual(model.book.businessProfile.name, "On Disk")
+        XCTAssertNil(model.invoiceDraft)
+        XCTAssertNil(model.pendingStoreReplacement)
+    }
+
     func testDeletingClientUnassignsRelatedProjectsAndInvoices() {
         let model = AppModel(store: LocalInvoiceStore(url: temporaryStoreURL()))
+        let timestamp = Date()
         let client = Client(name: "Acme")
         let project = Project(clientId: client.id, name: "Launch")
-        let invoice = Invoice(number: "INV-CLIENT", clientId: client.id, projectId: project.id, dueDate: Date())
+        let invoice = Invoice(
+            number: "INV-CLIENT",
+            clientId: client.id,
+            projectId: project.id,
+            issueDate: timestamp,
+            dueDate: timestamp
+        )
 
         model.book.clients = [client]
         model.book.projects = [project]

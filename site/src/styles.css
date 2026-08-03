@@ -5,7 +5,7 @@
   --surface-soft: #fbfbfa;
   --ink: #0c0e0d;
   --muted: #4f5754;
-  --faint: #7d8782;
+  --faint: #606a65;
   --line: rgba(12, 14, 13, 0.1);
   --line-strong: rgba(12, 14, 13, 0.24);
   --accent: #2f8f52;
@@ -743,8 +743,8 @@ html.dark .button.primary {
 
 .terminal-row code {
   min-width: 0;
-  overflow-x: auto;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .terminal-row.success {
@@ -756,11 +756,28 @@ html.dark .button.primary {
   font-weight: 700;
 }
 
-.terminal-panel pre {
+.terminal-output {
   margin-top: 14px;
-  overflow-x: auto;
   color: rgba(239, 245, 239, 0.82);
   font: 0.84rem/1.55 var(--font-mono);
+}
+
+.terminal-output-row {
+  display: grid;
+  grid-template-columns: 1.05fr 1.7fr 0.9fr 1fr;
+  gap: 12px;
+}
+
+.terminal-output-row [role="cell"],
+.terminal-output-row [role="columnheader"] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.terminal-output-header {
+  color: rgba(239, 245, 239, 0.58);
+  font-size: 0.72rem;
+  text-transform: uppercase;
 }
 
 .backup-panel {
@@ -847,19 +864,21 @@ html.dark .button.primary {
 }
 
 .faq-answer {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.22s ease;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s ease;
 }
 
 .faq-item.active .faq-answer {
-  max-height: 220px;
+  grid-template-rows: 1fr;
 }
 
 .faq-answer-inner {
+  min-height: 0;
   max-width: 720px;
   padding: 0 0 22px;
   color: var(--muted);
+  overflow: hidden;
 }
 
 .faq-item.active .faq-icon {
@@ -1073,6 +1092,10 @@ footer::before {
 }
 
 @media (max-width: 720px) {
+  html {
+    scroll-padding-top: 132px;
+  }
+
   .site-header {
     min-height: 0;
     padding: 16px 18px;
@@ -1189,6 +1212,31 @@ footer::before {
   .invoice-sheet table {
     font-size: 0.8rem;
   }
+
+  .faq-question {
+    scroll-margin-top: 132px;
+  }
+}
+
+@media (max-width: 560px) {
+  .terminal-output-header {
+    display: none;
+  }
+
+  .terminal-output-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 14px;
+    padding: 12px 0;
+    border-top: 1px solid rgba(239, 245, 239, 0.14);
+  }
+
+  .terminal-output-row [role="cell"]::before {
+    display: block;
+    color: rgba(239, 245, 239, 0.58);
+    content: attr(data-label);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+  }
 }
 
 @media (max-width: 430px) {
@@ -1209,7 +1257,6 @@ footer::before {
     border-radius: 14px;
   }
 
-  .terminal-panel pre,
   .terminal-row {
     font-size: 0.76rem;
   }

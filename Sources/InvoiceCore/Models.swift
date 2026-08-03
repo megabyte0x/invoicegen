@@ -125,16 +125,31 @@ public struct InvoiceLineItem: Identifiable, Codable, Equatable, Sendable {
         self.taxRatePercent = taxRatePercent
     }
 
+    public var calculatedSubtotalMinorUnits: Int64? {
+        MinorUnitArithmetic.roundedProduct(unitPriceMinorUnits, by: quantity)
+    }
+
+    public var calculatedTaxMinorUnits: Int64? {
+        guard let subtotal = calculatedSubtotalMinorUnits else { return nil }
+        return MinorUnitArithmetic.roundedProduct(subtotal, by: taxRatePercent / 100)
+    }
+
+    public var calculatedTotalMinorUnits: Int64? {
+        guard let subtotal = calculatedSubtotalMinorUnits,
+              let tax = calculatedTaxMinorUnits else { return nil }
+        return MinorUnitArithmetic.adding(subtotal, tax)
+    }
+
     public var subtotalMinorUnits: Int64 {
-        Int64((quantity * Double(unitPriceMinorUnits)).rounded())
+        calculatedSubtotalMinorUnits ?? 0
     }
 
     public var taxMinorUnits: Int64 {
-        Int64((Double(subtotalMinorUnits) * taxRatePercent / 100).rounded())
+        calculatedTaxMinorUnits ?? 0
     }
 
     public var totalMinorUnits: Int64 {
-        subtotalMinorUnits + taxMinorUnits
+        calculatedTotalMinorUnits ?? 0
     }
 }
 
@@ -323,30 +338,65 @@ public struct Invoice: Identifiable, Codable, Equatable, Sendable {
         self.updatedAt = updatedAt
     }
 
+    public var calculatedSubtotalMinorUnits: Int64? {
+        let amounts = lineItems.map(\.calculatedSubtotalMinorUnits)
+        guard !amounts.contains(where: { $0 == nil }) else { return nil }
+        return MinorUnitArithmetic.sum(amounts.compactMap { $0 })
+    }
+
+    public var calculatedTaxMinorUnits: Int64? {
+        let amounts = lineItems.map(\.calculatedTaxMinorUnits)
+        guard !amounts.contains(where: { $0 == nil }) else { return nil }
+        return MinorUnitArithmetic.sum(amounts.compactMap { $0 })
+    }
+
+    public var calculatedTotalMinorUnits: Int64? {
+        guard let subtotal = calculatedSubtotalMinorUnits,
+              let tax = calculatedTaxMinorUnits else { return nil }
+        return MinorUnitArithmetic.adding(subtotal, tax)
+    }
+
+    public var calculatedPaidMinorUnits: Int64? {
+        MinorUnitArithmetic.sum(payments.map(\.amountMinorUnits))
+    }
+
+    public var calculatedBalanceDueMinorUnits: Int64? {
+        guard let total = calculatedTotalMinorUnits,
+              let paid = calculatedPaidMinorUnits,
+              let balance = MinorUnitArithmetic.subtracting(paid, from: total) else { return nil }
+        return max(0, balance)
+    }
+
     public var subtotalMinorUnits: Int64 {
-        lineItems.reduce(0) { $0 + $1.subtotalMinorUnits }
+        calculatedSubtotalMinorUnits ?? 0
     }
 
     public var taxMinorUnits: Int64 {
-        lineItems.reduce(0) { $0 + $1.taxMinorUnits }
+        calculatedTaxMinorUnits ?? 0
     }
 
     public var totalMinorUnits: Int64 {
-        subtotalMinorUnits + taxMinorUnits
+        calculatedTotalMinorUnits ?? 0
     }
 
     public var paidMinorUnits: Int64 {
-        payments.reduce(0) { $0 + $1.amountMinorUnits }
+        calculatedPaidMinorUnits ?? 0
     }
 
     public var balanceDueMinorUnits: Int64 {
-        max(0, totalMinorUnits - paidMinorUnits)
+        calculatedBalanceDueMinorUnits ?? 0
     }
 
     public mutating func refreshStatus(now: Date = Date()) {
         guard status != .void else { return }
 
-        if totalMinorUnits > 0, paidMinorUnits >= totalMinorUnits {
+        guard let total = calculatedTotalMinorUnits,
+              let paid = calculatedPaidMinorUnits else {
+            updatedAt = now
+            return
+        }
+
+        if total > 0, paid >= total {
             status = .paid
         } else if status == .sent || status == .overdue || status == .paid {
             status = dueDate < now ? .overdue : .sent
@@ -619,10 +669,6 @@ public extension InvoiceBook {
                 issues.append("Invoice currency must be a three-letter uppercase code for invoice \(displayNumber(for: invoice))")
             }
 
-            if invoice.paidMinorUnits > invoice.totalMinorUnits {
-                issues.append("Payments cannot exceed invoice total for invoice \(displayNumber(for: invoice))")
-            }
-
             for payment in invoice.payments where payment.amountMinorUnits <= 0 {
                 issues.append("Payment amount must be greater than zero for invoice \(displayNumber(for: invoice))")
             }
@@ -632,15 +678,44 @@ public extension InvoiceBook {
                 if item.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     issues.append("Line item title is required for invoice \(displayNumber(for: invoice))")
                 }
-                if item.quantity <= 0 || !item.quantity.isFinite {
-                    issues.append("Line item quantity must be greater than zero for \(itemLabel)")
+                if item.quantity <= 0 || !item.quantity.isFinite || item.quantity > InvoiceAmountPolicy.maximumQuantity {
+                    issues.append("Line item quantity must be greater than zero and no more than 1,000,000 for \(itemLabel)")
                 }
-                if item.unitPriceMinorUnits < 0 {
-                    issues.append("Line item unit price cannot be negative for \(itemLabel)")
+                if item.unitPriceMinorUnits < 0 || item.unitPriceMinorUnits > InvoiceAmountPolicy.maximumMoneyMinorUnits {
+                    issues.append("Line item unit price must be between 0.00 and 1,000,000,000.00 for \(itemLabel)")
                 }
                 if item.taxRatePercent < 0 || item.taxRatePercent > 100 || !item.taxRatePercent.isFinite {
                     issues.append("Line item tax rate must be between 0 and 100 for \(itemLabel)")
                 }
+                if item.quantity > 0,
+                   item.quantity <= InvoiceAmountPolicy.maximumQuantity,
+                   item.unitPriceMinorUnits >= 0,
+                   item.unitPriceMinorUnits <= InvoiceAmountPolicy.maximumMoneyMinorUnits,
+                   item.taxRatePercent >= 0,
+                   item.taxRatePercent <= 100,
+                   item.taxRatePercent.isFinite,
+                   item.calculatedTotalMinorUnits == nil {
+                    issues.append("Line item amount is too large to calculate for \(itemLabel)")
+                }
+            }
+
+            let hasInvalidLineAmount = invoice.lineItems.contains { item in
+                item.quantity <= 0 ||
+                    item.quantity > InvoiceAmountPolicy.maximumQuantity ||
+                    !item.quantity.isFinite ||
+                    item.unitPriceMinorUnits < 0 ||
+                    item.unitPriceMinorUnits > InvoiceAmountPolicy.maximumMoneyMinorUnits ||
+                    item.taxRatePercent < 0 ||
+                    item.taxRatePercent > 100 ||
+                    !item.taxRatePercent.isFinite ||
+                    item.calculatedTotalMinorUnits == nil
+            }
+
+            if !hasInvalidLineAmount,
+               (invoice.calculatedTotalMinorUnits == nil || invoice.calculatedPaidMinorUnits == nil) {
+                issues.append("Invoice totals are too large to calculate for invoice \(displayNumber(for: invoice))")
+            } else if !hasInvalidLineAmount, invoice.paidMinorUnits > invoice.totalMinorUnits {
+                issues.append("Payments cannot exceed invoice total for invoice \(displayNumber(for: invoice))")
             }
         }
 

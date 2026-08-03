@@ -1,8 +1,8 @@
 use crate::domain::{
-    add_days_iso, format_money, invoice_pdf_file_name, normalize_date_input, now_iso,
-    parse_minor_units, render_invoice_pdf, render_invoice_text, BusinessProfile, Client, Invoice,
-    InvoiceAutoGenerationSettings, InvoiceBook, InvoiceLineItem, InvoiceStatus, Payment,
-    PaymentAcceptanceDetail, PaymentAcceptanceKind, Project,
+    add_days_iso, checked_minor_unit_sum, format_money, invoice_pdf_file_name,
+    normalize_date_input, now_iso, parse_minor_units, render_invoice_pdf, render_invoice_text,
+    BusinessProfile, Client, Invoice, InvoiceAutoGenerationSettings, InvoiceBook, InvoiceLineItem,
+    InvoiceStatus, Payment, PaymentAcceptanceDetail, PaymentAcceptanceKind, Project,
 };
 use crate::json::{self, JsonValue};
 use crate::store::LocalInvoiceStore;
@@ -208,12 +208,18 @@ fn command_summary(
     let format = output_format_for(&mut args, context)?;
     reject_unknown(args)?;
     let book = store.load()?;
-    let outstanding: i64 = book
-        .invoices
-        .iter()
-        .map(Invoice::balance_due_minor_units)
-        .sum();
-    let paid: i64 = book.invoices.iter().map(Invoice::paid_minor_units).sum();
+    let outstanding = checked_minor_unit_sum(
+        book.invoices
+            .iter()
+            .map(Invoice::calculated_balance_due_minor_units),
+    );
+    let paid = checked_minor_unit_sum(
+        book.invoices
+            .iter()
+            .map(Invoice::calculated_paid_minor_units),
+    );
+    let outstanding_text = summary_money(outstanding, &book.business_profile.currency_code);
+    let paid_text = summary_money(paid, &book.business_profile.currency_code);
     let overdue = book
         .invoices
         .iter()
@@ -223,14 +229,11 @@ fn command_summary(
         OutputFormat::Json => Ok(json_string(json::object([
             (
                 "outstanding".to_string(),
-                json::string(format_money(
-                    outstanding,
-                    &book.business_profile.currency_code,
-                )),
+                json::string(&outstanding_text),
             ),
             (
                 "paidToDate".to_string(),
-                json::string(format_money(paid, &book.business_profile.currency_code)),
+                json::string(&paid_text),
             ),
             ("totalClients".to_string(), json::number(book.clients.len())),
             ("overdueInvoices".to_string(), json::number(overdue)),
@@ -244,11 +247,11 @@ fn command_summary(
             &[
                 vec![
                     "outstanding".to_string(),
-                    format_money(outstanding, &book.business_profile.currency_code),
+                    outstanding_text.clone(),
                 ],
                 vec![
                     "paidToDate".to_string(),
-                    format_money(paid, &book.business_profile.currency_code),
+                    paid_text.clone(),
                 ],
                 vec!["totalClients".to_string(), book.clients.len().to_string()],
                 vec!["overdueInvoices".to_string(), overdue.to_string()],
@@ -260,11 +263,11 @@ fn command_summary(
             &[
                 vec![
                     "outstanding".to_string(),
-                    format_money(outstanding, &book.business_profile.currency_code),
+                    outstanding_text.clone(),
                 ],
                 vec![
                     "paidToDate".to_string(),
-                    format_money(paid, &book.business_profile.currency_code),
+                    paid_text.clone(),
                 ],
                 vec!["totalClients".to_string(), book.clients.len().to_string()],
                 vec!["overdueInvoices".to_string(), overdue.to_string()],
@@ -273,13 +276,19 @@ fn command_summary(
         )),
         OutputFormat::Text => Ok(format!(
             "Outstanding: {}\nPaid to Date: {}\nTotal Clients: {}\nOverdue Invoices: {}\nStore: {}\n",
-            format_money(outstanding, &book.business_profile.currency_code),
-            format_money(paid, &book.business_profile.currency_code),
+            outstanding_text,
+            paid_text,
             book.clients.len(),
             overdue,
             store.path.display()
         )),
     }
+}
+
+fn summary_money(value: Option<i64>, currency_code: &str) -> String {
+    value
+        .map(|minor_units| format_money(minor_units, currency_code))
+        .unwrap_or_else(|| "Amount unavailable".to_string())
 }
 
 fn command_profile(
@@ -847,13 +856,13 @@ fn command_invoice(
             let index = find_invoice_index(&book, &id)?;
             if let Some(output_path) = output_path {
                 let output_path = invoice_render_output_path(output_path, &book.invoices[index]);
-                let pdf = render_invoice_pdf(&book.invoices[index], &book);
+                let pdf = render_invoice_pdf(&book.invoices[index], &book)?;
                 fs::write(&output_path, pdf).map_err(|error| {
                     format!("failed to write {}: {error}", output_path.display())
                 })?;
                 Ok(format!("Wrote {}\n", output_path.display()))
             } else {
-                let rendered = render_invoice_text(&book.invoices[index], &book);
+                let rendered = render_invoice_text(&book.invoices[index], &book)?;
                 Ok(format!("{rendered}\n"))
             }
         }

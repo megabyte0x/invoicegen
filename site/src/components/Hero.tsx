@@ -45,7 +45,7 @@ export function Hero({ release }: HeroProps): ReactElement {
             src={assetPaths.preview}
             srcSet={assetPaths.previewFallbackSrcSet}
             sizes={assetPaths.previewSizes}
-            alt="InvoiceGen macOS app window showing invoice lists, client revenue charts, and native sidebar tabs"
+            alt="InvoiceGen macOS workspace showing an invoice editor beside a multi-page invoice preview"
             width="1536"
             height="1024"
             fetchPriority="high"

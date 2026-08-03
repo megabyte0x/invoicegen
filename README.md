@@ -24,10 +24,13 @@ remote database.
 ## Data Location
 
 The macOS app uses:
-- `~/Library/Application Support/InvoiceGen/store.json`
+- `~/Documents/InvoiceGen/store.json`
 - set `INVOICEGEN_APP_STORE` only if you want to force a specific app store file
 
-The store is a versioned JSON document written atomically by `InvoiceCore`.
+On first launch after upgrading, InvoiceGen copies an existing store from
+`~/Library/Application Support/InvoiceGen/store.json` when the new location is empty. The legacy
+file is preserved as a fallback. The store is a versioned JSON document written atomically by
+`InvoiceCore`.
 
 ## Build
 
@@ -219,5 +222,5 @@ requires these GitHub Actions secrets so the uploaded DMG passes Gatekeeper:
 - `APP_STORE_CONNECT_API_PRIVATE_KEY`: private `.p8` key for that API key
 
 After those secrets are present, either push a new `v<version>` tag or run the
-GitHub Release workflow manually with a version like `0.1.8` to replace that
+GitHub Release workflow manually with a version like `0.2.0` to replace that
 release's DMG.

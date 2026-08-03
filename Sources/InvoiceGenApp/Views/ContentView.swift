@@ -1,11 +1,66 @@
+import Foundation
 import SwiftUI
 import InvoiceCore
 
+struct PendingNavigationAlertCoordinator: Equatable {
+    enum DismissalEffect: Equatable {
+        case preservePendingNavigation
+        case cancelPendingNavigation
+    }
+
+    private(set) var isPresented = false
+    private(set) var dismissalGeneration = 0
+    private var actionDismissalInFlight = false
+    private var dismissalAwaitingResolution = false
+
+    mutating func synchronize(hasPendingNavigation: Bool) {
+        guard !actionDismissalInFlight, !dismissalAwaitingResolution else { return }
+        if hasPendingNavigation {
+            isPresented = true
+        } else {
+            isPresented = false
+        }
+    }
+
+    mutating func beginActionDrivenDismissal() {
+        actionDismissalInFlight = true
+    }
+
+    mutating func presentationChanged(to isPresented: Bool) {
+        guard !isPresented else {
+            self.isPresented = true
+            return
+        }
+
+        self.isPresented = false
+        guard !dismissalAwaitingResolution else { return }
+        dismissalAwaitingResolution = true
+        dismissalGeneration &+= 1
+    }
+
+    mutating func resolveDismissal(hasPendingNavigation: Bool) -> DismissalEffect {
+        guard dismissalAwaitingResolution else { return .preservePendingNavigation }
+        dismissalAwaitingResolution = false
+
+        if actionDismissalInFlight {
+            actionDismissalInFlight = false
+            isPresented = hasPendingNavigation
+            return .preservePendingNavigation
+        }
+
+        isPresented = false
+        return hasPendingNavigation ? .cancelPendingNavigation : .preservePendingNavigation
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var sceneID = UUID()
+    @State private var pendingNavigationAlertCoordinator = PendingNavigationAlertCoordinator()
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: sidebarSelection) {
                 Section("Workspace") {
                     ForEach(AppSection.allCases) { section in
@@ -26,23 +81,28 @@ struct ContentView: View {
             detail
                 .searchable(text: $model.searchText, placement: .toolbar)
                 .toolbar {
+                    ToolbarItem(placement: .navigation) {
+                        if columnVisibility == .detailOnly {
+                            Button("Workspace") {
+                                columnVisibility = .all
+                            }
+                            .help("Show Workspace")
+                        }
+                    }
+
                     ToolbarItemGroup(placement: .primaryAction) {
                         Button {
-                            model.addInvoice()
+                            model.requestNavigation(to: .newInvoice)
                         } label: {
                             Label("New Invoice", systemImage: "plus")
                         }
                         .help("New Invoice")
-
-                        Button {
-                            model.save()
-                        } label: {
-                            Label("Save", systemImage: "tray.and.arrow.down")
-                        }
-                        .help("Save")
                     }
                 }
         }
+        .background(WindowCloseGuard(model: model))
+        .modifier(FocusedDraftCancellationAlert(model: model))
+        .modifier(StoreReplacementFeedbackAlert(model: model, sceneID: sceneID))
         .alert("Local Invoice", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -51,15 +111,41 @@ struct ContentView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
+        .alert(navigationConfirmationTitle, isPresented: pendingNavigationPresented) {
+            Button(isClosingWindow ? "Save and Close" : "Save and Continue") {
+                saveAndContinueNavigation()
+            }
+            Button(isClosingWindow ? "Discard and Close" : "Discard Changes", role: .destructive) {
+                pendingNavigationAlertCoordinator.beginActionDrivenDismissal()
+                model.discardDirtyDraftsAndContinue()
+            }
+            Button(isClosingWindow ? "Keep Editing" : "Stay Here", role: .cancel) {
+                model.cancelPendingNavigation()
+            }
+        } message: {
+            Text("Your changes have not been saved.")
+        }
+        .onChange(of: model.pendingNavigation, initial: true) { _, pendingNavigation in
+            pendingNavigationAlertCoordinator.synchronize(
+                hasPendingNavigation: pendingNavigation != nil
+            )
+        }
+        .onChange(of: pendingNavigationAlertCoordinator.dismissalGeneration) { _, _ in
+            let effect = pendingNavigationAlertCoordinator.resolveDismissal(
+                hasPendingNavigation: model.pendingNavigation != nil
+            )
+            if effect == .cancelPendingNavigation {
+                model.cancelPendingNavigation()
+            }
+        }
     }
 
     private var sidebarSelection: Binding<AppSection?> {
         Binding(
             get: { model.selectedSection },
-            set: { newValue in
-                if let newValue {
-                    model.selectedSection = newValue
-                }
+            set: { section in
+                guard let section else { return }
+                model.requestNavigation(to: .section(section))
             }
         )
     }
@@ -75,6 +161,63 @@ struct ContentView: View {
             ClientsView()
         case .projects:
             ProjectsView()
+        case .settings:
+            SettingsView(sceneID: sceneID, presentation: .workspace)
+                .onAppear {
+                    activateSettingsDraft()
+                }
         }
+    }
+
+    private var pendingNavigationPresented: Binding<Bool> {
+        Binding(
+            get: { pendingNavigationAlertCoordinator.isPresented },
+            set: { isPresented in
+                pendingNavigationAlertCoordinator.presentationChanged(to: isPresented)
+            }
+        )
+    }
+
+    private var isClosingWindow: Bool {
+        guard let pendingNavigation = model.pendingNavigation else { return false }
+        if case .closeWindow = pendingNavigation {
+            return true
+        }
+        return false
+    }
+
+    private var navigationConfirmationTitle: String {
+        isClosingWindow ? "Save changes before closing?" : "Save changes before leaving?"
+    }
+
+    private func saveAndContinueNavigation() {
+        pendingNavigationAlertCoordinator.beginActionDrivenDismissal()
+        let intent = model.pendingNavigation
+        guard let draftKind = model.dirtyDraftRequiringDecision else {
+            model.cancelPendingNavigation()
+            return
+        }
+
+        do {
+            try model.commitDraft(draftKind)
+            model.clearEditorIssues()
+            model.cancelPendingNavigation()
+            if let intent {
+                model.requestNavigation(to: intent)
+            }
+        } catch let error as EditorCommitError {
+            model.presentEditorIssues(error.issues)
+            model.cancelPendingNavigation()
+        } catch {
+            model.errorMessage = error.localizedDescription
+            model.cancelPendingNavigation()
+        }
+    }
+
+    private func activateSettingsDraft() {
+        if model.settingsDraft == nil {
+            model.beginEditingSettings()
+        }
+        model.activeDraftRoute = .settings
     }
 }

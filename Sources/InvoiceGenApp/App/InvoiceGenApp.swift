@@ -11,28 +11,37 @@ struct InvoiceGenApp: App {
         WindowGroup("Local Invoice", id: "main") {
             ContentView()
                 .environmentObject(model)
-                .frame(minWidth: 1040, minHeight: 640)
         }
-        .defaultSize(width: 1280, height: 760)
+        .defaultSize(width: 1180, height: 760)
         .commands {
+            SidebarCommands()
+
             CommandGroup(after: .newItem) {
                 Button("New Invoice") {
-                    model.addInvoice()
+                    model.requestNavigation(to: .newInvoice)
                 }
                 .keyboardShortcut("n", modifiers: [.command])
-
-                Button("Save") {
-                    model.save()
-                }
-                .keyboardShortcut("s", modifiers: [.command])
             }
+
+            DraftCommands(model: model)
         }
 
         Settings {
-            SettingsView()
-                .environmentObject(model)
-                .frame(width: 680)
+            SettingsSceneRoot(model: model)
         }
+        .defaultSize(width: 680, height: 560)
+    }
+}
+
+private struct SettingsSceneRoot: View {
+    @ObservedObject var model: AppModel
+    @State private var sceneID = UUID()
+
+    var body: some View {
+        SettingsView(sceneID: sceneID, presentation: .dedicated)
+            .environmentObject(model)
+            .modifier(FocusedDraftCancellationAlert(model: model))
+            .modifier(StoreReplacementFeedbackAlert(model: model, sceneID: sceneID))
     }
 }
 

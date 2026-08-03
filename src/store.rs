@@ -7,16 +7,31 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Debug)]
 pub struct LocalInvoiceStore {
     pub path: PathBuf,
+    legacy_path: Option<PathBuf>,
 }
 
 impl LocalInvoiceStore {
     pub fn new(path: Option<PathBuf>) -> Self {
+        if let Some(path) = path {
+            return Self {
+                path,
+                legacy_path: None,
+            };
+        }
+
+        let environment: Vec<(String, String)> = env::vars().collect();
+        let environment_refs: Vec<(&str, &str)> = environment
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+            .collect();
         Self {
-            path: path.unwrap_or_else(default_store_path),
+            path: default_store_path_for_environment(std::env::consts::OS, &environment_refs),
+            legacy_path: legacy_store_path_for_environment(std::env::consts::OS, &environment_refs),
         }
     }
 
     pub fn load(&self) -> Result<InvoiceBook, String> {
+        self.migrate_legacy_store_if_needed()?;
         if !self.path.exists() {
             return Ok(InvoiceBook::empty());
         }
@@ -27,6 +42,26 @@ impl LocalInvoiceStore {
         book.schema_version = CURRENT_SCHEMA_VERSION;
         book.refresh_invoice_statuses(&now_iso());
         Ok(book)
+    }
+
+    fn migrate_legacy_store_if_needed(&self) -> Result<(), String> {
+        if self.path.exists() {
+            return Ok(());
+        }
+        let Some(legacy_path) = self.legacy_path.as_ref() else {
+            return Ok(());
+        };
+        if !legacy_path.exists() {
+            return Ok(());
+        }
+
+        let data = fs::read_to_string(legacy_path)
+            .map_err(|error| format!("failed to read {}: {error}", legacy_path.display()))?;
+        let json = json::parse(&data)?;
+        let mut book = InvoiceBook::from_json(&json)?;
+        book.schema_version = CURRENT_SCHEMA_VERSION;
+        book.refresh_invoice_statuses(&now_iso());
+        self.save(&book)
     }
 
     pub fn save(&self, book: &InvoiceBook) -> Result<(), String> {
@@ -115,15 +150,6 @@ pub fn backup_path(path: &Path) -> PathBuf {
     path.with_file_name(format!("{file_name}.bak"))
 }
 
-fn default_store_path() -> PathBuf {
-    let environment: Vec<(String, String)> = env::vars().collect();
-    let environment_refs: Vec<(&str, &str)> = environment
-        .iter()
-        .map(|(key, value)| (key.as_str(), value.as_str()))
-        .collect();
-    default_store_path_for_environment(std::env::consts::OS, &environment_refs)
-}
-
 pub fn default_store_path_for_environment(platform: &str, environment: &[(&str, &str)]) -> PathBuf {
     if let Some(override_path) = env_value(environment, "INVOICEGEN_APP_STORE") {
         if !override_path.is_empty() {
@@ -135,8 +161,7 @@ pub fn default_store_path_for_environment(platform: &str, environment: &[(&str, 
         "macos" => {
             if let Some(home) = env_value(environment, "HOME") {
                 return PathBuf::from(home)
-                    .join("Library")
-                    .join("Application Support")
+                    .join("Documents")
                     .join("InvoiceGen")
                     .join("store.json");
             }
@@ -170,6 +195,26 @@ pub fn default_store_path_for_environment(platform: &str, environment: &[(&str, 
         .join("share")
         .join("invoicegen-app")
         .join("store.json")
+}
+
+fn legacy_store_path_for_environment(
+    platform: &str,
+    environment: &[(&str, &str)],
+) -> Option<PathBuf> {
+    if env_value(environment, "INVOICEGEN_APP_STORE").is_some_and(|value| !value.is_empty()) {
+        return None;
+    }
+    if platform != "macos" {
+        return None;
+    }
+
+    env_value(environment, "HOME").map(|home| {
+        PathBuf::from(home)
+            .join("Library")
+            .join("Application Support")
+            .join("InvoiceGen")
+            .join("store.json")
+    })
 }
 
 fn env_value<'a>(environment: &'a [(&str, &str)], key: &str) -> Option<&'a str> {

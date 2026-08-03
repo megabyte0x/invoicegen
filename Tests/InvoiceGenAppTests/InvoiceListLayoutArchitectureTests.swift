@@ -1,22 +1,42 @@
 import XCTest
+@testable import InvoiceGenApp
 
 final class InvoiceListLayoutArchitectureTests: XCTestCase {
-    func testInvoicesViewDoesNotNestNavigationSplitViewInsideAppDetail() throws {
-        let testFileURL = URL(fileURLWithPath: #filePath)
-        let packageRoot = testFileURL
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let sourceURL = packageRoot.appendingPathComponent("Sources/InvoiceGenApp/Views/InvoicesView.swift")
-        let source = try String(contentsOf: sourceURL)
+    func testSectionViewsDoNotNestNavigationSplitViewInsideAppDetail() throws {
+        for fileName in ["InvoicesView.swift", "ClientsView.swift", "ProjectsView.swift"] {
+            let source = try viewSource(named: fileName)
 
-        XCTAssertFalse(
-            source.contains("NavigationSplitView {"),
-            "InvoicesView must not nest NavigationSplitView inside the app detail because the inner sidebar can render under toolbar chrome."
-        )
+            XCTAssertFalse(
+                source.contains("NavigationSplitView"),
+                "\(fileName) must not nest NavigationSplitView inside the app detail."
+            )
+        }
+    }
+
+    func testContentViewOwnsTheNavigationSplitView() throws {
+        let source = try viewSource(named: "ContentView.swift")
+
         XCTAssertTrue(
-            source.contains("HSplitView"),
-            "InvoicesView should use a plain split layout inside the outer app navigation."
+            source.contains("NavigationSplitView"),
+            "ContentView must own the app-level NavigationSplitView."
         )
+    }
+
+    func testAppSectionIncludesSettings() {
+        XCTAssertTrue(AppSection.allCases.contains(.settings))
+    }
+
+    private func viewSource(named fileName: String) throws -> String {
+        let sourceURL = packageRoot
+            .appendingPathComponent("Sources/InvoiceGenApp/Views")
+            .appendingPathComponent(fileName)
+        return try String(contentsOf: sourceURL, encoding: .utf8)
+    }
+
+    private var packageRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }

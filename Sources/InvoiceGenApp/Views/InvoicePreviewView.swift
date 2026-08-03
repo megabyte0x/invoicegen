@@ -1,57 +1,32 @@
-import SwiftUI
-import InvoiceCore
 import AppKit
+import InvoiceCore
+import SwiftUI
+import UniformTypeIdentifiers
 
 struct InvoicePreviewView: View {
     @EnvironmentObject private var model: AppModel
     @Binding var invoice: Invoice
     var book: InvoiceBook
+    var isPaused = false
     @State private var isConfirmingMarkSent = false
     @State private var isChoosingMailMethod = false
     @State private var mailNotice: String?
+    @State private var scaleMode: PreviewScaleMode = .fitWidth
+
+    private var document: InvoiceDocument {
+        InvoiceDocumentPaginator.paginate(invoice: invoice, book: book)
+    }
 
     var body: some View {
-        VStack(spacing: 20) {
-            // Actions Toolbar
-            HStack {
-                if let mailNotice {
-                    Label(mailNotice, systemImage: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(Color.runeyMuted)
-                        .lineLimit(2)
-                }
+        VStack(spacing: 0) {
+            previewHeader
 
-                Spacer()
+            Divider()
 
-                Button(action: {
-                    isChoosingMailMethod = true
-                }) {
-                    Label("Mail Invoice", systemImage: "envelope")
-                }
-
-                Button(action: {
-                    printInvoice()
-                }) {
-                    Label("Print or Export PDF...", systemImage: "printer")
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-
-            // Invoice Sheet Container
-            ScrollView([.vertical, .horizontal]) {
-                InvoiceSheetView(invoice: invoice, book: book)
-                    .frame(width: 612) // Fixed width for standard Letter layout aspect
-                    .padding(36)
-                    .background(Color.white) // Fixed white paper sheet background
-                    .cornerRadius(8)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(Color.runeyBorder.opacity(0.75), lineWidth: 1)
-                    }
-                    .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: .infinity)
+            if isPaused {
+                pausedPreview
+            } else {
+                InvoicePreviewCanvas(document: document, scaleMode: $scaleMode)
             }
         }
         .background(Color.runeyPreviewBackground)
@@ -73,7 +48,6 @@ struct InvoicePreviewView: View {
         .alert("Mark invoice as sent?", isPresented: $isConfirmingMarkSent) {
             Button("Mark as Sent") {
                 invoice.status = .sent
-                model.save()
             }
             Button("Not Now", role: .cancel) {}
         } message: {
@@ -81,51 +55,160 @@ struct InvoicePreviewView: View {
         }
     }
 
-    private func printInvoice() {
-        // Build view explicitly sized for Letter printing
-        let printView = InvoiceSheetView(invoice: invoice, book: book)
-            .frame(width: 612, height: 792)
-            .background(Color.white)
-        
-        let hostingView = NSHostingView(rootView: printView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 612, height: 792)
+    private var previewHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                mailNoticeLabel
 
-        let printInfo = NSPrintInfo.shared
-        printInfo.horizontalPagination = .fit
-        printInfo.verticalPagination = .fit
-        printInfo.orientation = .portrait
-        printInfo.leftMargin = 36
-        printInfo.rightMargin = 36
-        printInfo.topMargin = 36
-        printInfo.bottomMargin = 36
+                Spacer(minLength: 8)
 
-        let printOp = NSPrintOperation(view: hostingView, printInfo: printInfo)
-        printOp.jobTitle = InvoiceExportNaming.pdfFileStem(for: invoice)
-        printOp.showsPrintPanel = true
-        printOp.showsProgressPanel = true
-        printOp.run()
+                previewActions
+                    .fixedSize()
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                mailNoticeLabel
+
+                HStack(alignment: .top, spacing: 8) {
+                    mailButton
+                        .frame(maxWidth: .infinity)
+
+                    exportButton
+                        .frame(maxWidth: .infinity)
+                }
+
+                scalePicker
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    @ViewBuilder
+    private var mailNoticeLabel: some View {
+        if let mailNotice {
+            Label(mailNotice, systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(Color.runeyMuted)
+                .lineLimit(2)
+        }
+    }
+
+    private var previewActions: some View {
+        HStack(spacing: 8) {
+            mailButton
+            exportButton
+            scalePicker
+                .frame(width: 210)
+        }
+    }
+
+    private var mailButton: some View {
+        Button {
+            isChoosingMailMethod = true
+        } label: {
+            Label("Mail Invoice", systemImage: "envelope")
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .disabled(isPaused)
+        .help(isPaused ? "Fix invalid line-item values before mailing this invoice." : "")
+    }
+
+    private var exportButton: some View {
+        Button(action: exportInvoicePDF) {
+            Label("Export PDF...", systemImage: "square.and.arrow.down")
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .disabled(isPaused)
+        .help(isPaused ? "Fix invalid line-item values before exporting this invoice." : "")
+    }
+
+    private var scalePicker: some View {
+        Picker("Preview scale", selection: $scaleMode) {
+            ForEach(PreviewScaleMode.allCases) { mode in
+                Text(mode.label).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+    }
+
+    private var pausedPreview: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.largeTitle)
+                .foregroundStyle(Color.runeyDestructive)
+            Text("Fix invalid line-item values to update this preview.")
+                .font(.headline)
+                .foregroundStyle(Color.runeyPrimary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.runeyPreviewBackground)
+    }
+
+    private func exportInvoicePDF() {
+        let exportDocument = document
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.nameFieldStringValue = InvoiceExportNaming.pdfFileName(for: invoice)
+        panel.directoryURL = FileManager.default.urls(
+            for: .downloadsDirectory,
+            in: .userDomainMask
+        ).first
+
+        let handleResponse: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let destinationURL = panel.url else { return }
+            do {
+                try InvoiceDocumentRenderer.writePDF(
+                    document: exportDocument,
+                    to: destinationURL
+                )
+            } catch {
+                model.errorMessage = "Could not export invoice: \(error.localizedDescription)"
+            }
+        }
+
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: handleResponse)
+        } else {
+            panel.begin(completionHandler: handleResponse)
+        }
     }
 
     private func mailInvoiceWithMailApp() {
         let draft = InvoiceMailDraft(invoice: invoice, book: book)
+        var attachmentURL: URL?
 
         do {
-            let attachmentURL = try writeTemporaryInvoicePDF()
+            attachmentURL = try writeTemporaryInvoicePDF()
+            guard let attachmentURL else { return }
             try InvoiceMailAppleScript.compose(draft: draft, attachmentURL: attachmentURL)
             scheduleTemporaryAttachmentCleanup(for: attachmentURL)
 
             mailNotice = draft.isMissingRecipient ? "No client email. Mail opened without a recipient." : nil
             isConfirmingMarkSent = true
         } catch {
+            if let attachmentURL {
+                removeTemporaryAttachment(at: attachmentURL)
+            }
             model.errorMessage = "Could not prepare invoice email: \(error.localizedDescription)"
         }
     }
 
     private func mailInvoiceWithBrowser() {
         let draft = InvoiceMailDraft(invoice: invoice, book: book)
+        var attachmentURL: URL?
 
         do {
-            let attachmentURL = try writeTemporaryInvoicePDF()
+            attachmentURL = try writeTemporaryInvoicePDF()
+            guard let attachmentURL else { return }
 
             guard let mailtoURL = InvoiceMailtoURL.url(for: draft) else {
                 throw NSError(
@@ -137,7 +220,18 @@ struct InvoicePreviewView: View {
                 )
             }
 
-            NSWorkspace.shared.activateFileViewerSelecting([attachmentURL])
+            guard NSWorkspace.shared.selectFile(
+                attachmentURL.path,
+                inFileViewerRootedAtPath: attachmentURL.deletingLastPathComponent().path
+            ) else {
+                throw NSError(
+                    domain: "InvoiceGen.Mailto",
+                    code: -2,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Could not reveal the temporary invoice PDF."
+                    ]
+                )
+            }
 
             guard NSWorkspace.shared.open(mailtoURL) else {
                 throw NSError(
@@ -153,6 +247,9 @@ struct InvoicePreviewView: View {
             mailNotice = browserMailNotice(isMissingRecipient: draft.isMissingRecipient)
             isConfirmingMarkSent = true
         } catch {
+            if let attachmentURL {
+                removeTemporaryAttachment(at: attachmentURL)
+            }
             model.errorMessage = "Could not prepare browser email: \(error.localizedDescription)"
         }
     }
@@ -161,21 +258,15 @@ struct InvoicePreviewView: View {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("InvoiceGen-Mail-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-
-        let fileURL = directoryURL.appendingPathComponent(InvoiceExportNaming.pdfFileName(for: invoice))
-        try invoicePDFData().write(to: fileURL, options: .atomic)
-        return fileURL
-    }
-
-    private func invoicePDFData() -> Data {
-        let pdfView = InvoiceSheetView(invoice: invoice, book: book)
-            .frame(width: 612, height: 792)
-            .background(Color.white)
-
-        let hostingView = NSHostingView(rootView: pdfView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 612, height: 792)
-        hostingView.layoutSubtreeIfNeeded()
-        return hostingView.dataWithPDF(inside: hostingView.bounds)
+        do {
+            let fileURL = directoryURL.appendingPathComponent(InvoiceExportNaming.pdfFileName(for: invoice))
+            try InvoiceDocumentRenderer.pdfData(document: document)
+                .write(to: fileURL, options: .atomic)
+            return fileURL
+        } catch {
+            try? FileManager.default.removeItem(at: directoryURL)
+            throw error
+        }
     }
 
     private func scheduleTemporaryAttachmentCleanup(
@@ -184,8 +275,16 @@ struct InvoicePreviewView: View {
     ) {
         let directoryURL = attachmentURL.deletingLastPathComponent()
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            try? FileManager.default.removeItem(at: directoryURL)
+            Self.removeTemporaryDirectory(at: directoryURL)
         }
+    }
+
+    private func removeTemporaryAttachment(at attachmentURL: URL) {
+        Self.removeTemporaryDirectory(at: attachmentURL.deletingLastPathComponent())
+    }
+
+    private static func removeTemporaryDirectory(at directoryURL: URL) {
+        try? FileManager.default.removeItem(at: directoryURL)
     }
 
     private func browserMailNotice(isMissingRecipient: Bool) -> String {
@@ -294,303 +393,5 @@ private struct MailInvoiceMethodRow: View {
                 .strokeBorder(Color.runeyBorder.opacity(0.8), lineWidth: 1)
         }
         .contentShape(Rectangle())
-    }
-}
-
-struct InvoiceSheetView: View {
-    var invoice: Invoice
-    var book: InvoiceBook
-
-    private var client: Client? {
-        book.client(for: invoice)
-    }
-
-    private var paymentAcceptanceDetails: [PaymentAcceptanceDetail] {
-        book.paymentAcceptanceDetails(for: invoice)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header: Invoice Title + Company Identity
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(book.businessProfile.name)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(Color.black) // Dark ink
-                    if !book.businessProfile.email.isEmpty {
-                        Text(book.businessProfile.email)
-                            .font(.caption)
-                            .foregroundStyle(Color(white: 0.35))
-                    }
-                    if !book.businessProfile.address.isEmpty {
-                        Text(book.businessProfile.address)
-                            .font(.caption)
-                            .foregroundStyle(Color(white: 0.35))
-                            .lineLimit(3)
-                    }
-                    if !book.businessProfile.taxIdentifier.isEmpty {
-                        Text("Tax ID: \(book.businessProfile.taxIdentifier)")
-                            .font(.caption)
-                            .foregroundStyle(Color(white: 0.35))
-                    }
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("INVOICE")
-                        .font(.system(.title, design: .rounded).weight(.black))
-                        .foregroundStyle(Color.black)
-                    Text(invoice.number)
-                        .font(.system(.headline, design: .monospaced))
-                        .foregroundStyle(Color(white: 0.35))
-                }
-            }
-            .padding(.bottom, 36)
-
-            Divider()
-                .background(Color(white: 0.85))
-                .padding(.bottom, 24)
-
-            // Invoice Metadata: Bill To + Terms
-            HStack(alignment: .top, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("BILL TO")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color(white: 0.45))
-                    Text(client?.name ?? "Unassigned Client")
-                        .font(.body.weight(.bold))
-                        .foregroundStyle(Color.black)
-                    if let company = client?.company, !company.isEmpty {
-                        Text(company)
-                            .font(.subheadline)
-                            .foregroundStyle(Color(white: 0.35))
-                    }
-                    if let address = client?.address, !address.isEmpty {
-                        Text(address)
-                            .font(.subheadline)
-                            .foregroundStyle(Color(white: 0.35))
-                            .lineLimit(4)
-                    }
-                    if let email = client?.email, !email.isEmpty {
-                        Text(email)
-                            .font(.subheadline)
-                            .foregroundStyle(Color(white: 0.35))
-                    }
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 6) {
-                    Grid(alignment: .trailing, horizontalSpacing: 16, verticalSpacing: 6) {
-                        GridRow {
-                            Text("Issue Date:")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color(white: 0.45))
-                            Text(DateFormatting.short.string(from: invoice.issueDate))
-                                .font(.subheadline)
-                                .foregroundStyle(Color.black)
-                        }
-                        GridRow {
-                            Text("Due Date:")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color(white: 0.45))
-                            Text(DateFormatting.short.string(from: invoice.dueDate))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(Color.black)
-                        }
-                    }
-                }
-            }
-            .padding(.bottom, 36)
-
-            // Line Items Table
-            VStack(alignment: .leading, spacing: 0) {
-                // Table Header
-                HStack(spacing: 8) {
-                    Text("Description")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color(white: 0.35))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("Qty")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color(white: 0.35))
-                        .frame(width: 50, alignment: .center)
-                    Text("Unit Price")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color(white: 0.35))
-                        .frame(width: 90, alignment: .trailing)
-                    Text("Tax")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color(white: 0.35))
-                        .frame(width: 50, alignment: .trailing)
-                    Text("Total")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color(white: 0.35))
-                        .frame(width: 100, alignment: .trailing)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
-                .background(Color(white: 0.94))
-                
-                Divider()
-                    .background(Color(white: 0.85))
-
-                // Items List
-                ForEach(invoice.lineItems) { item in
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(alignment: .top, spacing: 8) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title)
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(Color.black)
-                                if !item.details.isEmpty {
-                                    Text(item.details)
-                                        .font(.caption)
-                                        .foregroundStyle(Color(white: 0.4))
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                            Text(trimmedQty(item.quantity))
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundStyle(Color.black)
-                                .frame(width: 50, alignment: .center)
-
-                            Text(Money.format(minorUnits: item.unitPriceMinorUnits, currencyCode: invoice.currencyCode).replacingOccurrences(of: invoice.currencyCode + " ", with: ""))
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundStyle(Color.black)
-                                .frame(width: 90, alignment: .trailing)
-
-                            Text("\(trimmedQty(item.taxRatePercent))%")
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundStyle(Color.black)
-                                .frame(width: 50, alignment: .trailing)
-
-                            Text(Money.format(minorUnits: item.totalMinorUnits, currencyCode: invoice.currencyCode).replacingOccurrences(of: invoice.currencyCode + " ", with: ""))
-                                .font(.system(.body, design: .monospaced).weight(.semibold))
-                                .foregroundStyle(Color.black)
-                                .frame(width: 100, alignment: .trailing)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 10)
-                        
-                        Divider()
-                            .background(Color(white: 0.88))
-                    }
-                }
-            }
-            .padding(.bottom, 24)
-
-            // Bottom Summary: Notes/Terms + Totals Box
-            HStack(alignment: .top, spacing: 32) {
-                VStack(alignment: .leading, spacing: 12) {
-                    if !invoice.notes.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Notes")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color(white: 0.45))
-                            Text(invoice.notes)
-                                .font(.caption)
-                                .foregroundStyle(Color(white: 0.35))
-                        }
-                    }
-                    if !invoice.terms.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Terms & Conditions")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color(white: 0.45))
-                            Text(invoice.terms)
-                                .font(.caption)
-                                .foregroundStyle(Color(white: 0.35))
-                        }
-                    }
-                    if !paymentAcceptanceDetails.isEmpty {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Payment Acceptance")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color(white: 0.45))
-
-                            ForEach(paymentAcceptanceDetails) { detail in
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(detail.kind.label): \(detail.label)")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(Color.black)
-
-                                    ForEach(detailLines(for: detail), id: \.self) { line in
-                                        Text(line)
-                                            .font(.caption)
-                                            .foregroundStyle(Color(white: 0.35))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                VStack(alignment: .trailing, spacing: 0) {
-                    Grid(alignment: .trailing, horizontalSpacing: 24, verticalSpacing: 8) {
-                        GridRow {
-                            Text("Subtotal")
-                                .font(.subheadline)
-                                .foregroundStyle(Color(white: 0.4))
-                            Text(Money.format(minorUnits: invoice.subtotalMinorUnits, currencyCode: invoice.currencyCode))
-                                .font(.system(.subheadline, design: .monospaced))
-                                .foregroundStyle(Color.black)
-                        }
-                        GridRow {
-                            Text("Tax")
-                                .font(.subheadline)
-                                .foregroundStyle(Color(white: 0.4))
-                            Text(Money.format(minorUnits: invoice.taxMinorUnits, currencyCode: invoice.currencyCode))
-                                .font(.system(.subheadline, design: .monospaced))
-                                .foregroundStyle(Color.black)
-                        }
-                        if invoice.paidMinorUnits > 0 {
-                            GridRow {
-                                Text("Amount Paid")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color(white: 0.4))
-                                  Text(Money.format(minorUnits: invoice.paidMinorUnits, currencyCode: invoice.currencyCode))
-                                    .font(.system(.subheadline, design: .monospaced))
-                                    .foregroundStyle(Color.black)
-                            }
-                        }
-                    }
-                    .padding(.bottom, 12)
-                    
-                    Divider()
-                        .frame(width: 220)
-                        .background(Color(white: 0.8))
-                        .padding(.vertical, 8)
-                    
-                    HStack(spacing: 24) {
-                        Text("Balance Due")
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(Color.black)
-                        Text(Money.format(minorUnits: invoice.balanceDueMinorUnits, currencyCode: invoice.currencyCode))
-                            .font(.system(.headline, design: .monospaced).weight(.bold))
-                            .foregroundStyle(Color.black) // Dark ink
-                    }
-                }
-            }
-        }
-        .padding(32)
-        .background(Color.white)
-    }
-
-    private func trimmedQty(_ val: Double) -> String {
-        if val.rounded() == val {
-            return String(Int(val))
-        }
-        return String(format: "%.2f", val)
-    }
-
-    private func detailLines(for detail: PaymentAcceptanceDetail) -> [String] {
-        detail.details
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
     }
 }

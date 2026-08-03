@@ -3,8 +3,10 @@ import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const siteDir = resolve(root, "site");
+const siteShellDir = resolve(root, ".site-shell");
 const distDir = resolve(root, "dist/site");
 const canonicalHost = "https://invoicegen.megabyte.sh";
+const appShellMarker = "<!--INVOICEGEN_APP_SHELL-->";
 const stalePatterns = [/Local Invoice/g, /useinvoicegen\.com/g];
 const definitionStart = "InvoiceGen is a local-first invoicing workspace for macOS";
 const expectedSeoPages = [
@@ -103,7 +105,7 @@ function verifyNoStaleSeoText() {
   }
 }
 
-function verifyIndexHtml(path, label) {
+function verifyIndexMetadata(path, label, { expectAppShellMarker = false } = {}) {
   const html = read(path);
   assertIncludes(html, "<title>InvoiceGen - Local-first macOS invoicing</title>", label);
   assertIncludes(html, `rel="canonical" href="${canonicalHost}/"`, label);
@@ -114,6 +116,21 @@ function verifyIndexHtml(path, label) {
   assertIncludes(html, 'name="twitter:image" content="https://invoicegen.megabyte.sh/assets/invoicegen-social-preview.png"', label);
   assertIncludes(html, '"@type": "WebPage"', label);
   assertIncludes(html, '"mainEntity"', label);
+
+  if (expectAppShellMarker) {
+    assertIncludes(html, appShellMarker, label);
+  } else if (html.includes(appShellMarker)) {
+    fail(`${label} must have the app shell marker replaced`);
+  }
+}
+
+function verifyHomepageContent(path, label) {
+  if (!existsSync(path)) {
+    fail(`${label} must exist; generate the homepage shell before running verification`);
+    return;
+  }
+
+  const html = read(path).replaceAll("srcSet=", "srcset=").replaceAll("fetchPriority=", "fetchpriority=");
   assertIncludes(html, '<h1 id="hero-title">Local-first invoices, built for your Mac.</h1>', label);
   assertIncludes(html, '<h2 id="what-is-invoicegen">What is InvoiceGen?</h2>', label);
   assertIncludes(html, '<h2 id="resources-title">Indexable guides for local-first invoice generation.</h2>', label);
@@ -133,7 +150,7 @@ function verifyIndexHtml(path, label) {
   assertIncludes(html, '/assets/invoicegen-preview-1280.webp 1280w', label);
   assertIncludes(html, '/assets/invoicegen-preview-640.png 640w', label);
   assertIncludes(html, 'sizes="(max-width: 720px) calc(100vw - 36px), 1180px"', label);
-  assertIncludes(html, 'alt="InvoiceGen macOS app window showing invoice lists, client revenue charts, and native sidebar tabs"', label);
+  assertIncludes(html, 'alt="InvoiceGen macOS workspace showing an invoice editor beside a multi-page invoice preview"', label);
   assertDefinitionLength(html, label);
 
   const h1Count = countMatches(html, /<h1\b/gi);
@@ -220,6 +237,14 @@ function verifyStaticSeoPage(baseDir, page, label) {
     fail(`${label}/${page.source} raw text must be at least 900 characters, got ${rawTextLength}`);
   }
 
+  for (const tag of ["table", "thead", "tbody", "tr"]) {
+    const openingCount = countMatches(html, new RegExp(`<${tag}\\b`, "gi"));
+    const closingCount = countMatches(html, new RegExp(`</${tag}>`, "gi"));
+    if (openingCount !== closingCount) {
+      fail(`${label}/${page.source} must balance <${tag}> tags, got ${openingCount} opening and ${closingCount} closing`);
+    }
+  }
+
   for (const pattern of stalePatterns) {
     assertNotMatches(html, pattern, `${label}/${page.source}`);
   }
@@ -279,7 +304,8 @@ function verifyImageVariants() {
 }
 
 verifyNoStaleSeoText();
-verifyIndexHtml(resolve(siteDir, "index.html"), "site/index.html");
+verifyIndexMetadata(resolve(siteDir, "index.html"), "site/index.html", { expectAppShellMarker: true });
+verifyHomepageContent(resolve(siteShellDir, "homepage.html"), ".site-shell/homepage.html");
 verifyPublicFiles(resolve(siteDir, "public"), "site/public");
 for (const page of expectedSeoPages) {
   verifyStaticSeoPage(resolve(siteDir, "public"), page, "site/public");
@@ -288,7 +314,8 @@ verifyVercelHeaders();
 verifyImageVariants();
 
 if (existsSync(resolve(distDir, "index.html"))) {
-  verifyIndexHtml(resolve(distDir, "index.html"), "dist/site/index.html");
+  verifyIndexMetadata(resolve(distDir, "index.html"), "dist/site/index.html");
+  verifyHomepageContent(resolve(distDir, "index.html"), "dist/site/index.html");
   verifyPublicFiles(distDir, "dist/site", { expectSourcePlaceholders: false });
   for (const page of expectedSeoPages) {
     verifyStaticSeoPage(distDir, page, "dist/site");
