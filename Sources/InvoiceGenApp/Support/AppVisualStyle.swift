@@ -16,7 +16,11 @@ extension Color {
     static let runeyAccent = Color(nsColor: .controlAccentColor)
     
     static let runeySuccess = Color(red: 0.49, green: 0.78, blue: 0.28) // HSL 93 64% 52%
-    static let runeyDestructive = Color(red: 1.0, green: 0.35, blue: 0.35) // HSL 0 100% 65%
+    static let runeyDestructive = Color(
+        red: 0.70,
+        green: 0.14,
+        blue: 0.09
+    )
     static let runeyWarning = Color(red: 1.0, green: 0.64, blue: 0.39) // HSL 39 100% 64%
     static let runeyOrange = Color(red: 1.0, green: 0.52, blue: 0.34) // HSL 16 100% 67%
     static let runeyInfo = Color(red: 0.2, green: 0.65, blue: 0.85) // HSL 200 70% 50%

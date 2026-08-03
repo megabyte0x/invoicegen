@@ -30,48 +30,48 @@ struct DashboardView: View {
                         value: money(outstandingMinorUnits),
                         systemImage: "clock.badge.exclamationmark",
                         iconColor: Color.runeyWarning,
-                        isHovered: hoveredTile == "outstanding"
+                        isHovered: hoveredTile == "outstanding",
+                        action: {
+                            model.requestNavigation(to: .section(.invoices))
+                        }
                     )
                     .onHover { isHovered in hoveredTile = isHovered ? "outstanding" : nil }
-                    .onTapGesture {
-                        model.selectedSection = .invoices
-                    }
 
                     MetricTile(
                         title: "Paid to Date",
                         value: money(paidMinorUnits),
                         systemImage: "checkmark.circle.fill",
                         iconColor: Color.runeySuccess,
-                        isHovered: hoveredTile == "paid"
+                        isHovered: hoveredTile == "paid",
+                        action: {
+                            model.requestNavigation(to: .section(.invoices))
+                        }
                     )
                     .onHover { isHovered in hoveredTile = isHovered ? "paid" : nil }
-                    .onTapGesture {
-                        model.selectedSection = .invoices
-                    }
 
                     MetricTile(
                         title: "Total Clients",
                         value: "\(model.book.clients.count)",
                         systemImage: "person.2.fill",
                         iconColor: Color.runeyInfo,
-                        isHovered: hoveredTile == "clients"
+                        isHovered: hoveredTile == "clients",
+                        action: {
+                            model.requestNavigation(to: .section(.clients))
+                        }
                     )
                     .onHover { isHovered in hoveredTile = isHovered ? "clients" : nil }
-                    .onTapGesture {
-                        model.selectedSection = .clients
-                    }
 
                     MetricTile(
                         title: "Overdue Invoices",
                         value: "\(model.book.invoices.filter { $0.status == .overdue }.count)",
                         systemImage: "exclamationmark.triangle.fill",
                         iconColor: Color.runeyDestructive,
-                        isHovered: hoveredTile == "overdue"
+                        isHovered: hoveredTile == "overdue",
+                        action: {
+                            model.requestNavigation(to: .section(.invoices))
+                        }
                     )
                     .onHover { isHovered in hoveredTile = isHovered ? "overdue" : nil }
-                    .onTapGesture {
-                        model.selectedSection = .invoices
-                    }
                 }
 
                 VStack(alignment: .leading, spacing: 14) {
@@ -181,8 +181,20 @@ struct MetricTile: View {
     var systemImage: String
     var iconColor: Color
     var isHovered: Bool = false
+    var action: () -> Void
 
     var body: some View {
+        Button(action: action) {
+            metricContent
+                .runeyCard(padding: 16, isHovered: isHovered)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title), \(value)")
+        .accessibilityHint("Opens \(destinationLabel)")
+    }
+
+    private var metricContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(title)
@@ -202,8 +214,15 @@ struct MetricTile: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
-        .runeyCard(padding: 16, isHovered: isHovered)
-        .contentShape(Rectangle())
+    }
+
+    private var destinationLabel: String {
+        switch title {
+        case "Total Clients":
+            return "Clients"
+        default:
+            return "Invoices"
+        }
     }
 }
 
