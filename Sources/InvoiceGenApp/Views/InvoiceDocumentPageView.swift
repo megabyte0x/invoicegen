@@ -195,6 +195,7 @@ struct InvoiceDocumentPageView: View {
         Text(value)
             .font(.system(size: 13, weight: isStrong ? .semibold : .regular, design: .monospaced))
             .foregroundStyle(Color.black)
+            .invoiceDocumentNumericCell(fullValue: value)
             .frame(height: InvoiceDocumentMetrics.amountLineHeight, alignment: .top)
     }
 
@@ -267,6 +268,7 @@ struct InvoiceDocumentPageView: View {
                         .font(.system(size: 13, weight: .bold))
                     Text(snapshot.balanceDue)
                         .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .invoiceDocumentNumericCell(fullValue: snapshot.balanceDue)
                 }
                 .foregroundStyle(Color.black)
                 .frame(height: 20, alignment: .topTrailing)
@@ -283,6 +285,7 @@ struct InvoiceDocumentPageView: View {
             Text(value)
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundStyle(Color.black)
+                .invoiceDocumentNumericCell(fullValue: value)
         }
         .frame(height: 17, alignment: .topTrailing)
     }
@@ -296,6 +299,25 @@ struct InvoiceDocumentPageView: View {
         }
         .padding(.top, 8)
         .frame(height: InvoiceDocumentMetrics.pageNumberHeight, alignment: .topTrailing)
+    }
+}
+
+private struct InvoiceDocumentNumericCellModifier: ViewModifier {
+    var fullValue: String
+
+    func body(content: Content) -> some View {
+        content
+            .lineLimit(1)
+            .allowsTightening(true)
+            .minimumScaleFactor(0.5)
+            .truncationMode(.tail)
+            .accessibilityLabel(Text(verbatim: fullValue))
+    }
+}
+
+private extension View {
+    func invoiceDocumentNumericCell(fullValue: String) -> some View {
+        modifier(InvoiceDocumentNumericCellModifier(fullValue: fullValue))
     }
 }
 

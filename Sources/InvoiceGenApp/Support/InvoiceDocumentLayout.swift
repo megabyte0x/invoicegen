@@ -757,8 +757,8 @@ enum InvoiceDocumentPaginator {
 
 enum InvoiceDocumentFormatting {
     static func trimmedQuantity(_ value: Double) -> String {
-        if value.rounded() == value {
-            return String(Int(value))
+        if value.isFinite, value.rounded() == value {
+            return String(format: "%.0f", value)
         }
         return String(format: "%.2f", value)
     }
