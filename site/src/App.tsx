@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { FAQ } from './components/FAQ';
+import { DefinitionSection, ResourcesSection } from './components/CrawlableSections';
 import { FeatureFlow } from './components/FeatureFlow';
 import { Footer } from './components/Footer';
 import { Header } from './components/Header';
@@ -21,8 +22,10 @@ export function Homepage({ release, onToggleTheme }: HomepageProps): ReactElemen
       <main id="top">
         <Hero release={release} />
         <Overview />
+        <DefinitionSection />
         <FeatureFlow />
         <FAQ />
+        <ResourcesSection />
       </main>
       <Footer />
     </>
