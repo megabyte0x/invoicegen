@@ -8,10 +8,23 @@ const root = dirname(fileURLToPath(import.meta.url));
 const version = readReleaseVersion();
 const dateModified = new Date().toISOString().slice(0, 10);
 
+const cleanResourceRoutes = {
+  '/alternatives/invoice-ninja': '/alternatives/invoice-ninja.html',
+  '/alternatives/manta': '/alternatives/manta.html',
+  '/changelog': '/changelog.html',
+  '/cli': '/cli.html',
+  '/docs/backup-restore': '/docs/backup-restore.html',
+  '/docs/local-first-invoicing': '/docs/local-first-invoicing.html',
+  '/launch-kit': '/launch-kit.html',
+  '/offline-invoice-generator-mac': '/offline-invoice-generator-mac.html',
+  '/open-source-invoice-generator': '/open-source-invoice-generator.html',
+  '/privacy': '/privacy.html',
+} as const;
+
 export default defineConfig({
   root: 'site',
   publicDir: 'public',
-  plugins: [react(), invoicegenHtmlPlaceholders()],
+  plugins: [cleanResourceRoutePlugin(), react(), invoicegenHtmlPlaceholders()],
   define: {
     __INVOICEGEN_VERSION__: JSON.stringify(version),
     __INVOICEGEN_DATE_MODIFIED__: JSON.stringify(dateModified),
@@ -29,6 +42,31 @@ export default defineConfig({
     port: 4173,
   },
 });
+
+function cleanResourceRoutePlugin(): Plugin {
+  const rewrite = (requestUrl: string | undefined): string | undefined => {
+    if (!requestUrl) return requestUrl;
+    const url = new URL(requestUrl, 'http://invoicegen.local');
+    const route = cleanResourceRoutes[url.pathname as keyof typeof cleanResourceRoutes];
+    return route ? `${route}${url.search}` : requestUrl;
+  };
+
+  return {
+    name: 'invoicegen-clean-resource-routes',
+    configureServer(server) {
+      server.middlewares.use((request, _response, next) => {
+        request.url = rewrite(request.url);
+        next();
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((request, _response, next) => {
+        request.url = rewrite(request.url);
+        next();
+      });
+    },
+  };
+}
 
 function invoicegenHtmlPlaceholders(): Plugin {
   return {
