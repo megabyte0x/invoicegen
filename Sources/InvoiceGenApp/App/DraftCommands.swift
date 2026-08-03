@@ -1,11 +1,17 @@
+import Foundation
 import SwiftUI
 
+struct DraftCommandTarget: Equatable {
+    let sceneID: UUID
+    let kind: DraftKind
+}
+
 private struct DraftCommandTargetKey: FocusedValueKey {
-    typealias Value = DraftKind
+    typealias Value = DraftCommandTarget
 }
 
 extension FocusedValues {
-    var draftCommandTarget: DraftKind? {
+    var draftCommandTarget: DraftCommandTarget? {
         get { self[DraftCommandTargetKey.self] }
         set { self[DraftCommandTargetKey.self] = newValue }
     }
@@ -19,7 +25,7 @@ struct DraftCommands: Commands {
         CommandGroup(after: .newItem) {
             Button("Save") { saveFocusedDraft() }
                 .keyboardShortcut("s", modifiers: [.command])
-                .disabled(target.map(model.isDraftDirty) != true)
+                .disabled(target.map { model.isDraftDirty($0.kind) } != true)
 
             Button("Cancel Changes") {
                 if let target {
@@ -35,7 +41,7 @@ struct DraftCommands: Commands {
         guard let target else { return }
 
         do {
-            try model.commitDraft(target)
+            try model.commitDraft(target.kind)
             model.clearEditorIssues()
         } catch let error as EditorCommitError {
             model.presentEditorIssues(error.issues)
@@ -53,9 +59,9 @@ struct FocusedDraftCancellationAlert: ViewModifier {
         content.alert("Discard unsaved changes?", isPresented: isPresented) {
             Button("Discard Changes", role: .destructive) {
                 guard let focusedTarget,
-                      model.draftKindPendingCancellation == focusedTarget else { return }
-                model.cancelDraft(focusedTarget)
-                model.draftKindPendingCancellation = nil
+                      model.draftCommandTargetPendingCancellation == focusedTarget else { return }
+                model.cancelDraft(focusedTarget.kind)
+                model.draftCommandTargetPendingCancellation = nil
             }
             Button("Keep Editing", role: .cancel) {}
         } message: {
@@ -67,13 +73,13 @@ struct FocusedDraftCancellationAlert: ViewModifier {
         Binding(
             get: {
                 guard let focusedTarget else { return false }
-                return model.draftKindPendingCancellation == focusedTarget
+                return model.draftCommandTargetPendingCancellation == focusedTarget
             },
             set: { presented in
                 guard !presented,
                       let focusedTarget,
-                      model.draftKindPendingCancellation == focusedTarget else { return }
-                model.draftKindPendingCancellation = nil
+                      model.draftCommandTargetPendingCancellation == focusedTarget else { return }
+                model.draftCommandTargetPendingCancellation = nil
             }
         )
     }

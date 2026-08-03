@@ -19,8 +19,6 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .focusedSceneValue(\.draftCommandTarget, DraftKind.settings)
-        .modifier(FocusedDraftCancellationAlert(model: model))
         .onAppear(perform: activateSettingsDraft)
         .onChange(of: focusedField) { oldValue, _ in
             if let oldValue {

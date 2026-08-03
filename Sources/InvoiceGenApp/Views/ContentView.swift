@@ -1,9 +1,11 @@
+import Foundation
 import SwiftUI
 import InvoiceCore
 
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var sceneID = UUID()
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -82,19 +84,23 @@ struct ContentView: View {
         )
     }
 
-    private var commandTarget: DraftKind? {
+    private var commandTarget: DraftCommandTarget? {
+        let kind: DraftKind?
+
         switch model.selectedSection {
         case .invoices where model.invoiceDraft != nil:
-            .invoice
+            kind = .invoice
         case .clients where model.clientDraft != nil:
-            .client
+            kind = .client
         case .projects where model.projectDraft != nil:
-            .project
+            kind = .project
         case .settings where model.settingsDraft != nil:
-            .settings
+            kind = .settings
         default:
-            nil
+            kind = nil
         }
+
+        return kind.map { DraftCommandTarget(sceneID: sceneID, kind: $0) }
     }
 
     @ViewBuilder

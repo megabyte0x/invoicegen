@@ -27,19 +27,24 @@ struct InvoiceGenApp: App {
         }
 
         Settings {
-            SettingsView()
-                .environmentObject(model)
-                .onAppear {
-                    activateSettingsDraft()
-                }
+            SettingsSceneRoot(model: model)
         }
         .defaultSize(width: 680, height: 560)
     }
+}
 
-    private func activateSettingsDraft() {
-        if model.settingsDraft == nil {
-            model.beginEditingSettings()
-        }
+private struct SettingsSceneRoot: View {
+    @ObservedObject var model: AppModel
+    @State private var sceneID = UUID()
+
+    var body: some View {
+        SettingsView()
+            .environmentObject(model)
+            .focusedSceneValue(
+                \.draftCommandTarget,
+                DraftCommandTarget(sceneID: sceneID, kind: .settings)
+            )
+            .modifier(FocusedDraftCancellationAlert(model: model))
     }
 }
 

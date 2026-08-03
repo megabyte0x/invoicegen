@@ -48,7 +48,7 @@ final class AppModel: ObservableObject {
     @Published var activeDraftRoute: DraftKind?
     @Published var pendingNavigation: NavigationIntent?
     @Published var dirtyDraftRequiringDecision: DraftKind?
-    @Published var draftKindPendingCancellation: DraftKind?
+    @Published var draftCommandTargetPendingCancellation: DraftCommandTarget?
     @Published var contextualReturnSection: AppSection?
     @Published var editorIssues: [EditorIssue] = []
     @Published var focusedEditorField: EditorField?
@@ -94,13 +94,13 @@ final class AppModel: ObservableObject {
         focusedEditorField = nil
     }
 
-    func requestDraftCancellation(_ kind: DraftKind) {
-        guard isDraftDirty(kind) else {
-            cancelDraft(kind)
+    func requestDraftCancellation(_ target: DraftCommandTarget) {
+        guard isDraftDirty(target.kind) else {
+            cancelDraft(target.kind)
             return
         }
 
-        draftKindPendingCancellation = kind
+        draftCommandTargetPendingCancellation = target
     }
 
     func reload() {
