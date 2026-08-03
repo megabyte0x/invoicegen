@@ -325,9 +325,11 @@ private extension String {
 
 struct RuneyIntegerTextField: View {
     @Binding var value: Int
+    @Binding var draft: String?
+    var validRange: ClosedRange<Int>
     var width: CGFloat? = nil
     var resetID: AnyHashable? = nil
-    @State private var draft: String?
+    var onValidityChange: (Bool) -> Void
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -335,15 +337,15 @@ struct RuneyIntegerTextField: View {
             .runeyFieldInput(width: width)
             .focused($isFocused)
             .onSubmit {
-                resetDraft()
+                clearDraftIfValid()
             }
             .onChange(of: isFocused) { _, newValue in
                 if !newValue {
-                    resetDraft()
+                    clearDraftIfValid()
                 }
             }
             .onChange(of: resetID) { _, _ in
-                resetDraft()
+                draft = nil
             }
     }
 
@@ -357,15 +359,23 @@ struct RuneyIntegerTextField: View {
             },
             set: { newValue in
                 draft = newValue
-                guard let parsed = IntegerTextFieldFormatter.value(from: newValue) else {
+                guard let parsed = IntegerTextFieldFormatter.value(from: newValue),
+                      validRange.contains(parsed) else {
+                    onValidityChange(false)
                     return
                 }
                 value = parsed
+                onValidityChange(true)
             }
         )
     }
 
-    private func resetDraft() {
-        draft = nil
+    private func clearDraftIfValid() {
+        guard let draft,
+              let parsed = IntegerTextFieldFormatter.value(from: draft),
+              validRange.contains(parsed) else {
+            return
+        }
+        self.draft = nil
     }
 }

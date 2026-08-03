@@ -6,6 +6,8 @@ struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
     let sceneID: UUID
     @State private var paymentDetailIDPendingDeletion: UUID?
+    @State private var paymentTermsDraft: String?
+    @State private var inputResetGeneration = 0
     @State private var touchedFields: Set<EditorField> = []
     @State private var suppressNextReplacementDismissalCancellation = false
     @FocusState private var focusedField: EditorField?
@@ -67,6 +69,7 @@ struct SettingsView: View {
 
     private func settingsEditor(session: DraftSession<WorkspaceSettingsDraft>) -> some View {
         let settings = settingsBinding(fallback: session.value)
+        let isDirty = session.isDirty || paymentTermsDraft != nil
 
         return GeometryReader { geometry in
             let padding = WorkspaceContentMetrics.padding(for: geometry.size.width)
@@ -80,13 +83,13 @@ struct SettingsView: View {
                         if contextualInvoiceNumber != nil {
                             Button(returnToInvoiceTitle, action: returnToInvoice)
                                 .buttonStyle(RuneyButtonStyle())
-                                .disabled(session.isDirty)
-                                .help(session.isDirty ? "Save or Cancel business and payment changes before returning." : "")
+                                .disabled(isDirty)
+                                .help(isDirty ? "Save or Cancel business and payment changes before returning." : "")
                         }
 
                         EditorActionBar(
                             title: "Business and payment editor actions",
-                            isDirty: session.isDirty,
+                            isDirty: isDirty,
                             save: saveSettings,
                             cancel: cancelSettings
                         )
@@ -230,7 +233,17 @@ struct SettingsView: View {
 
                 RuneyIntegerTextField(
                     value: settings.businessProfile.paymentTermsDays,
-                    width: 56
+                    draft: $paymentTermsDraft,
+                    validRange: 0...120,
+                    width: 56,
+                    resetID: inputResetGeneration,
+                    onValidityChange: { isValid in
+                        model.updateTransientEditorInputValidity(
+                            field: .paymentTermsDays,
+                            isValid: isValid,
+                            invalidMessage: "Payment terms must be a whole number between 0 and 120 days."
+                        )
+                    }
                 )
                 .font(.system(.body, design: .monospaced))
                 .multilineTextAlignment(.trailing)
@@ -242,7 +255,11 @@ struct SettingsView: View {
             }
             .frame(height: 30)
 
-            if let issue = issueMessage(
+            if let issue = model.transientEditorInputIssue(for: .paymentTermsDays)?.message {
+                Text(issue)
+                    .font(.caption)
+                    .foregroundStyle(Color.runeyDestructive)
+            } else if let issue = issueMessage(
                 for: .paymentTermsDays,
                 settings: settings.wrappedValue
             ) {
@@ -402,6 +419,7 @@ struct SettingsView: View {
 
     private func activateSettingsDraftAfterBookReplacement() {
         paymentDetailIDPendingDeletion = nil
+        resetPaymentTermsInput()
         touchedFields.removeAll()
         focusedField = nil
         if model.settingsDraft == nil {
@@ -440,7 +458,11 @@ struct SettingsView: View {
 
     private func saveSettings() {
         guard let settings = model.settingsDraft?.value else { return }
-        let issues = EditorValidator.settingsIssues(for: settings)
+        var issues = EditorValidator.settingsIssues(for: settings)
+        for issue in model.transientInputIssues(for: .settings)
+        where !issues.contains(where: { $0.field == issue.field }) {
+            issues.append(issue)
+        }
         touchedFields.formUnion(issues.map(\.field))
 
         guard issues.isEmpty else {
@@ -452,6 +474,7 @@ struct SettingsView: View {
         do {
             try model.commitSettingsDraft()
             model.clearEditorIssues()
+            resetPaymentTermsInput()
         } catch let error as EditorCommitError {
             model.presentEditorIssues(error.issues)
             focusedField = error.issues.first?.field
@@ -464,6 +487,7 @@ struct SettingsView: View {
         let wasContextual = contextualInvoiceNumber != nil
         model.cancelSettingsDraft()
         model.clearEditorIssues()
+        resetPaymentTermsInput()
         touchedFields.removeAll()
 
         if wasContextual {
@@ -476,9 +500,16 @@ struct SettingsView: View {
     private func returnToInvoice() {
         guard model.settingsDraft?.isDirty != true else { return }
         model.cancelSettingsDraft()
+        resetPaymentTermsInput()
         model.contextualReturnSection = nil
         model.activeDraftRoute = .invoice
         model.selectedSection = .invoices
+    }
+
+    private func resetPaymentTermsInput() {
+        inputResetGeneration &+= 1
+        paymentTermsDraft = nil
+        model.clearTransientEditorInputIssue(for: .paymentTermsDays)
     }
 
     private func issueMessage(

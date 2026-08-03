@@ -7,15 +7,18 @@ struct InvoicesView: View {
     @State private var isPresentingDetail = false
     @State private var requestedPresentation: InvoiceEditorPresentation = .edit
 
+    private var searchQuery: String {
+        model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var filteredInvoices: [Invoice] {
-        let query = model.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return model.book.invoices
             .filter { invoice in
-                guard !query.isEmpty else { return true }
+                guard !searchQuery.isEmpty else { return true }
                 let clientName = model.book.client(for: invoice)?.name ?? ""
-                return invoice.number.localizedCaseInsensitiveContains(query)
-                    || clientName.localizedCaseInsensitiveContains(query)
-                    || invoice.status.rawValue.localizedCaseInsensitiveContains(query)
+                return invoice.number.localizedCaseInsensitiveContains(searchQuery)
+                    || clientName.localizedCaseInsensitiveContains(searchQuery)
+                    || invoice.status.rawValue.localizedCaseInsensitiveContains(searchQuery)
             }
             .sorted { $0.issueDate > $1.issueDate }
     }
@@ -87,6 +90,17 @@ struct InvoicesView: View {
             }
         }
         .listStyle(.sidebar)
+        .overlay {
+            if !searchQuery.isEmpty, filteredInvoices.isEmpty {
+                ContentUnavailableView {
+                    Label("No matching invoices", systemImage: "magnifyingglass")
+                } description: {
+                    Text("No invoice number, client, or status matches “\(searchQuery)”.")
+                } actions: {
+                    Button("Clear Search") { model.searchText = "" }
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             Button(action: {
                 isPresentingDetail = true

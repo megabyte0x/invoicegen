@@ -219,7 +219,11 @@ extension AppModel {
         var candidate = book
         let savedSettings = session.value
 
-        let issues = EditorValidator.settingsIssues(for: savedSettings)
+        var issues = EditorValidator.settingsIssues(for: savedSettings)
+        for issue in transientInputIssues(for: .settings)
+        where !issues.contains(where: { $0.field == issue.field }) {
+            issues.append(issue)
+        }
         guard issues.isEmpty else {
             throw EditorCommitError(issues: issues)
         }
