@@ -34,6 +34,15 @@ fn run_without_store(args: &[&str]) -> Output {
         .expect("failed to run invoicegen-rs")
 }
 
+fn run_with_home(home: &Path, args: &[&str]) -> Output {
+    Command::new(bin())
+        .env("HOME", home)
+        .env_remove("INVOICEGEN_APP_STORE")
+        .args(args)
+        .output()
+        .expect("failed to run invoicegen-rs")
+}
+
 fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
@@ -379,8 +388,7 @@ fn default_store_paths_are_platform_appropriate_for_packaged_cli() {
     assert_eq!(
         invoicegen_rs::default_store_path_for_environment("macos", &[("HOME", "/Users/ada")]),
         PathBuf::from("/Users/ada")
-            .join("Library")
-            .join("Application Support")
+            .join("Documents")
             .join("InvoiceGen")
             .join("store.json")
     );
@@ -394,6 +402,31 @@ fn default_store_paths_are_platform_appropriate_for_packaged_cli() {
         ),
         PathBuf::from("/home/ada/custom/invoices.json")
     );
+}
+
+#[test]
+fn cli_migrates_legacy_macos_store_to_documents_without_deleting_source() {
+    let home = temp_store("macos-legacy-home")
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let legacy_store = home
+        .join("Library")
+        .join("Application Support")
+        .join("InvoiceGen")
+        .join("store.json");
+    let documents_store = home.join("Documents").join("InvoiceGen").join("store.json");
+
+    assert_success(run(&legacy_store, &["seed-sample", "--force"]));
+    let summary = assert_success(run_with_home(&home, &["summary"]));
+
+    assert!(summary.contains("Total Clients: 2"), "{summary}");
+    assert!(
+        summary.contains(&format!("Store: {}", documents_store.display())),
+        "{summary}"
+    );
+    assert!(documents_store.exists());
+    assert!(legacy_store.exists());
 }
 
 #[test]

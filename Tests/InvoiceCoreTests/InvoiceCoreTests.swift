@@ -361,6 +361,90 @@ final class InvoiceCoreTests: XCTestCase {
         XCTAssertEqual(try store.load().invoices.first?.status, .paid)
     }
 
+    func testMacAppStoreDefaultsToDocumentsInvoiceGen() {
+        let appURL = LocalInvoiceStore.defaultStoreURL(
+            environment: ["HOME": "/Users/ada"]
+        )
+
+        XCTAssertEqual(appURL.path, "/Users/ada/Documents/InvoiceGen/store.json")
+    }
+
+    func testDefaultStoreMigratesLegacyMacStoreWithoutDeletingSource() throws {
+        let homeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let legacyURL = homeURL
+            .appendingPathComponent("Library/Application Support/InvoiceGen", isDirectory: true)
+            .appendingPathComponent("store.json")
+        let documentsURL = homeURL
+            .appendingPathComponent("Documents/InvoiceGen", isDirectory: true)
+            .appendingPathComponent("store.json")
+        try LocalInvoiceStore(url: legacyURL).save(
+            InvoiceBook(businessProfile: BusinessProfile(name: "Legacy Business"))
+        )
+
+        let store = LocalInvoiceStore(
+            fileManager: .default,
+            environment: ["HOME": homeURL.path]
+        )
+        let migrated = try store.load()
+
+        XCTAssertEqual(store.url, documentsURL)
+        XCTAssertEqual(migrated.businessProfile.name, "Legacy Business")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: documentsURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyURL.path))
+    }
+
+    func testDefaultStoreKeepsExistingDocumentsStoreWhenLegacyStoreAlsoExists() throws {
+        let homeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let legacyURL = homeURL
+            .appendingPathComponent("Library/Application Support/InvoiceGen", isDirectory: true)
+            .appendingPathComponent("store.json")
+        let documentsURL = homeURL
+            .appendingPathComponent("Documents/InvoiceGen", isDirectory: true)
+            .appendingPathComponent("store.json")
+        try LocalInvoiceStore(url: legacyURL).save(
+            InvoiceBook(businessProfile: BusinessProfile(name: "Legacy Business"))
+        )
+        try LocalInvoiceStore(url: documentsURL).save(
+            InvoiceBook(businessProfile: BusinessProfile(name: "Current Business"))
+        )
+
+        let store = LocalInvoiceStore(
+            fileManager: .default,
+            environment: ["HOME": homeURL.path]
+        )
+
+        XCTAssertEqual(try store.load().businessProfile.name, "Current Business")
+    }
+
+    func testStoreOverrideDoesNotMigrateLegacyMacStore() throws {
+        let homeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let legacyURL = homeURL
+            .appendingPathComponent("Library/Application Support/InvoiceGen", isDirectory: true)
+            .appendingPathComponent("store.json")
+        let overrideURL = homeURL.appendingPathComponent("custom/store.json")
+        try LocalInvoiceStore(url: legacyURL).save(
+            InvoiceBook(businessProfile: BusinessProfile(name: "Legacy Business"))
+        )
+
+        let store = LocalInvoiceStore(
+            fileManager: .default,
+            environment: [
+                "HOME": homeURL.path,
+                "INVOICEGEN_APP_STORE": overrideURL.path
+            ]
+        )
+
+        XCTAssertEqual(try store.load(), .empty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: overrideURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyURL.path))
+    }
+
     func testAppStoreOverrides() {
         let appURL = LocalInvoiceStore.defaultStoreURL(
             environment: ["INVOICEGEN_APP_STORE": "/tmp/invoicegen-app.json"]

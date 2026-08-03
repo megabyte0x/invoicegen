@@ -24,10 +24,13 @@ remote database.
 ## Data Location
 
 The macOS app uses:
-- `~/Library/Application Support/InvoiceGen/store.json`
+- `~/Documents/InvoiceGen/store.json`
 - set `INVOICEGEN_APP_STORE` only if you want to force a specific app store file
 
-The store is a versioned JSON document written atomically by `InvoiceCore`.
+On first launch after upgrading, InvoiceGen copies an existing store from
+`~/Library/Application Support/InvoiceGen/store.json` when the new location is empty. The legacy
+file is preserved as a fallback. The store is a versioned JSON document written atomically by
+`InvoiceCore`.
 
 ## Build
 

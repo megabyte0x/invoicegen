@@ -14,10 +14,21 @@ public enum LocalInvoiceStoreError: Error, LocalizedError {
 public final class LocalInvoiceStore {
     public let url: URL
     private let fileManager: FileManager
+    private let legacyURL: URL?
 
-    public init(url: URL? = nil, fileManager: FileManager = .default) {
+    public init(
+        url: URL? = nil,
+        fileManager: FileManager = .default,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
         self.fileManager = fileManager
-        self.url = url ?? Self.defaultStoreURL(environment: ProcessInfo.processInfo.environment)
+        if let url {
+            self.url = url
+            self.legacyURL = nil
+        } else {
+            self.url = Self.defaultStoreURL(environment: environment)
+            self.legacyURL = Self.legacyStoreURL(environment: environment)
+        }
     }
 
     public static func defaultStoreURL(environment: [String: String]) -> URL {
@@ -31,14 +42,44 @@ public final class LocalInvoiceStore {
 
     private static func defaultAppStoreURL(environment: [String: String]) -> URL {
         #if os(macOS)
-        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            return appSupport
+        if let home = environment["HOME"], !home.isEmpty {
+            return URL(fileURLWithPath: NSString(string: home).expandingTildeInPath)
+                .appendingPathComponent("Documents", isDirectory: true)
+                .appendingPathComponent("InvoiceGen", isDirectory: true)
+                .appendingPathComponent("store.json")
+        }
+        if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            return documents
                 .appendingPathComponent("InvoiceGen", isDirectory: true)
                 .appendingPathComponent("store.json")
         }
         #endif
 
         return xdgStoreURL(directoryName: "invoicegen-app", environment: environment)
+    }
+
+    private static func legacyStoreURL(environment: [String: String]) -> URL? {
+        if let override = environment["INVOICEGEN_APP_STORE"], !override.isEmpty {
+            return nil
+        }
+
+        #if os(macOS)
+        if let home = environment["HOME"], !home.isEmpty {
+            return URL(fileURLWithPath: NSString(string: home).expandingTildeInPath)
+                .appendingPathComponent("Library/Application Support/InvoiceGen", isDirectory: true)
+                .appendingPathComponent("store.json")
+        }
+        if let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first {
+            return appSupport
+                .appendingPathComponent("InvoiceGen", isDirectory: true)
+                .appendingPathComponent("store.json")
+        }
+        #endif
+
+        return nil
     }
 
     private static func xdgStoreURL(directoryName: String, environment: [String: String]) -> URL {
@@ -54,6 +95,7 @@ public final class LocalInvoiceStore {
     }
 
     public func load() throws -> InvoiceBook {
+        try migrateLegacyStoreIfNeeded()
         guard fileManager.fileExists(atPath: url.path) else {
             return .empty
         }
@@ -65,6 +107,20 @@ public final class LocalInvoiceStore {
         book.schemaVersion = InvoiceBook.currentSchemaVersion
         book.refreshInvoiceStatuses()
         return book
+    }
+
+    private func migrateLegacyStoreIfNeeded() throws {
+        guard !fileManager.fileExists(atPath: url.path),
+              let legacyURL,
+              fileManager.fileExists(atPath: legacyURL.path) else { return }
+
+        let data = try Data(contentsOf: legacyURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var book = try decoder.decode(InvoiceBook.self, from: data)
+        book.schemaVersion = InvoiceBook.currentSchemaVersion
+        book.refreshInvoiceStatuses()
+        try save(book)
     }
 
     public func save(_ book: InvoiceBook) throws {
