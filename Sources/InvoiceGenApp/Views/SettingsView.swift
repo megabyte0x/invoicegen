@@ -19,6 +19,9 @@ struct SettingsView: View {
             }
         }
         .onAppear(perform: activateSettingsDraft)
+        .onDisappear {
+            model.cancelStoreReplacement(from: sceneID)
+        }
         .onChange(of: model.storeReplacementGeneration) { _, _ in
             activateSettingsDraftAfterBookReplacement()
         }
@@ -412,7 +415,11 @@ struct SettingsView: View {
     private var replacementConfirmationPresented: Binding<Bool> {
         Binding(
             get: { scenePendingStoreReplacement != nil },
-            set: { _ in }
+            set: { isPresented in
+                if !isPresented {
+                    model.cancelStoreReplacement(from: sceneID)
+                }
+            }
         )
     }
 
