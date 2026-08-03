@@ -141,6 +141,10 @@ struct InvoiceEditorView: View {
         session: DraftSession<Invoice>
     ) -> some View {
         GeometryReader { geometry in
+            let padding = WorkspaceContentMetrics.padding(for: geometry.size.width)
+            let contentWidth = WorkspaceContentMetrics.contentWidth(for: geometry.size.width)
+            let fieldRowWidth = max(0, contentWidth - (padding * 2) - 32)
+
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -153,12 +157,12 @@ struct InvoiceEditorView: View {
                             cancel: cancelInvoice
                         )
 
-                        invoiceDetailsCard(invoice: invoice, availableWidth: geometry.size.width)
+                        invoiceDetailsCard(invoice: invoice, availableWidth: fieldRowWidth)
                         automaticGenerationCard(invoice: invoice)
                         lineItemsCard(
                             invoice: invoice,
                             proxy: proxy,
-                            availableWidth: geometry.size.width
+                            availableWidth: fieldRowWidth
                         )
                         notesAndTermsCard(invoice: invoice)
                         paymentAcceptanceCard(invoice: invoice)
@@ -179,8 +183,8 @@ struct InvoiceEditorView: View {
                             .padding(.bottom, 24)
                         }
                     }
-                    .padding(20)
-                    .frame(maxWidth: 760, alignment: .topLeading)
+                    .padding(padding)
+                    .responsiveEditorFrame(availableWidth: geometry.size.width)
                 }
                 .onChange(of: model.focusedEditorField) { _, field in
                     guard let itemID = lineItemID(from: field) else { return }

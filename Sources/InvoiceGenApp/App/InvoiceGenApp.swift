@@ -11,7 +11,6 @@ struct InvoiceGenApp: App {
         WindowGroup("Local Invoice", id: "main") {
             ContentView()
                 .environmentObject(model)
-                .frame(minWidth: 900, minHeight: 640)
         }
         .defaultSize(width: 1180, height: 760)
         .commands {
@@ -39,11 +38,11 @@ struct InvoiceGenApp: App {
         Settings {
             SettingsView()
                 .environmentObject(model)
-                .frame(width: 680)
                 .onAppear {
                     activateSettingsDraft()
                 }
         }
+        .defaultSize(width: 680, height: 560)
     }
 
     private func commitActiveDraft() {

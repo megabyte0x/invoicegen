@@ -147,6 +147,10 @@ struct ProjectEditorView: View {
         let project = draftProjectBinding(fallback: session.value)
 
         return GeometryReader { geometry in
+            let padding = WorkspaceContentMetrics.padding(for: geometry.size.width)
+            let contentWidth = WorkspaceContentMetrics.contentWidth(for: geometry.size.width)
+            let fieldRowWidth = max(0, contentWidth - (padding * 2) - 32)
+
             ScrollView {
                 VStack(spacing: 24) {
                     EditorActionBar(
@@ -162,12 +166,12 @@ struct ProjectEditorView: View {
                             .foregroundStyle(Color.runeyPrimary)
 
                         VStack(alignment: .leading, spacing: 14) {
-                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                            AdaptiveFieldRow(availableWidth: fieldRowWidth) {
                                 projectNameField(project: project)
                                 clientAssignmentField(project: project)
                             }
 
-                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                            AdaptiveFieldRow(availableWidth: fieldRowWidth) {
                                 hourlyRateField(project: project)
                                 runeyField("Project Summary", text: project.summary, isMultiline: true)
                             }
@@ -188,9 +192,8 @@ struct ProjectEditorView: View {
                         .runeyCard()
                     }
                 }
-                .padding(24)
-                .frame(maxWidth: 860, alignment: .topLeading)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(padding)
+                .responsiveEditorFrame(availableWidth: geometry.size.width)
             }
         }
         .navigationTitle(project.wrappedValue.name)

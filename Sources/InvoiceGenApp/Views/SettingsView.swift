@@ -77,6 +77,11 @@ struct SettingsView: View {
         let settings = settingsBinding(fallback: session.value)
 
         return GeometryReader { geometry in
+            let padding = WorkspaceContentMetrics.padding(for: geometry.size.width)
+            let contentWidth = WorkspaceContentMetrics.contentWidth(for: geometry.size.width)
+            let fieldRowWidth = max(0, contentWidth - (padding * 2) - 32)
+            let paymentDetailFieldRowWidth = max(0, fieldRowWidth - 24)
+
             ScrollView {
                 VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 10) {
@@ -101,17 +106,17 @@ struct SettingsView: View {
                             .foregroundStyle(Color.runeyPrimary)
 
                         VStack(alignment: .leading, spacing: 14) {
-                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                            AdaptiveFieldRow(availableWidth: fieldRowWidth) {
                                 businessNameField(settings: settings)
                                 businessEmailField(settings: settings)
                             }
 
-                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                            AdaptiveFieldRow(availableWidth: fieldRowWidth) {
                                 businessTaxIdentifierField(settings: settings)
                                 businessCurrencyField(settings: settings)
                             }
 
-                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                            AdaptiveFieldRow(availableWidth: fieldRowWidth) {
                                 businessAddressField(settings: settings)
                                 paymentTermsField(settings: settings)
                             }
@@ -120,26 +125,25 @@ struct SettingsView: View {
                     .runeyCard()
 
                     VStack(alignment: .leading, spacing: 16) {
-                        HStack(alignment: .center, spacing: 12) {
-                            Text("Payment Acceptance Details")
-                                .font(.headline)
-                                .foregroundStyle(Color.runeyPrimary)
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .center, spacing: 12) {
+                                Text("Payment Acceptance Details")
+                                    .font(.headline)
+                                    .foregroundStyle(Color.runeyPrimary)
 
-                            Spacer()
+                                Spacer()
 
-                            Button {
-                                model.addPaymentAcceptanceDetail(kind: .bankDetails)
-                            } label: {
-                                Label("Add Bank Details", systemImage: "building.columns")
+                                paymentAcceptanceAddActions
                             }
-                            .buttonStyle(RuneyButtonStyle())
 
-                            Button {
-                                model.addPaymentAcceptanceDetail(kind: .cryptocurrency)
-                            } label: {
-                                Label("Add Cryptocurrency", systemImage: "bitcoinsign.circle")
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Payment Acceptance Details")
+                                    .font(.headline)
+                                    .foregroundStyle(Color.runeyPrimary)
+
+                                paymentAcceptanceAddActions
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .buttonStyle(RuneyButtonStyle())
                         }
 
                         if settings.wrappedValue.paymentAcceptanceDetails.isEmpty {
@@ -158,7 +162,7 @@ struct SettingsView: View {
                                             for: .paymentDetailLabel(detailID),
                                             settings: settings.wrappedValue
                                         ),
-                                        availableWidth: geometry.size.width,
+                                        availableWidth: paymentDetailFieldRowWidth,
                                         focusedField: $focusedField,
                                         onDelete: { paymentDetailIDPendingDeletion = detailID }
                                     )
@@ -170,9 +174,8 @@ struct SettingsView: View {
 
                     localStorageCard
                 }
-                .padding(24)
-                .frame(maxWidth: 980, alignment: .topLeading)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(padding)
+                .responsiveEditorFrame(availableWidth: geometry.size.width)
             }
         }
     }
@@ -280,63 +283,86 @@ struct SettingsView: View {
                     }
             }
 
-            HStack(spacing: 12) {
-                Button {
-                    model.reload()
-                    model.beginEditingSettings()
-                } label: {
-                    Label("Reload From Disk", systemImage: "arrow.clockwise")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    storageActionButtons
                 }
-                .buttonStyle(RuneyButtonStyle())
-                .disabled(model.settingsDraft?.isDirty == true)
-                .help(
-                    model.settingsDraft?.isDirty == true
-                        ? "Save or Cancel business and payment changes before reloading."
-                        : "Reload the local store from disk."
-                )
 
-                Button(action: exportStoreBackup) {
-                    Label("Export Backup", systemImage: "square.and.arrow.up")
+                VStack(alignment: .leading, spacing: 10) {
+                    storageActionButtons
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(RuneyButtonStyle())
-
-                Button(action: chooseStoreBackupToRestore) {
-                    Label("Restore Backup", systemImage: "arrow.down.doc")
-                }
-                .buttonStyle(RuneyButtonStyle())
-
-                Button {
-                    isConfirmingSeedSampleData = true
-                } label: {
-                    Label("Seed Sample Data", systemImage: "doc.text.fill.badge.plus")
-                }
-                .buttonStyle(RuneyButtonStyle(variant: .prominent))
-
-                Spacer()
-            }
-
-            HStack(spacing: 12) {
-                Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([model.store.url])
-                } label: {
-                    Label("Open Store Folder", systemImage: "folder")
-                }
-                .buttonStyle(RuneyButtonStyle())
-
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(model.store.url.path, forType: .string)
-                    model.errorMessage = "Copied local store path."
-                } label: {
-                    Label("Copy Store Path", systemImage: "doc.on.doc")
-                }
-                .buttonStyle(RuneyButtonStyle())
-
-                Spacer()
             }
             .padding(.top, 4)
         }
         .runeyCard()
+    }
+
+    @ViewBuilder
+    private var paymentAcceptanceAddActions: some View {
+        Button {
+            model.addPaymentAcceptanceDetail(kind: .bankDetails)
+        } label: {
+            Label("Add Bank Details", systemImage: "building.columns")
+        }
+        .buttonStyle(RuneyButtonStyle())
+
+        Button {
+            model.addPaymentAcceptanceDetail(kind: .cryptocurrency)
+        } label: {
+            Label("Add Cryptocurrency", systemImage: "bitcoinsign.circle")
+        }
+        .buttonStyle(RuneyButtonStyle())
+    }
+
+    @ViewBuilder
+    private var storageActionButtons: some View {
+        Button {
+            model.reload()
+            model.beginEditingSettings()
+        } label: {
+            Label("Reload From Disk", systemImage: "arrow.clockwise")
+        }
+        .buttonStyle(RuneyButtonStyle())
+        .disabled(model.settingsDraft?.isDirty == true)
+        .help(
+            model.settingsDraft?.isDirty == true
+                ? "Save or Cancel business and payment changes before reloading."
+                : "Reload the local store from disk."
+        )
+
+        Button(action: exportStoreBackup) {
+            Label("Export Backup", systemImage: "square.and.arrow.up")
+        }
+        .buttonStyle(RuneyButtonStyle())
+
+        Button(action: chooseStoreBackupToRestore) {
+            Label("Restore Backup", systemImage: "arrow.down.doc")
+        }
+        .buttonStyle(RuneyButtonStyle())
+
+        Button {
+            NSWorkspace.shared.activateFileViewerSelecting([model.store.url])
+        } label: {
+            Label("Open Store Folder", systemImage: "folder")
+        }
+        .buttonStyle(RuneyButtonStyle())
+
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(model.store.url.path, forType: .string)
+            model.errorMessage = "Copied local store path."
+        } label: {
+            Label("Copy Store Path", systemImage: "doc.on.doc")
+        }
+        .buttonStyle(RuneyButtonStyle())
+
+        Button {
+            isConfirmingSeedSampleData = true
+        } label: {
+            Label("Seed Sample Data", systemImage: "doc.text.fill.badge.plus")
+        }
+        .buttonStyle(RuneyButtonStyle(variant: .prominent))
     }
 
     private func settingsBinding(fallback: WorkspaceSettingsDraft) -> Binding<WorkspaceSettingsDraft> {

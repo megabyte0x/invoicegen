@@ -170,6 +170,10 @@ struct ClientEditorView: View {
         let client = draftClientBinding(fallback: session.value)
 
         return GeometryReader { geometry in
+            let padding = WorkspaceContentMetrics.padding(for: geometry.size.width)
+            let contentWidth = WorkspaceContentMetrics.contentWidth(for: geometry.size.width)
+            let fieldRowWidth = max(0, contentWidth - (padding * 2) - 32)
+
             ScrollView {
                 VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 10) {
@@ -194,7 +198,7 @@ struct ClientEditorView: View {
                             .foregroundStyle(Color.runeyPrimary)
 
                         VStack(alignment: .leading, spacing: 14) {
-                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                            AdaptiveFieldRow(availableWidth: fieldRowWidth) {
                                 runeyField(
                                     "Client Name",
                                     text: client.name,
@@ -204,7 +208,7 @@ struct ClientEditorView: View {
                                 runeyField("Company / Organization", text: client.company)
                             }
 
-                            AdaptiveFieldRow(availableWidth: geometry.size.width) {
+                            AdaptiveFieldRow(availableWidth: fieldRowWidth) {
                                 runeyField("Email Address", text: client.email)
                                 runeyField("Billing Address", text: client.address, isMultiline: true)
                             }
@@ -234,9 +238,8 @@ struct ClientEditorView: View {
                         .runeyCard()
                     }
                 }
-                .padding(24)
-                .frame(maxWidth: 860, alignment: .topLeading)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(padding)
+                .responsiveEditorFrame(availableWidth: geometry.size.width)
             }
         }
         .navigationTitle(client.wrappedValue.name)
